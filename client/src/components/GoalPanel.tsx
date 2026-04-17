@@ -34,13 +34,11 @@ export function GoalPanel({ goals, setGoals, send }: Props) {
   const handleSave = () => {
     if (!editingGoal || !editingGoal.name.trim()) return;
     if (editingGoal.id) {
-      // update
       setGoals((prev) =>
         prev.map((g) => (g.id === editingGoal.id ? editingGoal : g)),
       );
       send({ type: "goal_edit", goal: editingGoal });
     } else {
-      // create
       const newGoal = { ...editingGoal, id: generateId() };
       setGoals((prev) => [...prev, newGoal]);
       send({ type: "goal_add", goal: newGoal });
@@ -82,64 +80,69 @@ export function GoalPanel({ goals, setGoals, send }: Props) {
 
   return (
     <div className="goal-panel">
-      <div className="goal-panel-header">
-        <h2 className="goal-panel-title">目標一覧</h2>
-        <button className="goal-add-btn" onClick={openNew}>
-          + 新しい目標
-        </button>
+      <div className="page-head">
+        <div className="page-head-title-wrap">
+          <h1 className="page-title">目標管理</h1>
+          <div className="page-subtitle">
+            {goals.length} goal{goals.length === 1 ? "" : "s"} tracked
+          </div>
+        </div>
+        <div className="page-actions">
+          <button className="btn btn--primary" onClick={openNew}>
+            + 新しい目標
+          </button>
+        </div>
       </div>
 
-      {/* 目標カード一覧 */}
-      <div className="goal-list">
-        {goals.length === 0 && !showForm && (
-          <div className="goal-empty">
-            目標がまだありません。「+ 新しい目標」から追加できます。
-          </div>
-        )}
-        {goals.map((goal) => (
-          <div key={goal.id} className="goal-card">
-            <div className="goal-card-header">
-              <div className="goal-card-name">{goal.name}</div>
-              <div className="goal-card-actions">
-                <button
-                  className="goal-card-action"
-                  onClick={() => openEdit(goal)}
-                  title="編集"
-                >
-                  &#9998;
-                </button>
-                <button
-                  className="goal-card-action goal-card-action--delete"
-                  onClick={() => handleDelete(goal.id)}
-                  title="削除"
-                >
-                  &times;
-                </button>
-              </div>
+      <div className="page-body">
+        <div className="goal-list">
+          {goals.length === 0 && !showForm && (
+            <div className="goal-empty">
+              目標がまだありません。「+ 新しい目標」から追加できます。
             </div>
-            {goal.deadline && (
-              <div className="goal-card-meta">期日: {goal.deadline}</div>
-            )}
-            {goal.memo && (
-              <div className="goal-card-memo">{goal.memo}</div>
-            )}
-            {goal.kpis.length > 0 && (
-              <div className="goal-card-kpis">
-                {goal.kpis.map((kpi) => (
-                  <div key={kpi.id} className="goal-kpi-chip">
-                    <span className="goal-kpi-name">{kpi.name}</span>
-                    {kpi.value && (
-                      <span className="goal-kpi-value">{kpi.value}</span>
-                    )}
-                  </div>
-                ))}
+          )}
+          {goals.map((goal) => (
+            <div key={goal.id} className="goal-card">
+              <div className="goal-card-header">
+                <div className="goal-card-name">{goal.name}</div>
+                <div className="goal-card-actions">
+                  <button
+                    className="goal-card-action"
+                    onClick={() => openEdit(goal)}
+                    title="編集"
+                  >
+                    &#9998;
+                  </button>
+                  <button
+                    className="goal-card-action goal-card-action--delete"
+                    onClick={() => handleDelete(goal.id)}
+                    title="削除"
+                  >
+                    &times;
+                  </button>
+                </div>
               </div>
-            )}
-          </div>
-        ))}
+              {goal.deadline && (
+                <div className="goal-card-meta">期日: {goal.deadline}</div>
+              )}
+              {goal.memo && <div className="goal-card-memo">{goal.memo}</div>}
+              {goal.kpis.length > 0 && (
+                <div className="goal-card-kpis">
+                  {goal.kpis.map((kpi) => (
+                    <div key={kpi.id} className="goal-kpi-chip">
+                      <span className="goal-kpi-name">{kpi.name}</span>
+                      {kpi.value && (
+                        <span className="goal-kpi-value">{kpi.value}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* 編集フォーム (モーダル) */}
       {showForm && editingGoal && (
         <div className="modal-overlay" onClick={() => setShowForm(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>

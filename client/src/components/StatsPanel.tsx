@@ -11,15 +11,13 @@ interface Props {
 type Period = "day" | "month" | "year";
 
 const COLORS = [
-  "#9a5b2f", "#6366f1", "#d4a24e", "#10b981", "#f43f5e",
-  "#8b5cf6", "#0ea5e9", "#f59e0b", "#64748b", "#ec4899",
+  "#8a5ff0", "#6366f1", "#d4a24e", "#10b981", "#f43f5e",
+  "#06b6d4", "#0ea5e9", "#f59e0b", "#64748b", "#ec4899",
 ];
 
 function getColor(i: number) {
   return COLORS[i % COLORS.length];
 }
-
-// --- Period helpers ---
 
 function formatPeriodLabel(date: Date, period: Period): string {
   if (period === "day") {
@@ -94,7 +92,6 @@ function aggregateByGoalAndPeriod(
   const periods = generatePeriods(period);
   const goalMap = new Map(goals.map((g) => [g.id, g.name]));
 
-  // Collect all logs
   const allLogs: (TimeLog & { goalId: string })[] = [];
   for (const task of tasks) {
     for (const log of task.timeLogs) {
@@ -102,7 +99,6 @@ function aggregateByGoalAndPeriod(
     }
   }
 
-  // goalId → periodKey → seconds
   const data: Record<string, Record<string, number>> = {};
   const goalIds = new Set<string>();
 
@@ -127,7 +123,6 @@ function aggregateByGoalAndPeriod(
   return { periods, data, goalList };
 }
 
-// --- Pie Chart ---
 function PieChart({ slices }: { slices: { label: string; value: number; color: string }[] }) {
   const total = slices.reduce((s, d) => s + d.value, 0);
   if (total === 0) {
@@ -154,7 +149,7 @@ function PieChart({ slices }: { slices: { label: string; value: number; color: s
     <div className="pie-chart-wrap">
       <svg viewBox="0 0 200 200" className="pie-chart-svg">
         {paths.map((p, i) => (
-          <path key={i} d={p.d} fill={p.color} stroke="white" strokeWidth="2" />
+          <path key={i} d={p.d} fill={p.color} />
         ))}
       </svg>
       <div className="pie-legend">
@@ -172,7 +167,6 @@ function PieChart({ slices }: { slices: { label: string; value: number; color: s
   );
 }
 
-// --- Bar Chart ---
 function BarChart({
   periods,
   data,
@@ -182,7 +176,6 @@ function BarChart({
   data: Record<string, Record<string, number>>;
   goalList: { id: string; name: string }[];
 }) {
-  // Find max value for scaling
   let maxVal = 0;
   for (const p of periods) {
     let sum = 0;
@@ -203,17 +196,22 @@ function BarChart({
     <div className="bar-chart-wrap">
       <div className="bar-chart">
         {periods.map((p) => {
-          let y = 0;
           const segments: { goalId: string; height: number; color: string }[] = [];
           for (let gi = 0; gi < goalList.length; gi++) {
             const val = data[goalList[gi].id]?.[p.key] || 0;
             if (val > 0) {
               const h = (val / maxVal) * chartH;
-              segments.push({ goalId: goalList[gi].id, height: h, color: getColor(gi) });
-              y += h;
+              segments.push({
+                goalId: goalList[gi].id,
+                height: h,
+                color: getColor(gi),
+              });
             }
           }
-          const totalSec = goalList.reduce((s, g) => s + (data[g.id]?.[p.key] || 0), 0);
+          const totalSec = goalList.reduce(
+            (s, g) => s + (data[g.id]?.[p.key] || 0),
+            0,
+          );
           return (
             <div key={p.key} className="bar-column" style={{ width: barW }}>
               <div className="bar-stack" style={{ height: chartH }}>
@@ -221,10 +219,7 @@ function BarChart({
                   <div
                     key={i}
                     className="bar-segment"
-                    style={{
-                      height: seg.height,
-                      background: seg.color,
-                    }}
+                    style={{ height: seg.height, background: seg.color }}
                     title={`${goalList.find((g) => g.id === seg.goalId)?.name}: ${formatDuration(
                       data[seg.goalId]?.[p.key] || 0,
                     )}`}
@@ -242,7 +237,10 @@ function BarChart({
       <div className="bar-legend">
         {goalList.map((g, i) => (
           <div key={g.id} className="pie-legend-item">
-            <span className="pie-legend-dot" style={{ background: getColor(i) }} />
+            <span
+              className="pie-legend-dot"
+              style={{ background: getColor(i) }}
+            />
             <span className="pie-legend-label">{g.name}</span>
           </div>
         ))}
@@ -254,12 +252,10 @@ function BarChart({
 export function StatsPanel({ tasks, goals, tick: _tick }: Props) {
   const [period, setPeriod] = useState<Period>("day");
 
-  // Pie: total time by goal
   const goalTimeMap: Record<string, number> = {};
   for (const task of tasks) {
     const gId = task.goalId || "__none__";
     goalTimeMap[gId] = (goalTimeMap[gId] || 0) + task.timeSpent;
-    // Include running timer
     if (task.timerStartedAt) {
       const running = Math.floor(
         (Date.now() - new Date(task.timerStartedAt).getTime()) / 1000,
@@ -277,55 +273,79 @@ export function StatsPanel({ tasks, goals, tick: _tick }: Props) {
       color: getColor(i),
     }));
 
-  // Bar: by period
-  const { periods, data, goalList } = aggregateByGoalAndPeriod(tasks, goals, period);
+  const { periods, data, goalList } = aggregateByGoalAndPeriod(
+    tasks,
+    goals,
+    period,
+  );
 
   const totalTime = Object.values(goalTimeMap).reduce((s, v) => s + v, 0);
   const completedCount = tasks.filter((t) => t.completedAt).length;
 
   return (
     <div className="stats-panel">
-      <div className="stats-header">
-        <h2 className="stats-title">統計</h2>
-      </div>
-
-      <div className="stats-summary">
-        <div className="stats-summary-card">
-          <div className="stats-summary-value">{formatDuration(totalTime)}</div>
-          <div className="stats-summary-label">合計作業時間</div>
-        </div>
-        <div className="stats-summary-card">
-          <div className="stats-summary-value">{completedCount}</div>
-          <div className="stats-summary-label">完了タスク</div>
-        </div>
-        <div className="stats-summary-card">
-          <div className="stats-summary-value">{tasks.length}</div>
-          <div className="stats-summary-label">全タスク</div>
+      <div className="page-head">
+        <div className="page-head-title-wrap">
+          <h1 className="page-title">統計</h1>
+          <div className="page-subtitle">作業時間と目標の推移を可視化</div>
         </div>
       </div>
 
-      <section className="stats-section">
-        <h3 className="stats-section-title">目標別 作業時間</h3>
-        <PieChart slices={pieSlices} />
-      </section>
-
-      <section className="stats-section">
-        <div className="stats-section-header">
-          <h3 className="stats-section-title">作業時間の推移</h3>
-          <div className="stats-period-tabs">
-            {(["day", "month", "year"] as const).map((p) => (
-              <button
-                key={p}
-                className={`stats-period-tab ${period === p ? "stats-period-tab--active" : ""}`}
-                onClick={() => setPeriod(p)}
-              >
-                {p === "day" ? "日" : p === "month" ? "月" : "年"}
-              </button>
-            ))}
+      <div className="page-body">
+        <div className="stats-summary">
+          <div className="widget">
+            <div className="kpi-tile">
+              <div className="kpi-label">合計作業時間</div>
+              <div className="kpi-value kpi-value--accent">
+                {formatDuration(totalTime)}
+              </div>
+            </div>
+          </div>
+          <div className="widget">
+            <div className="kpi-tile">
+              <div className="kpi-label">完了タスク</div>
+              <div className="kpi-value">{completedCount}</div>
+            </div>
+          </div>
+          <div className="widget">
+            <div className="kpi-tile">
+              <div className="kpi-label">全タスク</div>
+              <div className="kpi-value">{tasks.length}</div>
+            </div>
           </div>
         </div>
-        <BarChart periods={periods} data={data} goalList={goalList} />
-      </section>
+
+        <div className="overview-grid">
+          <div className="widget col-6">
+            <div className="widget-head">
+              <span className="widget-title">目標別 作業時間</span>
+            </div>
+            <div className="widget-body">
+              <PieChart slices={pieSlices} />
+            </div>
+          </div>
+
+          <div className="widget col-6">
+            <div className="widget-head">
+              <span className="widget-title">作業時間の推移</span>
+              <div className="stats-period-tabs">
+                {(["day", "month", "year"] as const).map((p) => (
+                  <button
+                    key={p}
+                    className={`stats-period-tab ${period === p ? "stats-period-tab--active" : ""}`}
+                    onClick={() => setPeriod(p)}
+                  >
+                    {p === "day" ? "日" : p === "month" ? "月" : "年"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="widget-body">
+              <BarChart periods={periods} data={data} goalList={goalList} />
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

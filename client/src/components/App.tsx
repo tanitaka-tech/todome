@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { AskUserRequest, ChatMessage, Goal, KanbanTask, UserProfile, WSMessage } from "../types";
+import type {
+  AskUserRequest,
+  ChatMessage,
+  Goal,
+  KanbanTask,
+  UserProfile,
+  WSMessage,
+} from "../types";
 import { formatDuration, totalSeconds } from "../types";
+import { applyTheme, getInitialTheme, type ThemeName } from "../theme";
 import { useWebSocket } from "../hooks/useWebSocket";
 import { KanbanBoard } from "./KanbanBoard";
 import { ChatPanel } from "./ChatPanel";
@@ -8,13 +16,21 @@ import { TaskDetailModal } from "./TaskDetailModal";
 import { GoalPanel } from "./GoalPanel";
 import { ProfilePanel } from "./ProfilePanel";
 import { StatsPanel } from "./StatsPanel";
+import { OverviewPanel } from "./OverviewPanel";
+import { SettingsPanel } from "./SettingsPanel";
 
 let msgId = 0;
 const nextId = () => String(++msgId);
 
 const TOOL_PREFIX = "\x00tool:";
 
-type ActiveView = "board" | "goals" | "profile" | "stats";
+type ActiveView =
+  | "overview"
+  | "board"
+  | "goals"
+  | "stats"
+  | "profile"
+  | "settings";
 
 const EMPTY_PROFILE: UserProfile = {
   currentState: "",
@@ -42,6 +58,29 @@ interface Celebration {
 
 let celebrationId = 0;
 
+const NAV_ITEMS: {
+  id: ActiveView;
+  label: string;
+  icon: string;
+  group: "work" | "app";
+}[] = [
+  { id: "overview", label: "Overview", icon: "▦", group: "work" },
+  { id: "board", label: "ボード", icon: "▤", group: "work" },
+  { id: "goals", label: "目標", icon: "◎", group: "work" },
+  { id: "stats", label: "統計", icon: "▨", group: "work" },
+  { id: "profile", label: "自分について", icon: "◉", group: "work" },
+  { id: "settings", label: "設定", icon: "⚙", group: "app" },
+];
+
+const VIEW_LABEL: Record<ActiveView, string> = {
+  overview: "Overview",
+  board: "ボード",
+  goals: "目標管理",
+  stats: "統計",
+  profile: "自分について",
+  settings: "設定",
+};
+
 export function App() {
   const [tasks, setTasks] = useState<KanbanTask[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
@@ -52,10 +91,15 @@ export function App() {
   const [askRequests, setAskRequests] = useState<AskUserRequest[]>([]);
   const [waiting, setWaiting] = useState(false);
   const [selectedTask, setSelectedTask] = useState<KanbanTask | null>(null);
-  const [activeView, setActiveView] = useState<ActiveView>("board");
+  const [activeView, setActiveView] = useState<ActiveView>("overview");
   const [tick, setTick] = useState(0);
   const [popupTaskId, setPopupTaskId] = useState<string | null>(null);
   const [celebrations, setCelebrations] = useState<Celebration[]>([]);
+  const [theme, setThemeState] = useState<ThemeName>(() => getInitialTheme());
+
+  useEffect(() => {
+    applyTheme(theme);
+  }, [theme]);
 
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 1000);
@@ -64,7 +108,11 @@ export function App() {
 
   const showCelebration = useCallback((title: string, timeSpent: number) => {
     const id = ++celebrationId;
-    const entry: Celebration = { id, title, duration: formatDuration(timeSpent) };
+    const entry: Celebration = {
+      id,
+      title,
+      duration: formatDuration(timeSpent),
+    };
     setCelebrations((p) => [...p, entry]);
     setTimeout(() => {
       setCelebrations((p) => p.filter((c) => c.id !== id));
@@ -81,10 +129,14 @@ export function App() {
         setStreamText((p) => p + msg.text);
         break;
       case "tool_use": {
-        const hasGoalOp = msg.input?.includes("GOAL_ADD:") || msg.input?.includes("GOAL_UPDATE:");
+        const hasGoalOp =
+          msg.input?.includes("GOAL_ADD:") ||
+          msg.input?.includes("GOAL_UPDATE:");
         const label =
           msg.name === "TodoWrite"
-            ? hasGoalOp ? "ボード・目標を更新中" : "ボードを更新中"
+            ? hasGoalOp
+              ? "ボード・目標を更新中"
+              : "ボードを更新中"
             : msg.name === "AskUserQuestion"
               ? ""
               : `${msg.name} を実行中`;
@@ -205,18 +257,17 @@ export function App() {
         const now = new Date().toISOString();
 
         if (task.timerStartedAt) {
-          // 一時停止 — popupTaskId はそのまま
           const stopped = stopTask(task, now);
           return prev.map((t) => (t.id === taskId ? stopped : t));
         } else {
-          // 他に計測中があれば先に停止
           let next = prev;
-          const running = prev.find((t) => t.timerStartedAt && t.id !== taskId);
+          const running = prev.find(
+            (t) => t.timerStartedAt && t.id !== taskId,
+          );
           if (running) {
             const stopped = stopTask(running, now);
             next = next.map((t) => (t.id === running.id ? stopped : t));
           }
-          // 新タスクを開始
           const updated = {
             ...next.find((t) => t.id === taskId)!,
             timerStartedAt: now,
@@ -241,7 +292,11 @@ export function App() {
           const elapsed = Math.floor(
             (Date.now() - new Date(task.timerStartedAt).getTime()) / 1000,
           );
-          const log = { start: task.timerStartedAt, end: now, duration: elapsed };
+          const log = {
+            start: task.timerStartedAt,
+            end: now,
+            duration: elapsed,
+          };
           updated = {
             ...updated,
             timeSpent: task.timeSpent + elapsed,
@@ -265,7 +320,6 @@ export function App() {
           timeLogs: updated.timeLogs,
         });
 
-        // 完了時に褒め演出 + ポップアップを閉じる
         if (column === "done") {
           showCelebration(updated.title, updated.timeSpent);
           setPopupTaskId(null);
@@ -277,11 +331,6 @@ export function App() {
     [send, showCelebration],
   );
 
-  const toggleView = (view: ActiveView) => {
-    setActiveView((cur) => (cur === view ? "board" : view));
-  };
-
-  // ポップアップに表示するタスクを取得
   const popupTask = useMemo(() => {
     if (!popupTaskId) return undefined;
     return tasks.find((t) => t.id === popupTaskId);
@@ -295,44 +344,89 @@ export function App() {
 
   const isPopupRunning = !!popupTask?.timerStartedAt;
 
+  const workNav = NAV_ITEMS.filter((n) => n.group === "work");
+  const appNav = NAV_ITEMS.filter((n) => n.group === "app");
+
   return (
-    <div className="app-layout">
-      <div className="topbar">
-        <div className="topbar-title">todome</div>
-        <div className="topbar-subtitle">TODO管理 + AIエージェント</div>
-        <div className="topbar-tabs">
-          <button
-            className={`topbar-tab ${activeView === "goals" ? "topbar-tab--active" : ""}`}
-            onClick={() => toggleView("goals")}
-          >
-            目標管理
-          </button>
-          <button
-            className={`topbar-tab ${activeView === "stats" ? "topbar-tab--active" : ""}`}
-            onClick={() => toggleView("stats")}
-          >
-            統計
-          </button>
-          <button
-            className={`topbar-tab ${activeView === "profile" ? "topbar-tab--active" : ""}`}
-            onClick={() => toggleView("profile")}
-          >
-            自分について
-          </button>
+    <div className="app-shell">
+      {/* === Sidebar === */}
+      <aside className="sidebar">
+        <div className="sidebar-brand">
+          <div className="sidebar-brand-mark">t</div>
+          <div>
+            <div className="sidebar-brand-text">todome</div>
+            <div className="sidebar-brand-sub">TASK · AI</div>
+          </div>
+        </div>
+
+        <div className="sidebar-section-label">Workspace</div>
+        <nav className="sidebar-nav">
+          {workNav.map((item) => (
+            <button
+              key={item.id}
+              className={`sidebar-nav-item ${
+                activeView === item.id ? "sidebar-nav-item--active" : ""
+              }`}
+              onClick={() => setActiveView(item.id)}
+            >
+              <span className="sidebar-nav-icon">{item.icon}</span>
+              <span className="sidebar-nav-label">{item.label}</span>
+            </button>
+          ))}
+        </nav>
+
+        <div className="sidebar-section-label">App</div>
+        <nav className="sidebar-nav">
+          {appNav.map((item) => (
+            <button
+              key={item.id}
+              className={`sidebar-nav-item ${
+                activeView === item.id ? "sidebar-nav-item--active" : ""
+              }`}
+              onClick={() => setActiveView(item.id)}
+            >
+              <span className="sidebar-nav-icon">{item.icon}</span>
+              <span className="sidebar-nav-label">{item.label}</span>
+            </button>
+          ))}
+        </nav>
+
+        <div className="sidebar-footer">
+          <span>v0.1</span>
+          <span style={{ marginLeft: "auto" }}>
+            {theme === "dark" ? "DARK" : "BEIGE"}
+          </span>
+        </div>
+      </aside>
+
+      {/* === Topbar === */}
+      <header className="topbar">
+        <div className="topbar-crumbs">
+          <span className="topbar-crumb">todome</span>
+          <span className="topbar-crumb-sep">›</span>
+          <span className="topbar-crumb-current">{VIEW_LABEL[activeView]}</span>
         </div>
         <div className="topbar-status">
+          <span
+            className={`topbar-status-dot ${
+              connected ? "topbar-status-dot--online" : "topbar-status-dot--offline"
+            }`}
+          />
           {connected ? "connected" : "connecting…"}
         </div>
-      </div>
+      </header>
 
-      <div className="main-content">
-        {activeView === "goals" ? (
-          <GoalPanel goals={goals} setGoals={setGoals} send={send} />
-        ) : activeView === "profile" ? (
-          <ProfilePanel profile={profile} setProfile={setProfile} send={send} />
-        ) : activeView === "stats" ? (
-          <StatsPanel tasks={tasks} goals={goals} tick={tick} />
-        ) : (
+      {/* === Main === */}
+      <main className="main">
+        {activeView === "overview" ? (
+          <OverviewPanel
+            tasks={tasks}
+            goals={goals}
+            tick={tick}
+            onOpenBoard={() => setActiveView("board")}
+            onCardClick={setSelectedTask}
+          />
+        ) : activeView === "board" ? (
           <KanbanBoard
             tasks={tasks}
             goals={goals}
@@ -343,18 +437,28 @@ export function App() {
             onMoveColumn={handleMoveColumn}
             tick={tick}
           />
+        ) : activeView === "goals" ? (
+          <GoalPanel goals={goals} setGoals={setGoals} send={send} />
+        ) : activeView === "stats" ? (
+          <StatsPanel tasks={tasks} goals={goals} tick={tick} />
+        ) : activeView === "profile" ? (
+          <ProfilePanel profile={profile} setProfile={setProfile} send={send} />
+        ) : (
+          <SettingsPanel theme={theme} setTheme={setThemeState} />
         )}
-        <ChatPanel
-          messages={messages}
-          streamText={streamText}
-          thinkingText={thinkingText}
-          askRequests={askRequests}
-          waiting={waiting}
-          connected={connected}
-          onSend={handleSendMessage}
-          onAskSubmit={handleAskSubmit}
-        />
-      </div>
+      </main>
+
+      {/* === AI Assistant === */}
+      <ChatPanel
+        messages={messages}
+        streamText={streamText}
+        thinkingText={thinkingText}
+        askRequests={askRequests}
+        waiting={waiting}
+        connected={connected}
+        onSend={handleSendMessage}
+        onAskSubmit={handleAskSubmit}
+      />
 
       {selectedTask && (
         <TaskDetailModal
@@ -365,10 +469,15 @@ export function App() {
         />
       )}
 
-      {/* タイマーポップアップ（計測中 & 一時停止中） */}
       {popupTask && (
-        <div className={`timer-popup ${isPopupRunning ? "" : "timer-popup--paused"}`}>
-          <div className={`timer-popup-pulse ${isPopupRunning ? "" : "timer-popup-pulse--paused"}`} />
+        <div
+          className={`timer-popup ${isPopupRunning ? "" : "timer-popup--paused"}`}
+        >
+          <div
+            className={`timer-popup-pulse ${
+              isPopupRunning ? "" : "timer-popup-pulse--paused"
+            }`}
+          />
           <div className="timer-popup-body">
             <div className="timer-popup-title">{popupTask.title}</div>
             <div className="timer-popup-meta">
@@ -424,7 +533,6 @@ export function App() {
         </div>
       )}
 
-      {/* 褒め演出トースト */}
       {celebrations.map((c) => (
         <div key={c.id} className="celebration-toast">
           <div className="celebration-check">&#10003;</div>

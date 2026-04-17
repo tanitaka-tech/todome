@@ -11,8 +11,21 @@
       href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&family=Newsreader:ital,wght@0,400;0,600;1,400&display=swap"
       rel="stylesheet"
     />
-    <script type="module" crossorigin src="/assets/index-D-WOO71k.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-CqHUAqBd.css">
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem("todome.theme");
+          document.documentElement.setAttribute(
+            "data-theme",
+            t === "beige" ? "beige" : "dark"
+          );
+        } catch (e) {
+          document.documentElement.setAttribute("data-theme", "dark");
+        }
+      })();
+    </script>
+    <script type="module" crossorigin src="/assets/index-a3Yn1And.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-TuFIlxgh.css">
   </head>
   <body>
     <div id="root"></div>
