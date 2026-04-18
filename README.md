@@ -61,7 +61,21 @@ cd ..
 
 ## 起動方法
 
-### 開発モード (ターミナル2つ)
+### ワンコマンド起動 (推奨)
+
+```bash
+./start.sh          # 開発モード (Vite + uvicorn --reload を並列起動)
+./start.sh prod     # 本番モード (client をビルドして uvicorn のみ起動)
+```
+
+- 開発モードはブラウザで **http://localhost:5173**、本番モードは **http://localhost:3002** でアクセスします。
+- Ctrl+C で両方のプロセスが停止します。
+- `client/node_modules` が無ければ初回に `npm install` が自動実行されます。
+
+### 手動で起動する場合
+
+<details>
+<summary>開発モード (ターミナル2つ)</summary>
 
 ```bash
 # ターミナル 1: フロントエンド (HMR)

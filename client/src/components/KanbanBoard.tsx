@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ColumnId, Goal, KanbanTask } from "../types";
 import { formatDuration, totalSeconds } from "../types";
 
@@ -25,6 +25,15 @@ const PRIORITY_LABELS: Record<string, { label: string; className: string }> = {
   low: { label: "低", className: "priority-low" },
 };
 
+const GOAL_FILTER_NONE = "__none__";
+const RECENT_DAYS_OPTIONS: { value: number; label: string }[] = [
+  { value: 0, label: "全期間" },
+  { value: 1, label: "1日" },
+  { value: 3, label: "3日" },
+  { value: 7, label: "7日" },
+  { value: 30, label: "30日" },
+];
+
 type InsertPos = "above" | "below";
 
 export function KanbanBoard({
@@ -44,6 +53,8 @@ export function KanbanBoard({
   const [addingTo, setAddingTo] = useState<ColumnId | null>(null);
   const [newTitle, setNewTitle] = useState("");
   const [newPriority, setNewPriority] = useState<"low" | "medium" | "high">("medium");
+  const [goalFilter, setGoalFilter] = useState<string>("");
+  const [recentDays, setRecentDays] = useState<number>(0);
   const addInputRef = useRef<HTMLInputElement>(null);
 
   const cardRefs = useRef(new Map<string, HTMLElement>());
@@ -331,10 +342,77 @@ export function KanbanBoard({
     send({ type: "kanban_edit", taskId: task.id, priority: next });
   };
 
+  const visibleTasks = useMemo(() => {
+    if (!goalFilter && recentDays === 0) return tasks;
+    const cutoff =
+      recentDays > 0 ? Date.now() - recentDays * 24 * 60 * 60 * 1000 : 0;
+    return tasks.filter((t) => {
+      if (goalFilter) {
+        if (goalFilter === GOAL_FILTER_NONE) {
+          if (t.goalId) return false;
+        } else if (t.goalId !== goalFilter) {
+          return false;
+        }
+      }
+      if (cutoff > 0 && t.column === "done") {
+        if (!t.completedAt) return false;
+        if (new Date(t.completedAt).getTime() < cutoff) return false;
+      }
+      return true;
+    });
+  }, [tasks, goalFilter, recentDays]);
+
+  const hiddenCount = tasks.length - visibleTasks.length;
+
   return (
-    <div className="kanban-board">
+    <div className="kanban-wrap">
+      <div className="kanban-filter-bar">
+        <div className="kanban-filter-group">
+          <span className="kanban-filter-label">目標</span>
+          <select
+            className="kanban-filter-select"
+            value={goalFilter}
+            onChange={(e) => setGoalFilter(e.target.value)}
+          >
+            <option value="">すべて</option>
+            <option value={GOAL_FILTER_NONE}>目標なし</option>
+            {goals.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="kanban-filter-group">
+          <span className="kanban-filter-label">完了</span>
+          <div className="kanban-filter-tabs">
+            {RECENT_DAYS_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                className={`kanban-filter-tab ${recentDays === opt.value ? "kanban-filter-tab--active" : ""}`}
+                onClick={() => setRecentDays(opt.value)}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        {hiddenCount > 0 && (
+          <button
+            className="kanban-filter-clear"
+            onClick={() => {
+              setGoalFilter("");
+              setRecentDays(0);
+            }}
+            title="フィルターをクリア"
+          >
+            {hiddenCount}件を非表示 &times;
+          </button>
+        )}
+      </div>
+      <div className="kanban-board">
       {COLUMNS.map((col) => {
-        const colTasks = tasks.filter((t) => t.column === col.id);
+        const colTasks = visibleTasks.filter((t) => t.column === col.id);
         return (
           <div
             key={col.id}
@@ -485,6 +563,7 @@ export function KanbanBoard({
           </div>
         );
       })}
+      </div>
     </div>
   );
 }

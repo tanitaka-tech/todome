@@ -592,10 +592,14 @@ def process_todos(
                 title = content[len(tag) :].strip()
                 break
 
+        goal_id = todo.get("goalId", "")
+
         if title in existing_task_map:
             task = existing_task_map[title].copy()
             task["column"] = status_to_column.get(status, "todo")
             task["priority"] = priority
+            if goal_id:
+                task["goalId"] = goal_id
         else:
             task = {
                 "id": _short_id(),
@@ -604,7 +608,7 @@ def process_todos(
                 "column": status_to_column.get(status, "todo"),
                 "priority": priority,
                 "memo": "",
-                "goalId": "",
+                "goalId": goal_id,
                 "estimatedMinutes": 0,
                 "timeSpent": 0,
                 "timerStartedAt": "",
