@@ -2,8 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
   AskUserRequest,
   ChatMessage,
+  GitHubStatus,
   Goal,
   KanbanTask,
+  RepoInfo,
   UserProfile,
   WSMessage,
 } from "../types";
@@ -95,6 +97,8 @@ export function App() {
   const [celebrations, setCelebrations] = useState<Celebration[]>([]);
   const [theme, setThemeState] = useState<ThemeName>(() => getInitialTheme());
   const [chatOpen, setChatOpen] = useState(true);
+  const [githubStatus, setGithubStatus] = useState<GitHubStatus | null>(null);
+  const [githubRepos, setGithubRepos] = useState<RepoInfo[]>([]);
 
   useEffect(() => {
     applyTheme(theme);
@@ -188,6 +192,12 @@ export function App() {
       case "profile_sync":
         setProfile(msg.profile);
         break;
+      case "github_status":
+        setGithubStatus(msg.status);
+        break;
+      case "github_repo_list":
+        setGithubRepos(msg.repos);
+        break;
       case "result":
         setStreamText("");
         setThinkingText("");
@@ -230,6 +240,36 @@ export function App() {
     setAskRequests([]);
     setWaiting(false);
   }, [connected, send]);
+
+  const handleRequestRepoList = useCallback(() => {
+    send({ type: "github_list_repos" });
+  }, [send]);
+
+  const handleLinkRepo = useCallback(
+    (args: { owner?: string; name: string; create: boolean; private: boolean }) => {
+      send({ type: "github_link", ...args });
+    },
+    [send],
+  );
+
+  const handleUnlinkRepo = useCallback(() => {
+    send({ type: "github_unlink" });
+  }, [send]);
+
+  const handleSyncNow = useCallback(() => {
+    send({ type: "github_sync_now" });
+  }, [send]);
+
+  const handlePullNow = useCallback(() => {
+    send({ type: "github_pull_now" });
+  }, [send]);
+
+  const handleToggleAutoSync = useCallback(
+    (value: boolean) => {
+      send({ type: "github_set_auto_sync", value });
+    },
+    [send],
+  );
 
   const handleAskSubmit = useCallback(
     (requestId: string, answers: Record<string, string>) => {
@@ -481,7 +521,18 @@ export function App() {
         ) : activeView === "profile" ? (
           <ProfilePanel profile={profile} setProfile={setProfile} send={send} />
         ) : (
-          <SettingsPanel theme={theme} setTheme={setThemeState} />
+          <SettingsPanel
+            theme={theme}
+            setTheme={setThemeState}
+            githubStatus={githubStatus}
+            githubRepos={githubRepos}
+            onRequestRepoList={handleRequestRepoList}
+            onLinkRepo={handleLinkRepo}
+            onUnlink={handleUnlinkRepo}
+            onSyncNow={handleSyncNow}
+            onPullNow={handlePullNow}
+            onToggleAutoSync={handleToggleAutoSync}
+          />
         )}
       </main>
 

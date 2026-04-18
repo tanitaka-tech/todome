@@ -8,6 +8,7 @@ import asyncio
 import datetime
 import json
 import os
+import shutil
 import sqlite3
 import uuid
 from pathlib import Path
@@ -32,10 +33,13 @@ from claude_agent_sdk.types import (
     ToolPermissionContext,
 )
 
+import github_sync
+
 load_dotenv()
 app = FastAPI()
 
 pending_approvals: dict[str, asyncio.Future] = {}
+active_sockets: set[WebSocket] = set()
 
 
 # --- Types ---
@@ -57,11 +61,49 @@ GOAL_UPDATE_PREFIX = "GOAL_UPDATE:"
 # --- SQLite storage ---
 DATA_DIR = Path(__file__).parent / "data"
 DATA_DIR.mkdir(exist_ok=True)
-DB_PATH = DATA_DIR / "todome.db"
+DEFAULT_DB = DATA_DIR / "todome.db"
+REPO_DIR = DATA_DIR / "repo"
+CONFIG_PATH = DATA_DIR / "github_config.json"
+
+_cfg_cache: dict[str, Any] | None = None
+
+
+def _load_github_config() -> dict[str, Any]:
+    global _cfg_cache
+    if _cfg_cache is not None:
+        return _cfg_cache
+    if CONFIG_PATH.exists():
+        try:
+            _cfg_cache = json.loads(CONFIG_PATH.read_text())
+        except (OSError, json.JSONDecodeError):
+            _cfg_cache = {}
+    else:
+        _cfg_cache = {}
+    return _cfg_cache
+
+
+def _save_github_config(cfg: dict[str, Any]) -> None:
+    global _cfg_cache
+    _cfg_cache = cfg
+    CONFIG_PATH.write_text(json.dumps(cfg, ensure_ascii=False, indent=2))
+
+
+def _clear_github_config() -> None:
+    global _cfg_cache
+    _cfg_cache = {}
+    if CONFIG_PATH.exists():
+        CONFIG_PATH.unlink()
+
+
+def get_db_path() -> Path:
+    cfg = _load_github_config()
+    if cfg.get("linked") and (REPO_DIR / "todome.db").exists():
+        return REPO_DIR / "todome.db"
+    return DEFAULT_DB
 
 
 def _db() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(get_db_path())
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -146,6 +188,272 @@ def save_profile(profile: ProfileData) -> None:
 
 
 init_db()
+
+
+# --- GitHub sync state ---
+DEBOUNCE_SEC = 20
+
+github_state: dict[str, Any] = {
+    "syncing": False,
+    "lastSyncAt": None,
+    "lastError": None,
+    "debounce_task": None,
+    "sync_lock": None,  # lazy init inside async context
+}
+
+
+async def broadcast(msg: dict[str, Any]) -> None:
+    dead: list[WebSocket] = []
+    for ws in list(active_sockets):
+        try:
+            await ws.send_json(msg)
+        except Exception:
+            dead.append(ws)
+    for ws in dead:
+        active_sockets.discard(ws)
+
+
+async def send_to(ws: WebSocket, msg: dict[str, Any]) -> None:
+    try:
+        await ws.send_json(msg)
+    except Exception:
+        active_sockets.discard(ws)
+
+
+async def _build_github_status() -> dict[str, Any]:
+    cfg = _load_github_config()
+    auth = await asyncio.to_thread(github_sync.gh_auth_status)
+    return {
+        "type": "github_status",
+        "status": {
+            "authUser": auth.get("username"),
+            "authOk": bool(auth.get("ok")),
+            "authError": auth.get("error"),
+            "linked": bool(cfg.get("linked")),
+            "owner": cfg.get("owner"),
+            "repo": cfg.get("repo"),
+            "autoSync": bool(cfg.get("autoSync", True)),
+            "syncing": github_state["syncing"],
+            "lastSyncAt": github_state["lastSyncAt"] or cfg.get("lastSyncAt"),
+            "lastError": github_state["lastError"],
+        },
+    }
+
+
+def _get_sync_lock() -> asyncio.Lock:
+    lock = github_state["sync_lock"]
+    if lock is None:
+        lock = asyncio.Lock()
+        github_state["sync_lock"] = lock
+    return lock
+
+
+def schedule_autosync() -> None:
+    cfg = _load_github_config()
+    if not (cfg.get("linked") and cfg.get("autoSync", True)):
+        return
+    t: asyncio.Task | None = github_state.get("debounce_task")
+    if t and not t.done():
+        t.cancel()
+    github_state["debounce_task"] = asyncio.create_task(_autosync_after_delay())
+
+
+async def _autosync_after_delay() -> None:
+    try:
+        await asyncio.sleep(DEBOUNCE_SEC)
+    except asyncio.CancelledError:
+        return
+    await _do_push("auto sync")
+
+
+def _wal_checkpoint() -> None:
+    """push 直前に WAL をマージ (サイズが 0 かつ journal_mode が delete の場合は no-op)。"""
+    try:
+        with _db() as conn:
+            conn.execute("PRAGMA wal_checkpoint(FULL)")
+    except sqlite3.Error:
+        pass
+
+
+async def _do_push(message: str) -> None:
+    cfg = _load_github_config()
+    if not cfg.get("linked"):
+        return
+    async with _get_sync_lock():
+        github_state["syncing"] = True
+        github_state["lastError"] = None
+        await broadcast(await _build_github_status())
+        try:
+            await asyncio.to_thread(_wal_checkpoint)
+            now_iso = datetime.datetime.now().isoformat(timespec="seconds")
+            commit_msg = f"todome {message}: {now_iso}"
+            pushed = await asyncio.to_thread(
+                github_sync.git_add_commit_push, REPO_DIR, commit_msg
+            )
+            if pushed:
+                github_state["lastSyncAt"] = now_iso
+                cfg["lastSyncAt"] = now_iso
+                _save_github_config(cfg)
+        except github_sync.GitHubSyncError as e:
+            github_state["lastError"] = str(e)
+        except Exception as e:
+            github_state["lastError"] = f"unexpected: {e}"
+        finally:
+            github_state["syncing"] = False
+            await broadcast(await _build_github_status())
+
+
+async def _do_pull() -> None:
+    cfg = _load_github_config()
+    if not cfg.get("linked"):
+        return
+    async with _get_sync_lock():
+        github_state["syncing"] = True
+        github_state["lastError"] = None
+        await broadcast(await _build_github_status())
+        try:
+            await asyncio.to_thread(github_sync.git_pull, REPO_DIR)
+            init_db()
+            await _broadcast_db_state()
+            github_state["lastSyncAt"] = datetime.datetime.now().isoformat(
+                timespec="seconds"
+            )
+            cfg["lastSyncAt"] = github_state["lastSyncAt"]
+            _save_github_config(cfg)
+        except github_sync.GitHubSyncError as e:
+            github_state["lastError"] = str(e)
+        except Exception as e:
+            github_state["lastError"] = f"unexpected: {e}"
+        finally:
+            github_state["syncing"] = False
+            await broadcast(await _build_github_status())
+
+
+async def _broadcast_db_state() -> None:
+    """現在の DB からロードして全クライアントへ同期 push。"""
+    tasks = load_tasks()
+    goals = load_goals()
+    profile = load_profile()
+    await broadcast({"type": "kanban_sync", "tasks": tasks})
+    await broadcast({"type": "goal_sync", "goals": goals})
+    await broadcast({"type": "profile_sync", "profile": profile})
+
+
+async def _do_link(
+    owner: str | None,
+    name: str,
+    create: bool,
+    private: bool,
+) -> None:
+    async with _get_sync_lock():
+        github_state["syncing"] = True
+        github_state["lastError"] = None
+        await broadcast(await _build_github_status())
+        try:
+            auth = await asyncio.to_thread(github_sync.gh_auth_status)
+            if not auth.get("ok"):
+                raise github_sync.GitHubSyncError(
+                    auth.get("error") or "gh 認証が必要です"
+                )
+
+            if create:
+                created = await asyncio.to_thread(
+                    github_sync.gh_create_repo, name, private
+                )
+                owner = created["owner"]
+                name = created["name"]
+            if not owner:
+                owner = auth["username"]
+
+            remote_has_db = await asyncio.to_thread(
+                github_sync.gh_repo_has_db, owner, name
+            )
+
+            if REPO_DIR.exists():
+                await asyncio.to_thread(shutil.rmtree, REPO_DIR)
+
+            await asyncio.to_thread(
+                github_sync.git_clone, owner, name, REPO_DIR
+            )
+            await asyncio.to_thread(github_sync.ensure_git_identity, REPO_DIR)
+            await asyncio.to_thread(github_sync.write_gitattributes, REPO_DIR)
+
+            cloned_db = REPO_DIR / "todome.db"
+            if not remote_has_db and not cloned_db.exists():
+                # ローカル DB を初回 push 用にコピー
+                if DEFAULT_DB.exists():
+                    await asyncio.to_thread(shutil.copy2, DEFAULT_DB, cloned_db)
+                else:
+                    # 空の DB を作る: get_db_path 経由で新しい path を使うため config を先に書く
+                    _save_github_config(
+                        {
+                            "linked": True,
+                            "owner": owner,
+                            "repo": name,
+                            "autoSync": True,
+                            "lastSyncAt": None,
+                        }
+                    )
+                    init_db()
+
+            # config 確定 (上で既に書いていれば上書き)
+            _save_github_config(
+                {
+                    "linked": True,
+                    "owner": owner,
+                    "repo": name,
+                    "autoSync": True,
+                    "lastSyncAt": _load_github_config().get("lastSyncAt"),
+                }
+            )
+
+            # スキーマを念のため確認
+            init_db()
+
+            if not remote_has_db:
+                # 初回 push (todome.db と .gitattributes)
+                now_iso = datetime.datetime.now().isoformat(timespec="seconds")
+                commit_msg = f"todome initial sync: {now_iso}"
+                pushed = await asyncio.to_thread(
+                    github_sync.git_add_commit_push, REPO_DIR, commit_msg
+                )
+                if pushed:
+                    github_state["lastSyncAt"] = now_iso
+                    cfg = _load_github_config()
+                    cfg["lastSyncAt"] = now_iso
+                    _save_github_config(cfg)
+
+            await _broadcast_db_state()
+        except github_sync.GitHubSyncError as e:
+            github_state["lastError"] = str(e)
+        except Exception as e:
+            github_state["lastError"] = f"unexpected: {e}"
+        finally:
+            github_state["syncing"] = False
+            await broadcast(await _build_github_status())
+
+
+async def _do_unlink() -> None:
+    async with _get_sync_lock():
+        github_state["syncing"] = True
+        github_state["lastError"] = None
+        await broadcast(await _build_github_status())
+        try:
+            t: asyncio.Task | None = github_state.get("debounce_task")
+            if t and not t.done():
+                t.cancel()
+            github_state["debounce_task"] = None
+
+            _clear_github_config()
+            if REPO_DIR.exists():
+                await asyncio.to_thread(shutil.rmtree, REPO_DIR)
+            init_db()
+            await _broadcast_db_state()
+        except Exception as e:
+            github_state["lastError"] = f"unexpected: {e}"
+        finally:
+            github_state["syncing"] = False
+            await broadcast(await _build_github_status())
 
 
 def _short_id() -> str:
@@ -475,6 +783,7 @@ TodoWrite の todos:
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
+    active_sockets.add(ws)
     client: ClaudeSDKClient | None = None
     kanban_tasks: list[KanbanTask] = load_tasks()
     goals: list[GoalData] = load_goals()
@@ -483,6 +792,7 @@ async def websocket_endpoint(ws: WebSocket):
     await ws.send_json({"type": "kanban_sync", "tasks": kanban_tasks})
     await ws.send_json({"type": "goal_sync", "goals": goals})
     await ws.send_json({"type": "profile_sync", "profile": profile})
+    await ws.send_json(await _build_github_status())
 
     msg_queue: asyncio.Queue = asyncio.Queue()
 
@@ -537,6 +847,7 @@ async def websocket_endpoint(ws: WebSocket):
                                 t[key] = data[key]
                         break
                 save_tasks(kanban_tasks)
+                schedule_autosync()
                 continue
 
             if data["type"] == "kanban_add":
@@ -556,6 +867,7 @@ async def websocket_endpoint(ws: WebSocket):
                 }
                 kanban_tasks.append(new_task)
                 save_tasks(kanban_tasks)
+                schedule_autosync()
                 await ws.send_json(
                     {"type": "kanban_sync", "tasks": kanban_tasks}
                 )
@@ -566,6 +878,7 @@ async def websocket_endpoint(ws: WebSocket):
                     t for t in kanban_tasks if t["id"] != data["taskId"]
                 ]
                 save_tasks(kanban_tasks)
+                schedule_autosync()
                 await ws.send_json(
                     {"type": "kanban_sync", "tasks": kanban_tasks}
                 )
@@ -585,6 +898,7 @@ async def websocket_endpoint(ws: WebSocket):
                         new_order.append(t)
                 kanban_tasks = new_order
                 save_tasks(kanban_tasks)
+                schedule_autosync()
                 continue
 
             if data["type"] == "kanban_edit":
@@ -607,6 +921,7 @@ async def websocket_endpoint(ws: WebSocket):
                                 t[key] = data[key]
                         break
                 save_tasks(kanban_tasks)
+                schedule_autosync()
                 await ws.send_json(
                     {"type": "kanban_sync", "tasks": kanban_tasks}
                 )
@@ -623,6 +938,7 @@ async def websocket_endpoint(ws: WebSocket):
                 _sync_goal_achievement(goal)
                 goals.append(goal)
                 save_goals(goals)
+                schedule_autosync()
                 await ws.send_json({"type": "goal_sync", "goals": goals})
                 continue
 
@@ -637,6 +953,7 @@ async def websocket_endpoint(ws: WebSocket):
                     for g in goals
                 ]
                 save_goals(goals)
+                schedule_autosync()
                 await ws.send_json({"type": "goal_sync", "goals": goals})
                 continue
 
@@ -648,6 +965,7 @@ async def websocket_endpoint(ws: WebSocket):
                         t["goalId"] = ""
                 save_goals(goals)
                 save_tasks(kanban_tasks)
+                schedule_autosync()
                 await ws.send_json({"type": "goal_sync", "goals": goals})
                 await ws.send_json(
                     {"type": "kanban_sync", "tasks": kanban_tasks}
@@ -669,9 +987,56 @@ async def websocket_endpoint(ws: WebSocket):
             if data["type"] == "profile_update":
                 profile = data.get("profile", dict(DEFAULT_PROFILE))
                 save_profile(profile)
+                schedule_autosync()
                 await ws.send_json(
                     {"type": "profile_sync", "profile": profile}
                 )
+                continue
+
+            # --- GitHub 連携 ---
+            if data["type"] == "github_status_request":
+                await ws.send_json(await _build_github_status())
+                continue
+
+            if data["type"] == "github_list_repos":
+                try:
+                    repos = await asyncio.to_thread(github_sync.gh_list_repos)
+                    await ws.send_json(
+                        {"type": "github_repo_list", "repos": repos}
+                    )
+                except github_sync.GitHubSyncError as e:
+                    github_state["lastError"] = str(e)
+                    await ws.send_json(await _build_github_status())
+                continue
+
+            if data["type"] == "github_link":
+                asyncio.create_task(
+                    _do_link(
+                        owner=data.get("owner"),
+                        name=data.get("name", ""),
+                        create=bool(data.get("create")),
+                        private=bool(data.get("private", True)),
+                    )
+                )
+                continue
+
+            if data["type"] == "github_unlink":
+                asyncio.create_task(_do_unlink())
+                continue
+
+            if data["type"] == "github_sync_now":
+                asyncio.create_task(_do_push("manual sync"))
+                continue
+
+            if data["type"] == "github_pull_now":
+                asyncio.create_task(_do_pull())
+                continue
+
+            if data["type"] == "github_set_auto_sync":
+                cfg = _load_github_config()
+                cfg["autoSync"] = bool(data.get("value", True))
+                _save_github_config(cfg)
+                await broadcast(await _build_github_status())
                 continue
 
             # --- チャットメッセージ ---
@@ -764,6 +1129,7 @@ async def websocket_endpoint(ws: WebSocket):
                                         )
                                         save_tasks(kanban_tasks)
                                         save_goals(goals)
+                                        schedule_autosync()
                                         await ws.send_json(
                                             {
                                                 "type": "kanban_sync",
@@ -813,9 +1179,17 @@ async def websocket_endpoint(ws: WebSocket):
     except WebSocketDisconnect:
         pass
     finally:
+        active_sockets.discard(ws)
         reader_task.cancel()
         if client:
             await client.disconnect()
+
+
+@app.on_event("shutdown")
+async def _on_shutdown() -> None:
+    t: asyncio.Task | None = github_state.get("debounce_task")
+    if t and not t.done():
+        t.cancel()
 
 
 _client_dist = os.path.join(os.path.dirname(__file__), "client", "dist")

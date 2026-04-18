@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c \"import ast; ast.parse\\(open\\('server.py'\\).read\\(\\)\\); ast.parse\\(open\\('github_sync.py'\\).read\\(\\)\\); print\\('ok'\\)\")",
+      "Bash(npx tsc *)",
+      "Bash(./node_modules/.bin/tsc -b)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(./node_modules/.bin/vite build *)"
+    ]
+  }
+}

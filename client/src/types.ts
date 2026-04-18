@@ -118,6 +118,30 @@ export interface AskUserRequest {
   questions: AskQuestion[];
 }
 
+// --- GitHub sync ---
+
+export interface GitHubStatus {
+  authUser: string | null;
+  authOk: boolean;
+  authError: string | null;
+  linked: boolean;
+  owner?: string | null;
+  repo?: string | null;
+  autoSync: boolean;
+  syncing: boolean;
+  lastSyncAt: string | null;
+  lastError: string | null;
+}
+
+export interface RepoInfo {
+  name: string;
+  owner: { login: string };
+  nameWithOwner: string;
+  isPrivate: boolean;
+  updatedAt: string;
+  url: string;
+}
+
 export type WSMessage =
   | { type: "stream_delta"; text: string }
   | { type: "thinking_delta"; text: string }
@@ -128,4 +152,6 @@ export type WSMessage =
   | { type: "kanban_sync"; tasks: KanbanTask[] }
   | { type: "goal_sync"; goals: Goal[] }
   | { type: "profile_sync"; profile: UserProfile }
+  | { type: "github_status"; status: GitHubStatus }
+  | { type: "github_repo_list"; repos: RepoInfo[] }
   | { type: "result"; result: string; cost: number; turns: number; sessionId: string };

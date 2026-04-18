@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+
+# Env
+.env
+.env.*
+
+# Local data (DB) and GitHub sync state
+data/todome.db
+data/todome.db-journal
+data/todome.db-wal
+data/todome.db-shm
+data/repo/
+data/github_config.json
+
+# Node / Vite
+node_modules/
+client/node_modules/
+client/dist/
+client/.vite/
+
+# OS
+.DS_Store
