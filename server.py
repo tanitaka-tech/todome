@@ -8,7 +8,9 @@ import asyncio
 import datetime
 import json
 import os
+import sqlite3
 import uuid
+from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
@@ -50,6 +52,100 @@ DEFAULT_PROFILE: ProfileData = {
 
 GOAL_ADD_PREFIX = "GOAL_ADD:"
 GOAL_UPDATE_PREFIX = "GOAL_UPDATE:"
+
+
+# --- SQLite storage ---
+DATA_DIR = Path(__file__).parent / "data"
+DATA_DIR.mkdir(exist_ok=True)
+DB_PATH = DATA_DIR / "todome.db"
+
+
+def _db() -> sqlite3.Connection:
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def init_db() -> None:
+    with _db() as conn:
+        conn.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS kanban_tasks (
+                id TEXT PRIMARY KEY,
+                sort_order INTEGER NOT NULL,
+                data TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS goals (
+                id TEXT PRIMARY KEY,
+                sort_order INTEGER NOT NULL,
+                data TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS profile (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                data TEXT NOT NULL
+            );
+            """
+        )
+
+
+def load_tasks() -> list[KanbanTask]:
+    with _db() as conn:
+        rows = conn.execute(
+            "SELECT data FROM kanban_tasks ORDER BY sort_order"
+        ).fetchall()
+    return [json.loads(r["data"]) for r in rows]
+
+
+def save_tasks(tasks: list[KanbanTask]) -> None:
+    with _db() as conn:
+        conn.execute("DELETE FROM kanban_tasks")
+        conn.executemany(
+            "INSERT INTO kanban_tasks (id, sort_order, data) VALUES (?, ?, ?)",
+            [
+                (t["id"], i, json.dumps(t, ensure_ascii=False))
+                for i, t in enumerate(tasks)
+            ],
+        )
+
+
+def load_goals() -> list[GoalData]:
+    with _db() as conn:
+        rows = conn.execute(
+            "SELECT data FROM goals ORDER BY sort_order"
+        ).fetchall()
+    return [json.loads(r["data"]) for r in rows]
+
+
+def save_goals(goals: list[GoalData]) -> None:
+    with _db() as conn:
+        conn.execute("DELETE FROM goals")
+        conn.executemany(
+            "INSERT INTO goals (id, sort_order, data) VALUES (?, ?, ?)",
+            [
+                (g["id"], i, json.dumps(g, ensure_ascii=False))
+                for i, g in enumerate(goals)
+            ],
+        )
+
+
+def load_profile() -> ProfileData:
+    with _db() as conn:
+        row = conn.execute("SELECT data FROM profile WHERE id = 1").fetchone()
+    if row is None:
+        return dict(DEFAULT_PROFILE)
+    return json.loads(row["data"])
+
+
+def save_profile(profile: ProfileData) -> None:
+    with _db() as conn:
+        conn.execute(
+            "INSERT INTO profile (id, data) VALUES (1, ?) "
+            "ON CONFLICT(id) DO UPDATE SET data = excluded.data",
+            (json.dumps(profile, ensure_ascii=False),),
+        )
+
+
+init_db()
 
 
 def _short_id() -> str:
@@ -380,9 +476,13 @@ TodoWrite の todos:
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
     client: ClaudeSDKClient | None = None
-    kanban_tasks: list[KanbanTask] = []
-    goals: list[GoalData] = []
-    profile: ProfileData = dict(DEFAULT_PROFILE)
+    kanban_tasks: list[KanbanTask] = load_tasks()
+    goals: list[GoalData] = load_goals()
+    profile: ProfileData = load_profile()
+
+    await ws.send_json({"type": "kanban_sync", "tasks": kanban_tasks})
+    await ws.send_json({"type": "goal_sync", "goals": goals})
+    await ws.send_json({"type": "profile_sync", "profile": profile})
 
     msg_queue: asyncio.Queue = asyncio.Queue()
 
@@ -422,6 +522,7 @@ async def websocket_endpoint(ws: WebSocket):
                             if key in data:
                                 t[key] = data[key]
                         break
+                save_tasks(kanban_tasks)
                 continue
 
             if data["type"] == "kanban_add":
@@ -440,6 +541,7 @@ async def websocket_endpoint(ws: WebSocket):
                     "timeLogs": [],
                 }
                 kanban_tasks.append(new_task)
+                save_tasks(kanban_tasks)
                 await ws.send_json(
                     {"type": "kanban_sync", "tasks": kanban_tasks}
                 )
@@ -449,6 +551,7 @@ async def websocket_endpoint(ws: WebSocket):
                 kanban_tasks = [
                     t for t in kanban_tasks if t["id"] != data["taskId"]
                 ]
+                save_tasks(kanban_tasks)
                 await ws.send_json(
                     {"type": "kanban_sync", "tasks": kanban_tasks}
                 )
@@ -473,6 +576,7 @@ async def websocket_endpoint(ws: WebSocket):
                             if key in data:
                                 t[key] = data[key]
                         break
+                save_tasks(kanban_tasks)
                 await ws.send_json(
                     {"type": "kanban_sync", "tasks": kanban_tasks}
                 )
@@ -488,6 +592,7 @@ async def websocket_endpoint(ws: WebSocket):
                 goal.setdefault("achievedAt", "")
                 _sync_goal_achievement(goal)
                 goals.append(goal)
+                save_goals(goals)
                 await ws.send_json({"type": "goal_sync", "goals": goals})
                 continue
 
@@ -501,6 +606,7 @@ async def websocket_endpoint(ws: WebSocket):
                     incoming if g["id"] == incoming.get("id") else g
                     for g in goals
                 ]
+                save_goals(goals)
                 await ws.send_json({"type": "goal_sync", "goals": goals})
                 continue
 
@@ -510,6 +616,8 @@ async def websocket_endpoint(ws: WebSocket):
                 for t in kanban_tasks:
                     if t.get("goalId") == goal_id:
                         t["goalId"] = ""
+                save_goals(goals)
+                save_tasks(kanban_tasks)
                 await ws.send_json({"type": "goal_sync", "goals": goals})
                 await ws.send_json(
                     {"type": "kanban_sync", "tasks": kanban_tasks}
@@ -519,6 +627,7 @@ async def websocket_endpoint(ws: WebSocket):
             # --- プロフィール更新 ---
             if data["type"] == "profile_update":
                 profile = data.get("profile", dict(DEFAULT_PROFILE))
+                save_profile(profile)
                 await ws.send_json(
                     {"type": "profile_sync", "profile": profile}
                 )
@@ -610,6 +719,8 @@ async def websocket_endpoint(ws: WebSocket):
                                         kanban_tasks,
                                         goals,
                                     )
+                                    save_tasks(kanban_tasks)
+                                    save_goals(goals)
                                     await ws.send_json(
                                         {
                                             "type": "kanban_sync",
