@@ -211,6 +211,13 @@ body {
   font-size: 18px;
   line-height: 1;
 }
+.sidebar-nav-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
 .sidebar-nav-label {
   width: 100%;
   white-space: nowrap;
