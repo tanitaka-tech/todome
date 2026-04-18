@@ -57,11 +57,48 @@ def _short_id() -> str:
 
 
 def _ensure_kpi_ids(kpis: list[dict]) -> list[dict]:
-    """KPI に id が無ければ付与する。"""
+    """KPI に id とデフォルト値を付与する。"""
     for kpi in kpis:
         if not kpi.get("id"):
             kpi["id"] = _short_id()
+        unit = kpi.get("unit")
+        if unit not in ("number", "percent"):
+            kpi["unit"] = "number"
+        try:
+            kpi["targetValue"] = max(0, int(round(float(kpi.get("targetValue", 0) or 0))))
+        except (TypeError, ValueError):
+            kpi["targetValue"] = 0
+        try:
+            kpi["currentValue"] = max(0, int(round(float(kpi.get("currentValue", 0) or 0))))
+        except (TypeError, ValueError):
+            kpi["currentValue"] = 0
+        kpi.pop("value", None)
     return kpis
+
+
+def _is_goal_all_kpis_achieved(goal: dict) -> bool:
+    kpis = goal.get("kpis", [])
+    if not kpis:
+        return False
+    for kpi in kpis:
+        target = kpi.get("targetValue", 0) or 0
+        current = kpi.get("currentValue", 0) or 0
+        if not (target > 0 and current >= target):
+            return False
+    return True
+
+
+def _sync_goal_achievement(goal: dict) -> dict:
+    """KPI の状態から achieved フィールドを同期する。"""
+    all_done = _is_goal_all_kpis_achieved(goal)
+    was_achieved = bool(goal.get("achieved", False))
+    if all_done and not was_achieved:
+        goal["achieved"] = True
+        goal["achievedAt"] = datetime.datetime.now().isoformat()
+    elif not all_done and was_achieved:
+        goal["achieved"] = False
+        goal["achievedAt"] = ""
+    return goal
 
 
 def process_todos(
@@ -104,6 +141,7 @@ def process_todos(
                 existing["kpis"] = _ensure_kpi_ids(
                     existing.get("kpis", [])
                 )
+                _sync_goal_achievement(existing)
             else:
                 new_goal: GoalData = {
                     "id": _short_id(),
@@ -111,7 +149,10 @@ def process_todos(
                     "memo": goal_data.get("memo", ""),
                     "kpis": _ensure_kpi_ids(goal_data.get("kpis", [])),
                     "deadline": goal_data.get("deadline", ""),
+                    "achieved": bool(goal_data.get("achieved", False)),
+                    "achievedAt": goal_data.get("achievedAt", ""),
                 }
+                _sync_goal_achievement(new_goal)
                 goals.append(new_goal)
                 existing_goal_map[new_goal["name"]] = new_goal
             continue
@@ -133,6 +174,7 @@ def process_todos(
                 for k, v in updates.items():
                     target[k] = v
                 target["kpis"] = _ensure_kpi_ids(target.get("kpis", []))
+                _sync_goal_achievement(target)
             continue
 
         # --- 通常タスク ---
@@ -254,14 +296,26 @@ def build_board_context(
     lines.append("\n=== 目標一覧 ===")
     if goals:
         for g in goals:
-            lines.append(f"\n  目標名: {g['name']}  (id: {g['id']})")
+            status = " [達成済み]" if g.get("achieved") else ""
+            lines.append(f"\n  目標名: {g['name']}{status}  (id: {g['id']})")
             if g.get("deadline"):
                 lines.append(f"    期日: {g['deadline']}")
+            if g.get("achieved") and g.get("achievedAt"):
+                lines.append(f"    達成日: {g['achievedAt'][:10]}")
             if g.get("memo"):
                 lines.append(f"    メモ: {g['memo']}")
             for kpi in g.get("kpis", []):
-                v = f" = {kpi['value']}" if kpi.get("value") else ""
-                lines.append(f"    KPI: {kpi['name']}{v}")
+                unit_suffix = "%" if kpi.get("unit") == "percent" else ""
+                target = kpi.get("targetValue", 0)
+                current = kpi.get("currentValue", 0)
+                pct = (
+                    min(100, (current / target * 100)) if target else 0
+                )
+                lines.append(
+                    f"    KPI: {kpi['name']} "
+                    f"{current}{unit_suffix} / {target}{unit_suffix} "
+                    f"({pct:.0f}%)"
+                )
     else:
         lines.append("  (なし)")
     return "\n".join(lines)
@@ -292,18 +346,26 @@ TodoWrite ツールで todos 配列を渡してタスクを管理する。
 目標を追加・更新するには、同じ TodoWrite の todos 配列に特殊エントリを含める。
 これらは目標として処理され、カンバンボードには表示されない。
 
+### KPI の形式
+各 KPI は以下のフィールドを持つ:
+- name: KPI名 (必須)
+- unit: "number" または "percent"
+- targetValue: 目標値 (数値、0より大)
+- currentValue: 現在の値 (数値)
+目標には必ず1つ以上の KPI を設定すること。全 KPI が targetValue に到達すると、目標は自動的に達成扱いになる。
+
 ### 目標の追加
 content を以下の形式にする (status は "completed"):
-  GOAL_ADD:{{"name":"目標名","memo":"メモ","kpis":[{{"name":"KPI名","value":"目標値"}}],"deadline":"2026-12-31"}}
+  GOAL_ADD:{{"name":"目標名","memo":"メモ","kpis":[{{"name":"KPI名","unit":"number","targetValue":1000,"currentValue":0}}],"deadline":"2026-12-31"}}
 
 ### 目標の更新
 content を以下の形式にする (status は "completed"):
-  GOAL_UPDATE:既存の目標名:{{"memo":"新しいメモ","kpis":[{{"name":"KPI名","value":"新目標値"}}]}}
-更新では変更したいフィールドだけ含めればよい。
+  GOAL_UPDATE:既存の目標名:{{"memo":"新しいメモ","kpis":[{{"name":"KPI名","unit":"percent","targetValue":80,"currentValue":40}}]}}
+更新では変更したいフィールドだけ含めればよい。KPI の currentValue を更新することで進捗を反映できる。
 
 ### 例: タスク追加と目標追加を同時に行う
 TodoWrite の todos:
-  [{{"content":"[HIGH] 企画書を作成","status":"pending"}},{{"content":"GOAL_ADD:{{\\\"name\\\":\\\"Q3売上目標\\\",\\\"memo\\\":\\\"前年比120%\\\",\\\"kpis\\\":[{{\\\"name\\\":\\\"月間売上\\\",\\\"value\\\":\\\"1000万円\\\"}}],\\\"deadline\\\":\\\"2026-09-30\\\"}}","status":"completed"}}]
+  [{{"content":"[HIGH] 企画書を作成","status":"pending"}},{{"content":"GOAL_ADD:{{\\\"name\\\":\\\"Q3売上目標\\\",\\\"memo\\\":\\\"前年比120%\\\",\\\"kpis\\\":[{{\\\"name\\\":\\\"月間売上(万円)\\\",\\\"unit\\\":\\\"number\\\",\\\"targetValue\\\":1000,\\\"currentValue\\\":0}}],\\\"deadline\\\":\\\"2026-09-30\\\"}}","status":"completed"}}]
 
 ## 制約
 - AskUserQuestion: 質問は最大4つ、各質問の選択肢は2〜4個まで
@@ -422,6 +484,9 @@ async def websocket_endpoint(ws: WebSocket):
                 if not goal.get("id"):
                     goal["id"] = _short_id()
                 goal["kpis"] = _ensure_kpi_ids(goal.get("kpis", []))
+                goal.setdefault("achieved", False)
+                goal.setdefault("achievedAt", "")
+                _sync_goal_achievement(goal)
                 goals.append(goal)
                 await ws.send_json({"type": "goal_sync", "goals": goals})
                 continue
@@ -431,6 +496,7 @@ async def websocket_endpoint(ws: WebSocket):
                 incoming["kpis"] = _ensure_kpi_ids(
                     incoming.get("kpis", [])
                 )
+                _sync_goal_achievement(incoming)
                 goals = [
                     incoming if g["id"] == incoming.get("id") else g
                     for g in goals

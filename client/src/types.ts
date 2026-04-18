@@ -1,9 +1,26 @@
 export type ColumnId = "todo" | "in_progress" | "done";
 
+export type KPIUnit = "number" | "percent";
+
 export interface KPI {
   id: string;
   name: string;
-  value: string;
+  unit: KPIUnit;
+  targetValue: number;
+  currentValue: number;
+}
+
+export function kpiProgress(kpi: KPI): number {
+  if (!kpi.targetValue) return 0;
+  return Math.min(100, Math.max(0, (kpi.currentValue / kpi.targetValue) * 100));
+}
+
+export function isKpiAchieved(kpi: KPI): boolean {
+  return kpi.targetValue > 0 && kpi.currentValue >= kpi.targetValue;
+}
+
+export function areAllKpisAchieved(kpis: KPI[]): boolean {
+  return kpis.length > 0 && kpis.every(isKpiAchieved);
 }
 
 export interface Goal {
@@ -12,6 +29,8 @@ export interface Goal {
   memo: string;
   kpis: KPI[];
   deadline: string;
+  achieved: boolean;
+  achievedAt: string; // ISO datetime or ""
 }
 
 export interface TimeLog {
