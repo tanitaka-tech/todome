@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import type { ColumnId, Goal, KanbanTask } from "../types";
 import { formatDuration, totalSeconds } from "../types";
 
@@ -25,6 +25,8 @@ const PRIORITY_LABELS: Record<string, { label: string; className: string }> = {
   low: { label: "低", className: "priority-low" },
 };
 
+type InsertPos = "above" | "below";
+
 export function KanbanBoard({
   tasks,
   goals,
@@ -36,38 +38,260 @@ export function KanbanBoard({
   tick: _tick,
 }: Props) {
   const [dragId, setDragId] = useState<string | null>(null);
-  const [dragOver, setDragOver] = useState<ColumnId | null>(null);
+  const [dragOverColumn, setDragOverColumn] = useState<ColumnId | null>(null);
+  const [dragOverCardId, setDragOverCardId] = useState<string | null>(null);
+  const [dragOverPos, setDragOverPos] = useState<InsertPos>("above");
   const [addingTo, setAddingTo] = useState<ColumnId | null>(null);
   const [newTitle, setNewTitle] = useState("");
   const [newPriority, setNewPriority] = useState<"low" | "medium" | "high">("medium");
   const addInputRef = useRef<HTMLInputElement>(null);
 
+  const cardRefs = useRef(new Map<string, HTMLElement>());
+  const prevRects = useRef(new Map<string, DOMRect>());
+  const originalTasksRef = useRef<KanbanTask[] | null>(null);
+  const dropCommittedRef = useRef(false);
+
+  useLayoutEffect(() => {
+    const nextRects = new Map<string, DOMRect>();
+    cardRefs.current.forEach((el, id) => {
+      nextRects.set(id, el.getBoundingClientRect());
+    });
+
+    cardRefs.current.forEach((el, id) => {
+      // The dragging card itself is handled by the OS drag ghost —
+      // we don't want to FLIP-animate its in-flow placeholder.
+      if (id === dragId) return;
+      const prev = prevRects.current.get(id);
+      const next = nextRects.get(id);
+      if (!prev || !next) return;
+      const dx = prev.left - next.left;
+      const dy = prev.top - next.top;
+      if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
+      el.style.transition = "transform 0s";
+      el.style.transform = `translate(${dx}px, ${dy}px)`;
+      // force reflow so the starting transform is committed
+      void el.offsetWidth;
+      el.style.transition = "transform 0.22s cubic-bezier(0.2, 0, 0, 1)";
+      el.style.transform = "";
+      const cleanup = () => {
+        el.style.transition = "";
+        el.removeEventListener("transitionend", cleanup);
+      };
+      el.addEventListener("transitionend", cleanup);
+    });
+
+    // Preserve the pre-drag rect for the dragging card so that when the drag
+    // ends it animates from its original position to its final position.
+    const newPrev = new Map(nextRects);
+    if (dragId) {
+      const preserved = prevRects.current.get(dragId);
+      if (preserved) newPrev.set(dragId, preserved);
+    }
+    prevRects.current = newPrev;
+  }, [tasks, dragId]);
+
+  const setCardRef = (id: string) => (el: HTMLDivElement | null) => {
+    if (el) cardRefs.current.set(id, el);
+    else cardRefs.current.delete(id);
+  };
+
   const goalMap = new Map(goals.map((g) => [g.id, g]));
 
-  const handleDragStart = (taskId: string) => {
-    setDragId(taskId);
-  };
-
-  const handleDragOver = (e: React.DragEvent, columnId: ColumnId) => {
-    e.preventDefault();
-    setDragOver(columnId);
-  };
-
-  const handleDragLeave = () => {
-    setDragOver(null);
-  };
-
-  const handleDrop = (columnId: ColumnId) => {
-    if (dragId) {
-      onMoveColumn(dragId, columnId);
-    }
+  const resetDragState = () => {
     setDragId(null);
-    setDragOver(null);
+    setDragOverColumn(null);
+    setDragOverCardId(null);
+  };
+
+  const handleDragStart = (e: React.DragEvent, taskId: string) => {
+    setDragId(taskId);
+    originalTasksRef.current = tasks;
+    dropCommittedRef.current = false;
+    e.dataTransfer.effectAllowed = "move";
+    try {
+      e.dataTransfer.setData("text/plain", taskId);
+    } catch {
+      /* some browsers block this */
+    }
+  };
+
+  const applyReorderLocally = (
+    draggedId: string,
+    targetCardId: string | null,
+    targetColumn: ColumnId,
+    insertAbove: boolean,
+  ) => {
+    setTasks((prev) => {
+      const draggedIdx = prev.findIndex((t) => t.id === draggedId);
+      if (draggedIdx === -1) return prev;
+      const dragged = prev[draggedIdx];
+      if (dragged.column !== targetColumn) return prev;
+      const without = prev.filter((t) => t.id !== draggedId);
+
+      let insertIdx: number;
+      if (targetCardId === null) {
+        let lastIdx = -1;
+        for (let i = 0; i < without.length; i++) {
+          if (without[i].column === targetColumn) lastIdx = i;
+        }
+        insertIdx = lastIdx + 1;
+      } else {
+        const targetIdx = without.findIndex((t) => t.id === targetCardId);
+        if (targetIdx === -1) return prev;
+        insertIdx = insertAbove ? targetIdx : targetIdx + 1;
+      }
+
+      const newArr = [
+        ...without.slice(0, insertIdx),
+        dragged,
+        ...without.slice(insertIdx),
+      ];
+      const unchanged = newArr.every((t, i) => t.id === prev[i]?.id);
+      return unchanged ? prev : newArr;
+    });
+  };
+
+  const commitReorder = (
+    draggedId: string,
+    targetCardId: string | null,
+    targetColumn: ColumnId,
+    insertAbove: boolean,
+  ) => {
+    const dragged = tasks.find((t) => t.id === draggedId);
+    if (!dragged) return;
+    const columnChanged = dragged.column !== targetColumn;
+
+    const without = tasks.filter((t) => t.id !== draggedId);
+    let insertIdx: number;
+    if (targetCardId === null) {
+      let lastIdx = -1;
+      for (let i = 0; i < without.length; i++) {
+        if (without[i].column === targetColumn) lastIdx = i;
+      }
+      insertIdx = lastIdx + 1;
+    } else {
+      const targetIdx = without.findIndex((t) => t.id === targetCardId);
+      if (targetIdx === -1) return;
+      insertIdx = insertAbove ? targetIdx : targetIdx + 1;
+    }
+
+    const finalOrder = [
+      ...without.slice(0, insertIdx),
+      dragged,
+      ...without.slice(insertIdx),
+    ];
+    const needsReorder = finalOrder.some((t, i) => t.id !== tasks[i]?.id);
+
+    if (columnChanged) {
+      onMoveColumn(draggedId, targetColumn);
+    }
+    if (needsReorder) {
+      setTasks((prev) => {
+        const map = new Map(prev.map((t) => [t.id, t]));
+        return finalOrder
+          .map((t) => map.get(t.id))
+          .filter((t): t is KanbanTask => !!t);
+      });
+    }
+
+    const origOrder = originalTasksRef.current;
+    const changedFromOriginal =
+      !origOrder ||
+      finalOrder.some((t, i) => t.id !== origOrder[i]?.id) ||
+      columnChanged;
+    if (changedFromOriginal) {
+      send({ type: "kanban_reorder", taskIds: finalOrder.map((t) => t.id) });
+    }
+  };
+
+  const handleColumnDragOver = (e: React.DragEvent, columnId: ColumnId) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDragOverCardId(null);
+    const dragged = dragId ? tasks.find((t) => t.id === dragId) : null;
+    if (dragId && dragged && dragged.column !== columnId) {
+      setDragOverColumn(columnId);
+    } else {
+      setDragOverColumn(null);
+    }
+  };
+
+  const handleColumnDragLeave = (e: React.DragEvent) => {
+    if (e.currentTarget === e.target) {
+      setDragOverColumn(null);
+    }
+  };
+
+  const handleColumnDrop = (e: React.DragEvent, columnId: ColumnId) => {
+    e.preventDefault();
+    dropCommittedRef.current = true;
+    if (dragId) {
+      commitReorder(dragId, null, columnId, false);
+    }
+    resetDragState();
+  };
+
+  const handleCardDragOver = (
+    e: React.DragEvent,
+    targetId: string,
+    targetCol: ColumnId,
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = "move";
+    if (!dragId || dragId === targetId) return;
+
+    const dragged = tasks.find((t) => t.id === dragId);
+    if (!dragged) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const mid = rect.top + rect.height / 2;
+    const insertAbove = e.clientY < mid;
+
+    if (dragged.column === targetCol) {
+      // Same column — live reorder so neighbors shift to make space.
+      setDragOverCardId(null);
+      setDragOverColumn(null);
+      applyReorderLocally(dragId, targetId, targetCol, insertAbove);
+    } else {
+      // Cross column — show an insertion indicator; commit on drop.
+      setDragOverCardId(targetId);
+      setDragOverPos(insertAbove ? "above" : "below");
+      setDragOverColumn(null);
+    }
+  };
+
+  const handleCardDrop = (
+    e: React.DragEvent,
+    targetId: string,
+    targetCol: ColumnId,
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dropCommittedRef.current = true;
+    if (dragId && dragId !== targetId) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const mid = rect.top + rect.height / 2;
+      const insertAbove = e.clientY < mid;
+      commitReorder(dragId, targetId, targetCol, insertAbove);
+    }
+    resetDragState();
   };
 
   const handleDragEnd = () => {
-    setDragId(null);
-    setDragOver(null);
+    // Revert if the drop was cancelled (dropped outside a valid target, ESC, etc.).
+    if (!dropCommittedRef.current && originalTasksRef.current) {
+      const original = originalTasksRef.current;
+      setTasks((prev) => {
+        const unchanged =
+          prev.length === original.length &&
+          prev.every((t, i) => t.id === original[i].id);
+        return unchanged ? prev : original;
+      });
+    }
+    originalTasksRef.current = null;
+    dropCommittedRef.current = false;
+    resetDragState();
   };
 
   const handleAdd = (columnId: ColumnId) => {
@@ -114,10 +338,10 @@ export function KanbanBoard({
         return (
           <div
             key={col.id}
-            className={`kanban-column ${dragOver === col.id ? "kanban-column--dragover" : ""}`}
-            onDragOver={(e) => handleDragOver(e, col.id)}
-            onDragLeave={handleDragLeave}
-            onDrop={() => handleDrop(col.id)}
+            className={`kanban-column ${dragOverColumn === col.id ? "kanban-column--dragover" : ""}`}
+            onDragOver={(e) => handleColumnDragOver(e, col.id)}
+            onDragLeave={handleColumnDragLeave}
+            onDrop={(e) => handleColumnDrop(e, col.id)}
           >
             <div className="kanban-column-header">
               <span className="kanban-column-dot" style={{ background: col.color }} />
@@ -137,13 +361,26 @@ export function KanbanBoard({
                 const linkedGoal = task.goalId ? goalMap.get(task.goalId) : undefined;
                 const secs = totalSeconds(task);
                 const running = !!task.timerStartedAt;
+                const showInsertAbove =
+                  !!dragId &&
+                  dragId !== task.id &&
+                  dragOverCardId === task.id &&
+                  dragOverPos === "above";
+                const showInsertBelow =
+                  !!dragId &&
+                  dragId !== task.id &&
+                  dragOverCardId === task.id &&
+                  dragOverPos === "below";
                 return (
                   <div
                     key={task.id}
-                    className={`kanban-card ${dragId === task.id ? "kanban-card--dragging" : ""} ${running ? "kanban-card--running" : ""}`}
+                    ref={setCardRef(task.id)}
+                    className={`kanban-card ${dragId === task.id ? "kanban-card--dragging" : ""} ${running ? "kanban-card--running" : ""} ${showInsertAbove ? "kanban-card--insert-above" : ""} ${showInsertBelow ? "kanban-card--insert-below" : ""}`}
                     draggable
-                    onDragStart={() => handleDragStart(task.id)}
+                    onDragStart={(e) => handleDragStart(e, task.id)}
                     onDragEnd={handleDragEnd}
+                    onDragOver={(e) => handleCardDragOver(e, task.id, col.id)}
+                    onDrop={(e) => handleCardDrop(e, task.id, col.id)}
                     onClick={() => onCardClick(task)}
                   >
                     <div className="kanban-card-top">

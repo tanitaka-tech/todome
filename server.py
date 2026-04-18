@@ -571,6 +571,22 @@ async def websocket_endpoint(ws: WebSocket):
                 )
                 continue
 
+            if data["type"] == "kanban_reorder":
+                ids = data.get("taskIds", [])
+                task_map = {t["id"]: t for t in kanban_tasks}
+                seen: set[str] = set()
+                new_order: list[KanbanTask] = []
+                for tid in ids:
+                    if tid in task_map and tid not in seen:
+                        new_order.append(task_map[tid])
+                        seen.add(tid)
+                for t in kanban_tasks:
+                    if t["id"] not in seen:
+                        new_order.append(t)
+                kanban_tasks = new_order
+                save_tasks(kanban_tasks)
+                continue
+
             if data["type"] == "kanban_edit":
                 task_id = data["taskId"]
                 for t in kanban_tasks:

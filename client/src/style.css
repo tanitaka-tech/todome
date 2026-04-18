@@ -670,22 +670,45 @@ body {
 }
 
 .kanban-card {
+  position: relative;
   background: var(--surface-raised);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 10px 12px;
   cursor: grab;
-  transition: border-color 0.12s, background 0.12s, transform 0.12s, opacity 0.12s;
+  transition: border-color 0.12s, background 0.12s, opacity 0.12s;
   animation: cardIn 0.15s ease;
 }
+.kanban-card::before,
+.kanban-card::after {
+  content: "";
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 2px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.1s;
+}
+.kanban-card::before { top: -4px; }
+.kanban-card::after { bottom: -4px; }
+.kanban-card--insert-above::before { opacity: 1; }
+.kanban-card--insert-below::after { opacity: 1; }
 .kanban-card:hover {
   border-color: var(--border-strong);
   background: var(--surface-hover);
 }
 .kanban-card:active { cursor: grabbing; }
 .kanban-card--dragging {
-  opacity: 0.4;
-  transform: scale(0.96);
+  opacity: 0.25;
+  background: var(--surface);
+  border-style: dashed;
+  box-shadow: none;
+}
+.kanban-card--dragging * {
+  visibility: hidden;
 }
 .kanban-card--adding {
   cursor: default;
