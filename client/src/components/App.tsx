@@ -68,7 +68,7 @@ const NAV_ITEMS: {
   { id: "board", label: "ボード", icon: "▤", group: "work" },
   { id: "goals", label: "目標", icon: "◎", group: "work" },
   { id: "stats", label: "統計", icon: "▨", group: "work" },
-  { id: "profile", label: "自分について", icon: "◉", group: "work" },
+  { id: "profile", label: "自分について", icon: "◉", group: "app" },
   { id: "settings", label: "設定", icon: "⚙", group: "app" },
 ];
 
@@ -96,6 +96,7 @@ export function App() {
   const [popupTaskId, setPopupTaskId] = useState<string | null>(null);
   const [celebrations, setCelebrations] = useState<Celebration[]>([]);
   const [theme, setThemeState] = useState<ThemeName>(() => getInitialTheme());
+  const [chatOpen, setChatOpen] = useState(true);
 
   useEffect(() => {
     applyTheme(theme);
@@ -347,20 +348,22 @@ export function App() {
   const workNav = NAV_ITEMS.filter((n) => n.group === "work");
   const appNav = NAV_ITEMS.filter((n) => n.group === "app");
 
+  const shellClass = [
+    "app-shell",
+    chatOpen ? "" : "app-shell--chat-collapsed",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <div className="app-shell">
+    <div className={shellClass}>
       {/* === Sidebar === */}
       <aside className="sidebar">
         <div className="sidebar-brand">
           <div className="sidebar-brand-mark">t</div>
-          <div>
-            <div className="sidebar-brand-text">todome</div>
-            <div className="sidebar-brand-sub">TASK · AI</div>
-          </div>
         </div>
 
-        <div className="sidebar-section-label">Workspace</div>
-        <nav className="sidebar-nav">
+        <nav className="sidebar-nav sidebar-nav--top">
           {workNav.map((item) => (
             <button
               key={item.id}
@@ -368,6 +371,7 @@ export function App() {
                 activeView === item.id ? "sidebar-nav-item--active" : ""
               }`}
               onClick={() => setActiveView(item.id)}
+              title={item.label}
             >
               <span className="sidebar-nav-icon">{item.icon}</span>
               <span className="sidebar-nav-label">{item.label}</span>
@@ -375,8 +379,7 @@ export function App() {
           ))}
         </nav>
 
-        <div className="sidebar-section-label">App</div>
-        <nav className="sidebar-nav">
+        <nav className="sidebar-nav sidebar-nav--bottom">
           {appNav.map((item) => (
             <button
               key={item.id}
@@ -384,19 +387,13 @@ export function App() {
                 activeView === item.id ? "sidebar-nav-item--active" : ""
               }`}
               onClick={() => setActiveView(item.id)}
+              title={item.label}
             >
               <span className="sidebar-nav-icon">{item.icon}</span>
               <span className="sidebar-nav-label">{item.label}</span>
             </button>
           ))}
         </nav>
-
-        <div className="sidebar-footer">
-          <span>v0.1</span>
-          <span style={{ marginLeft: "auto" }}>
-            {theme === "dark" ? "DARK" : "BEIGE"}
-          </span>
-        </div>
       </aside>
 
       {/* === Topbar === */}
@@ -414,6 +411,16 @@ export function App() {
           />
           {connected ? "connected" : "connecting…"}
         </div>
+        {!chatOpen && (
+          <button
+            className="topbar-toggle topbar-toggle--right"
+            onClick={() => setChatOpen(true)}
+            title="AIアシスタントを開く"
+            aria-label="AIアシスタントを開く"
+          >
+            &#10038;
+          </button>
+        )}
       </header>
 
       {/* === Main === */}
@@ -458,6 +465,7 @@ export function App() {
         connected={connected}
         onSend={handleSendMessage}
         onAskSubmit={handleAskSubmit}
+        onClose={() => setChatOpen(false)}
       />
 
       {selectedTask && (

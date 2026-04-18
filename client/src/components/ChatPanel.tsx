@@ -13,6 +13,7 @@ interface Props {
   connected: boolean;
   onSend: (text: string) => void;
   onAskSubmit: (requestId: string, answers: Record<string, string>) => void;
+  onClose?: () => void;
 }
 
 const TOOL_PREFIX = "\x00tool:";
@@ -32,6 +33,7 @@ export function ChatPanel({
   connected,
   onSend,
   onAskSubmit,
+  onClose,
 }: Props) {
   const [input, setInput] = useState("");
   const flowRef = useRef<HTMLDivElement>(null);
@@ -60,6 +62,16 @@ export function ChatPanel({
       <div className="chat-panel-header">
         <span className="chat-panel-icon">&#10038;</span>
         AI アシスタント
+        {onClose && (
+          <button
+            className="chat-panel-close"
+            onClick={onClose}
+            title="AIアシスタントを閉じる"
+            aria-label="AIアシスタントを閉じる"
+          >
+            &#10095;
+          </button>
+        )}
       </div>
 
       <div className="chat-flow" ref={flowRef}>
