@@ -51,6 +51,7 @@ export function ChatPanel({
   const [toolDetail, setToolDetail] = useState<ChatMessage | null>(null);
   const flowRef = useRef<HTMLDivElement>(null);
   const composing = useRef(false);
+  const toolOverlayMouseDownRef = useRef(false);
 
   const handleSend = () => {
     const text = input.trim();
@@ -241,7 +242,14 @@ export function ChatPanel({
       {toolDetail && (
         <div
           className="modal-overlay"
-          onClick={() => setToolDetail(null)}
+          onMouseDown={(e) => {
+            toolOverlayMouseDownRef.current = e.target === e.currentTarget;
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && toolOverlayMouseDownRef.current) {
+              setToolDetail(null);
+            }
+          }}
         >
           <div
             className="modal-content tool-detail-modal"

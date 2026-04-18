@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { Goal, KanbanTask } from "../types";
 import { formatDuration } from "../types";
 
@@ -17,6 +17,7 @@ export function TaskDetailModal({ task, goals, onSave, onClose }: Props) {
   const [estM, setEstM] = useState(task.estimatedMinutes % 60);
 
   const linkedGoal = goalId ? goals.find((g) => g.id === goalId) : undefined;
+  const overlayMouseDownRef = useRef(false);
 
   const handleSave = () => {
     const estimatedMinutes = Math.max(0, estH * 60 + estM);
@@ -24,7 +25,17 @@ export function TaskDetailModal({ task, goals, onSave, onClose }: Props) {
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div
+      className="modal-overlay"
+      onMouseDown={(e) => {
+        overlayMouseDownRef.current = e.target === e.currentTarget;
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget && overlayMouseDownRef.current) {
+          onClose();
+        }
+      }}
+    >
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2 className="modal-title">タスク詳細</h2>

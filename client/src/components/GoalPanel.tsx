@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   areAllKpisAchieved,
   isKpiAchieved,
@@ -43,6 +43,8 @@ export function GoalPanel({ goals, setGoals, send }: Props) {
   const [tab, setTab] = useState<"active" | "achieved">("active");
   const [formError, setFormError] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<Goal | null>(null);
+  const formOverlayMouseDownRef = useRef(false);
+  const deleteOverlayMouseDownRef = useRef(false);
 
   const openNew = () => {
     setEditingGoal({
@@ -345,7 +347,17 @@ export function GoalPanel({ goals, setGoals, send }: Props) {
       </div>
 
       {showForm && editingGoal && (
-        <div className="modal-overlay" onClick={closeForm}>
+        <div
+          className="modal-overlay"
+          onMouseDown={(e) => {
+            formOverlayMouseDownRef.current = e.target === e.currentTarget;
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && formOverlayMouseDownRef.current) {
+              closeForm();
+            }
+          }}
+        >
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2 className="modal-title">
@@ -522,7 +534,14 @@ export function GoalPanel({ goals, setGoals, send }: Props) {
       {deleteTarget && (
         <div
           className="modal-overlay"
-          onClick={() => setDeleteTarget(null)}
+          onMouseDown={(e) => {
+            deleteOverlayMouseDownRef.current = e.target === e.currentTarget;
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && deleteOverlayMouseDownRef.current) {
+              setDeleteTarget(null);
+            }
+          }}
         >
           <div
             className="modal-content modal-content--sm"
