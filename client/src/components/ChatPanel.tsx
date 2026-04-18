@@ -13,16 +13,26 @@ interface Props {
   connected: boolean;
   onSend: (text: string) => void;
   onAskSubmit: (requestId: string, answers: Record<string, string>) => void;
+  onCancel: () => void;
+  onClearSession: () => void;
   onClose?: () => void;
 }
-
-const TOOL_PREFIX = "\x00tool:";
 
 const SUGGESTIONS = [
   "今日やるべきタスクを提案して",
   "タスクの優先度を見直して",
   "このプロジェクトに足りないタスクは？",
 ];
+
+function formatToolInput(input: unknown): string {
+  if (input == null) return "";
+  if (typeof input === "string") return input;
+  try {
+    return JSON.stringify(input, null, 2);
+  } catch {
+    return String(input);
+  }
+}
 
 export function ChatPanel({
   messages,
@@ -33,15 +43,23 @@ export function ChatPanel({
   connected,
   onSend,
   onAskSubmit,
+  onCancel,
+  onClearSession,
   onClose,
 }: Props) {
   const [input, setInput] = useState("");
+  const [toolDetail, setToolDetail] = useState<ChatMessage | null>(null);
   const flowRef = useRef<HTMLDivElement>(null);
   const composing = useRef(false);
 
   const handleSend = () => {
     const text = input.trim();
     if (!text || !connected) return;
+    if (text === "/clear") {
+      onClearSession();
+      setInput("");
+      return;
+    }
     onSend(text);
     setInput("");
   };
@@ -62,6 +80,15 @@ export function ChatPanel({
       <div className="chat-panel-header">
         <span className="chat-panel-icon">&#10038;</span>
         AI アシスタント
+        <button
+          className="chat-panel-clear"
+          onClick={onClearSession}
+          disabled={!connected}
+          title="セッションをクリア (/clear)"
+          aria-label="セッションをクリア"
+        >
+          クリア
+        </button>
         {onClose && (
           <button
             className="chat-panel-close"
@@ -95,12 +122,17 @@ export function ChatPanel({
         )}
 
         {messages.map((m) => {
-          if (m.text.startsWith(TOOL_PREFIX)) {
+          if (m.role === "tool") {
             return (
               <div key={m.id} className="chat-tool-event">
-                <span className="chat-tool-label">
-                  {m.text.slice(TOOL_PREFIX.length)}
-                </span>
+                <button
+                  className="chat-tool-label chat-tool-label--button"
+                  onClick={() => setToolDetail(m)}
+                  title="詳細を表示"
+                >
+                  {m.text}
+                  <span className="chat-tool-label-icon">&#9432;</span>
+                </button>
               </div>
             );
           }
@@ -168,7 +200,13 @@ export function ChatPanel({
       <div className="chat-input-dock">
         <input
           className="chat-input"
-          placeholder={connected ? "AIに相談..." : "接続中..."}
+          placeholder={
+            connected
+              ? waiting
+                ? "AIが応答中..."
+                : "AIに相談..."
+              : "接続中..."
+          }
           value={input}
           disabled={!connected || waiting}
           onChange={(e) => setInput(e.target.value)}
@@ -181,14 +219,56 @@ export function ChatPanel({
             }
           }}
         />
-        <button
-          className="chat-send"
-          disabled={!connected || waiting || !input.trim()}
-          onClick={handleSend}
-        >
-          送信
-        </button>
+        {waiting ? (
+          <button
+            className="chat-send chat-send--cancel"
+            onClick={onCancel}
+            disabled={!connected}
+          >
+            キャンセル
+          </button>
+        ) : (
+          <button
+            className="chat-send"
+            disabled={!connected || !input.trim()}
+            onClick={handleSend}
+          >
+            送信
+          </button>
+        )}
       </div>
+
+      {toolDetail && (
+        <div
+          className="modal-overlay"
+          onClick={() => setToolDetail(null)}
+        >
+          <div
+            className="modal-content tool-detail-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header">
+              <div>
+                <div className="modal-title">{toolDetail.toolName ?? "Tool"}</div>
+                <div className="tool-detail-subtitle">{toolDetail.text}</div>
+              </div>
+              <button
+                className="modal-close"
+                onClick={() => setToolDetail(null)}
+                aria-label="閉じる"
+              >
+                &times;
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="modal-label">input</div>
+              <pre className="tool-detail-json">
+                {formatToolInput(toolDetail.toolInput)}
+              </pre>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

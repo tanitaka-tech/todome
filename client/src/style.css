@@ -979,8 +979,33 @@ body {
   text-transform: none;
 }
 
-.chat-panel-close {
+.chat-panel-clear {
   margin-left: auto;
+  height: 22px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--fg-muted);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.chat-panel-clear:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--fg);
+  border-color: var(--border-strong);
+}
+.chat-panel-clear:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.chat-panel-close {
   width: 22px;
   height: 22px;
   border: 1px solid var(--border);
@@ -1128,6 +1153,22 @@ body {
   border-radius: 99px;
   border: 1px solid var(--border);
 }
+.chat-tool-label--button {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.12s;
+}
+.chat-tool-label--button:hover {
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
+  color: var(--fg);
+}
+.chat-tool-label-icon {
+  font-size: 11px;
+  opacity: 0.7;
+}
 
 .chat-system {
   text-align: center;
@@ -1213,6 +1254,42 @@ body {
 }
 .chat-send:hover:not(:disabled) { background: var(--accent-hover); }
 .chat-send:disabled { opacity: 0.3; cursor: default; }
+
+.chat-send--cancel {
+  background: var(--danger);
+  color: #fff;
+}
+.chat-send--cancel:hover:not(:disabled) {
+  background: var(--danger);
+  filter: brightness(1.1);
+}
+
+.tool-detail-modal {
+  width: 620px;
+  max-width: 90vw;
+}
+.tool-detail-subtitle {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--fg-muted);
+  margin-top: 2px;
+  letter-spacing: 0.04em;
+}
+.tool-detail-json {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin-top: 4px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 60vh;
+  overflow-y: auto;
+}
 
 /* ===== Ask Card (in chat) ===== */
 .ask-card {

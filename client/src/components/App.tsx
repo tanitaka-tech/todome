@@ -22,8 +22,6 @@ import { SettingsPanel } from "./SettingsPanel";
 let msgId = 0;
 const nextId = () => String(++msgId);
 
-const TOOL_PREFIX = "\x00tool:";
-
 type ActiveView =
   | "overview"
   | "board"
@@ -130,9 +128,13 @@ export function App() {
         setStreamText((p) => p + msg.text);
         break;
       case "tool_use": {
+        const inputStr =
+          typeof msg.input === "string"
+            ? msg.input
+            : JSON.stringify(msg.input ?? "");
         const hasGoalOp =
-          msg.input?.includes("GOAL_ADD:") ||
-          msg.input?.includes("GOAL_UPDATE:");
+          inputStr.includes("GOAL_ADD:") ||
+          inputStr.includes("GOAL_UPDATE:");
         const label =
           msg.name === "TodoWrite"
             ? hasGoalOp
@@ -144,11 +146,24 @@ export function App() {
         if (label) {
           setMessages((p) => [
             ...p,
-            { id: nextId(), role: "system", text: TOOL_PREFIX + label },
+            {
+              id: nextId(),
+              role: "tool",
+              text: label,
+              toolName: msg.name,
+              toolInput: msg.input,
+            },
           ]);
         }
         break;
       }
+      case "session_cleared":
+        setMessages([]);
+        setStreamText("");
+        setThinkingText("");
+        setAskRequests([]);
+        setWaiting(false);
+        break;
       case "assistant":
         setStreamText("");
         setThinkingText("");
@@ -200,6 +215,21 @@ export function App() {
     },
     [connected, send],
   );
+
+  const handleCancel = useCallback(() => {
+    if (!connected) return;
+    send({ type: "cancel" });
+  }, [connected, send]);
+
+  const handleClearSession = useCallback(() => {
+    if (!connected) return;
+    send({ type: "clear_session" });
+    setMessages([]);
+    setStreamText("");
+    setThinkingText("");
+    setAskRequests([]);
+    setWaiting(false);
+  }, [connected, send]);
 
   const handleAskSubmit = useCallback(
     (requestId: string, answers: Record<string, string>) => {
@@ -465,6 +495,8 @@ export function App() {
         connected={connected}
         onSend={handleSendMessage}
         onAskSubmit={handleAskSubmit}
+        onCancel={handleCancel}
+        onClearSession={handleClearSession}
         onClose={() => setChatOpen(false)}
       />
 

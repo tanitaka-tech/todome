@@ -491,10 +491,24 @@ async def websocket_endpoint(ws: WebSocket):
             while True:
                 raw = await ws.receive_text()
                 data = json.loads(raw)
-                if data["type"] == "ask_response":
+                msg_type = data.get("type")
+                if msg_type == "ask_response":
                     request_id = data.get("requestId", "")
                     if request_id in pending_approvals:
                         pending_approvals[request_id].set_result(data)
+                elif msg_type == "cancel":
+                    if client is not None:
+                        try:
+                            await client.interrupt()
+                        except Exception as e:
+                            print(f"interrupt failed: {e}")
+                elif msg_type == "clear_session":
+                    if client is not None:
+                        try:
+                            await client.interrupt()
+                        except Exception:
+                            pass
+                    await msg_queue.put(data)
                 else:
                     await msg_queue.put(data)
         except WebSocketDisconnect:
@@ -624,6 +638,17 @@ async def websocket_endpoint(ws: WebSocket):
                 )
                 continue
 
+            # --- セッションクリア ---
+            if data["type"] == "clear_session":
+                if client is not None:
+                    try:
+                        await client.disconnect()
+                    except Exception:
+                        pass
+                    client = None
+                await ws.send_json({"type": "session_cleared"})
+                continue
+
             # --- プロフィール更新 ---
             if data["type"] == "profile_update":
                 profile = data.get("profile", dict(DEFAULT_PROFILE))
@@ -677,80 +702,95 @@ async def websocket_endpoint(ws: WebSocket):
 
                 await client.query(full_msg)
 
-                async for msg in client.receive_response():
-                    if isinstance(msg, StreamEvent):
-                        event = msg.event
-                        if event.get("type") == "content_block_delta":
-                            delta = event.get("delta", {})
-                            if delta.get("type") == "text_delta":
+                result_sent = False
+                try:
+                    async for msg in client.receive_response():
+                        if isinstance(msg, StreamEvent):
+                            event = msg.event
+                            if event.get("type") == "content_block_delta":
+                                delta = event.get("delta", {})
+                                if delta.get("type") == "text_delta":
+                                    await ws.send_json(
+                                        {
+                                            "type": "stream_delta",
+                                            "text": delta["text"],
+                                        }
+                                    )
+                                elif delta.get("type") == "thinking_delta":
+                                    await ws.send_json(
+                                        {
+                                            "type": "thinking_delta",
+                                            "text": delta.get("thinking", ""),
+                                        }
+                                    )
+
+                        elif isinstance(msg, AssistantMessage):
+                            text_parts = []
+                            for block in msg.content:
+                                if isinstance(block, TextBlock):
+                                    text_parts.append(block.text)
+                                elif isinstance(block, ThinkingBlock):
+                                    pass
+                                elif isinstance(block, ToolUseBlock):
+                                    await ws.send_json(
+                                        {
+                                            "type": "tool_use",
+                                            "name": block.name,
+                                            "input": block.input,
+                                        }
+                                    )
+                                    if block.name == "TodoWrite":
+                                        todos = block.input.get("todos", [])
+                                        kanban_tasks, goals = process_todos(
+                                            todos,
+                                            kanban_tasks,
+                                            goals,
+                                        )
+                                        save_tasks(kanban_tasks)
+                                        save_goals(goals)
+                                        await ws.send_json(
+                                            {
+                                                "type": "kanban_sync",
+                                                "tasks": kanban_tasks,
+                                            }
+                                        )
+                                        await ws.send_json(
+                                            {
+                                                "type": "goal_sync",
+                                                "goals": goals,
+                                            }
+                                        )
+                            if text_parts:
                                 await ws.send_json(
                                     {
-                                        "type": "stream_delta",
-                                        "text": delta["text"],
-                                    }
-                                )
-                            elif delta.get("type") == "thinking_delta":
-                                await ws.send_json(
-                                    {
-                                        "type": "thinking_delta",
-                                        "text": delta.get("thinking", ""),
+                                        "type": "assistant",
+                                        "text": "".join(text_parts),
+                                        "toolCalls": [],
                                     }
                                 )
 
-                    elif isinstance(msg, AssistantMessage):
-                        text_parts = []
-                        for block in msg.content:
-                            if isinstance(block, TextBlock):
-                                text_parts.append(block.text)
-                            elif isinstance(block, ThinkingBlock):
-                                pass
-                            elif isinstance(block, ToolUseBlock):
-                                input_summary = str(block.input)[:200]
-                                await ws.send_json(
-                                    {
-                                        "type": "tool_use",
-                                        "name": block.name,
-                                        "input": input_summary,
-                                    }
-                                )
-                                if block.name == "TodoWrite":
-                                    todos = block.input.get("todos", [])
-                                    kanban_tasks, goals = process_todos(
-                                        todos,
-                                        kanban_tasks,
-                                        goals,
-                                    )
-                                    save_tasks(kanban_tasks)
-                                    save_goals(goals)
-                                    await ws.send_json(
-                                        {
-                                            "type": "kanban_sync",
-                                            "tasks": kanban_tasks,
-                                        }
-                                    )
-                                    await ws.send_json(
-                                        {
-                                            "type": "goal_sync",
-                                            "goals": goals,
-                                        }
-                                    )
-                        if text_parts:
+                        elif isinstance(msg, ResultMessage):
+                            result_sent = True
                             await ws.send_json(
                                 {
-                                    "type": "assistant",
-                                    "text": "".join(text_parts),
-                                    "toolCalls": [],
+                                    "type": "result",
+                                    "result": msg.result,
+                                    "cost": msg.total_cost_usd or 0,
+                                    "turns": msg.num_turns,
+                                    "sessionId": msg.session_id,
                                 }
                             )
-
-                    elif isinstance(msg, ResultMessage):
+                except Exception as e:
+                    print(f"response error: {e}")
+                finally:
+                    if not result_sent:
                         await ws.send_json(
                             {
                                 "type": "result",
-                                "result": msg.result,
-                                "cost": msg.total_cost_usd or 0,
-                                "turns": msg.num_turns,
-                                "sessionId": msg.session_id,
+                                "result": "(中断されました)",
+                                "cost": 0,
+                                "turns": 0,
+                                "sessionId": "",
                             }
                         )
 

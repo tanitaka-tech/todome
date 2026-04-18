@@ -96,12 +96,14 @@ export function totalSeconds(task: KanbanTask): number {
 
 // --- Messages ---
 
-export type MessageRole = "user" | "assistant" | "system";
+export type MessageRole = "user" | "assistant" | "system" | "tool";
 
 export interface ChatMessage {
   id: string;
   role: MessageRole;
   text: string;
+  toolName?: string;
+  toolInput?: unknown;
 }
 
 export interface AskQuestion {
@@ -120,7 +122,8 @@ export type WSMessage =
   | { type: "stream_delta"; text: string }
   | { type: "thinking_delta"; text: string }
   | { type: "assistant"; text: string; toolCalls: unknown[] }
-  | { type: "tool_use"; name: string; input?: string }
+  | { type: "tool_use"; name: string; input?: unknown }
+  | { type: "session_cleared" }
   | { type: "ask_user"; requestId: string; questions: AskQuestion[] }
   | { type: "kanban_sync"; tasks: KanbanTask[] }
   | { type: "goal_sync"; goals: Goal[] }
