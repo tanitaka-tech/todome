@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import EmojiPicker, { EmojiStyle, Theme } from "emoji-picker-react";
 import type { BalanceWheelCategory, UserProfile } from "../types";
+import { DARK_THEMES, type ThemeName } from "../theme";
 
 const DIAGRAM_SIZE = 280;
 const DIAGRAM_CENTER = DIAGRAM_SIZE / 2;
@@ -271,10 +272,9 @@ const DEFAULT_CATEGORIES: { name: string; icon: string }[] = [
 
 function getEmojiPickerTheme(): Theme {
   if (typeof document === "undefined") return Theme.AUTO;
-  const t = document.documentElement.getAttribute("data-theme");
-  if (t === "dark") return Theme.DARK;
-  if (t === "beige") return Theme.LIGHT;
-  return Theme.AUTO;
+  const t = document.documentElement.getAttribute("data-theme") as ThemeName | null;
+  if (!t) return Theme.AUTO;
+  return DARK_THEMES.includes(t) ? Theme.DARK : Theme.LIGHT;
 }
 
 export function ProfilePanel({ profile, setProfile, send }: Props) {

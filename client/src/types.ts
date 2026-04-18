@@ -31,6 +31,7 @@ export interface Goal {
   deadline: string;
   achieved: boolean;
   achievedAt: string; // ISO datetime or ""
+  icon?: string; // 絵文字アイコン
 }
 
 export interface TimeLog {

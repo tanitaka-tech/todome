@@ -1,4 +1,6 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import EmojiPicker, { EmojiStyle, Theme } from "emoji-picker-react";
 import {
   areAllKpisAchieved,
   isKpiAchieved,
@@ -7,7 +9,15 @@ import {
   type KPI,
   type KPIUnit,
 } from "../types";
+import { DARK_THEMES, type ThemeName } from "../theme";
 import { useModalClose } from "../hooks/useModalClose";
+
+function getEmojiPickerTheme(): Theme {
+  if (typeof document === "undefined") return Theme.AUTO;
+  const t = document.documentElement.getAttribute("data-theme") as ThemeName | null;
+  if (!t) return Theme.AUTO;
+  return DARK_THEMES.includes(t) ? Theme.DARK : Theme.LIGHT;
+}
 
 interface Props {
   goals: Goal[];
@@ -44,8 +54,64 @@ export function GoalPanel({ goals, setGoals, send }: Props) {
   const [tab, setTab] = useState<"active" | "achieved">("active");
   const [formError, setFormError] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<Goal | null>(null);
+  const [iconPickerOpen, setIconPickerOpen] = useState(false);
+  const [pickerStyle, setPickerStyle] = useState<React.CSSProperties | null>(
+    null,
+  );
+  const iconWrapRef = useRef<HTMLDivElement>(null);
+  const pickerRef = useRef<HTMLDivElement>(null);
   const formOverlayMouseDownRef = useRef(false);
   const deleteOverlayMouseDownRef = useRef(false);
+
+  useEffect(() => {
+    if (!iconPickerOpen) {
+      setPickerStyle(null);
+      return;
+    }
+    const compute = () => {
+      const el = iconWrapRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const gap = 8;
+      const width = Math.min(340, window.innerWidth - 16);
+      const left = Math.max(
+        8,
+        Math.min(r.left, window.innerWidth - width - 8),
+      );
+      const height = 380 + 40;
+      const spaceBelow = window.innerHeight - r.bottom;
+      const openBelow = spaceBelow >= height + gap;
+      setPickerStyle({
+        position: "fixed",
+        left,
+        ...(openBelow
+          ? { top: r.bottom + gap }
+          : { bottom: window.innerHeight - r.top + gap }),
+        width,
+        zIndex: 1000,
+      });
+    };
+    compute();
+    const onDocDown = (e: MouseEvent) => {
+      const t = e.target as Node;
+      const inWrap = iconWrapRef.current?.contains(t);
+      const inPicker = pickerRef.current?.contains(t);
+      if (!inWrap && !inPicker) setIconPickerOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIconPickerOpen(false);
+    };
+    window.addEventListener("resize", compute);
+    window.addEventListener("scroll", compute, true);
+    document.addEventListener("mousedown", onDocDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("resize", compute);
+      window.removeEventListener("scroll", compute, true);
+      document.removeEventListener("mousedown", onDocDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [iconPickerOpen]);
 
   const openNew = () => {
     setEditingGoal({
@@ -71,6 +137,7 @@ export function GoalPanel({ goals, setGoals, send }: Props) {
     setShowForm(false);
     setEditingGoal(null);
     setFormError("");
+    setIconPickerOpen(false);
   }, []);
   const { closing: formClosing, close: closeForm } = useModalClose(resetForm);
 
@@ -245,7 +312,12 @@ export function GoalPanel({ goals, setGoals, send }: Props) {
                 className={`goal-card ${goal.achieved ? "goal-card--achieved" : ""}`}
               >
                 <div className="goal-card-header">
-                  <div className="goal-card-name">{goal.name}</div>
+                  <div className="goal-card-name">
+                    {goal.icon && (
+                      <span className="goal-card-icon">{goal.icon}</span>
+                    )}
+                    {goal.name}
+                  </div>
                   <div className="goal-card-actions">
                     <button
                       className="goal-card-action"
@@ -375,14 +447,80 @@ export function GoalPanel({ goals, setGoals, send }: Props) {
 
             <div className="modal-body">
               <label className="modal-label">目標名</label>
-              <input
-                className="modal-input"
-                placeholder="例: Q3 売上目標"
-                value={editingGoal.name}
-                onChange={(e) =>
-                  setEditingGoal({ ...editingGoal, name: e.target.value })
-                }
-              />
+              <div className="goal-name-row">
+                <div className="goal-icon-wrap" ref={iconWrapRef}>
+                  <button
+                    type="button"
+                    className={`goal-icon-btn ${iconPickerOpen ? "is-active" : ""}`}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => setIconPickerOpen((v) => !v)}
+                    title="アイコンを選択"
+                    aria-label="アイコンを選択"
+                  >
+                    {editingGoal.icon || (
+                      <span className="goal-icon-placeholder">🎯</span>
+                    )}
+                  </button>
+                  {iconPickerOpen &&
+                    pickerStyle &&
+                    createPortal(
+                      <div
+                        ref={pickerRef}
+                        className="bw-cat-editor-picker"
+                        style={pickerStyle}
+                        onMouseDown={(e) => {
+                          const t = e.target as HTMLElement;
+                          if (
+                            t.tagName === "INPUT" ||
+                            t.tagName === "TEXTAREA"
+                          )
+                            return;
+                          e.preventDefault();
+                        }}
+                      >
+                        <div className="bw-cat-editor-picker-head">
+                          <button
+                            type="button"
+                            className="bw-cat-editor-icon-clear"
+                            onClick={() => {
+                              setEditingGoal((g) =>
+                                g ? { ...g, icon: "" } : g,
+                              );
+                              setIconPickerOpen(false);
+                            }}
+                          >
+                            アイコンなし
+                          </button>
+                        </div>
+                        <EmojiPicker
+                          onEmojiClick={(data) => {
+                            setEditingGoal((g) =>
+                              g ? { ...g, icon: data.emoji } : g,
+                            );
+                            setIconPickerOpen(false);
+                          }}
+                          theme={getEmojiPickerTheme()}
+                          emojiStyle={EmojiStyle.NATIVE}
+                          searchPlaceHolder="検索"
+                          lazyLoadEmojis
+                          width="100%"
+                          height={380}
+                          previewConfig={{ showPreview: false }}
+                          autoFocusSearch={false}
+                        />
+                      </div>,
+                      document.body,
+                    )}
+                </div>
+                <input
+                  className="modal-input"
+                  placeholder="例: Q3 売上目標"
+                  value={editingGoal.name}
+                  onChange={(e) =>
+                    setEditingGoal({ ...editingGoal, name: e.target.value })
+                  }
+                />
+              </div>
 
               <label className="modal-label">メモ</label>
               <textarea

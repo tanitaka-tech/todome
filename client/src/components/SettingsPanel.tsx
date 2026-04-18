@@ -20,7 +20,7 @@ interface Props {
   onToggleAutoSync: (value: boolean) => void;
 }
 
-const THEMES: {
+type ThemeDef = {
   id: ThemeName;
   name: string;
   sub: string;
@@ -30,7 +30,9 @@ const THEMES: {
   fg: string;
   line: string;
   muted: string;
-}[] = [
+};
+
+const DARK_THEMES_LIST: ThemeDef[] = [
   {
     id: "dark",
     name: "Dark",
@@ -43,6 +45,64 @@ const THEMES: {
     muted: "#40435a",
   },
   {
+    id: "midnight",
+    name: "Midnight",
+    sub: "Deep blue",
+    sidebar: "#0f1424",
+    surface: "#161d35",
+    accent: "#4c8bf5",
+    fg: "#e4ecff",
+    line: "#232e52",
+    muted: "#3a4680",
+  },
+  {
+    id: "forest",
+    name: "Forest",
+    sub: "Pine green",
+    sidebar: "#111d18",
+    surface: "#1a2b23",
+    accent: "#4ade80",
+    fg: "#e6efe8",
+    line: "#2a3d34",
+    muted: "#436052",
+  },
+  {
+    id: "sunset",
+    name: "Sunset",
+    sub: "Dusk pink",
+    sidebar: "#1e1526",
+    surface: "#2b1d36",
+    accent: "#f472b6",
+    fg: "#f3e8f7",
+    line: "#3d2949",
+    muted: "#6a4580",
+  },
+  {
+    id: "ocean",
+    name: "Ocean",
+    sub: "Deep teal",
+    sidebar: "#0c1d22",
+    surface: "#142d36",
+    accent: "#22d3ee",
+    fg: "#e0f2f7",
+    line: "#1f3b46",
+    muted: "#395d6a",
+  },
+  {
+    id: "slate",
+    name: "Slate",
+    sub: "Neutral gray",
+    sidebar: "#181b20",
+    surface: "#23272f",
+    accent: "#94a3b8",
+    fg: "#e6e8ec",
+    line: "#2e333d",
+    muted: "#4a515e",
+  },
+];
+
+const LIGHT_THEMES_LIST: ThemeDef[] = [
+  {
     id: "beige",
     name: "Beige",
     sub: "Warm classic",
@@ -53,7 +113,106 @@ const THEMES: {
     line: "#e0dbd4",
     muted: "#b5afa6",
   },
+  {
+    id: "paper",
+    name: "Paper",
+    sub: "Clean white",
+    sidebar: "#f1f1f1",
+    surface: "#ffffff",
+    accent: "#111827",
+    fg: "#1f2937",
+    line: "#e5e7eb",
+    muted: "#9ca3af",
+  },
+  {
+    id: "mint",
+    name: "Mint",
+    sub: "Fresh green",
+    sidebar: "#e4f0e8",
+    surface: "#ffffff",
+    accent: "#15803d",
+    fg: "#1a2e23",
+    line: "#d7e6dc",
+    muted: "#98b5a3",
+  },
+  {
+    id: "rose",
+    name: "Rose",
+    sub: "Soft pink",
+    sidebar: "#f8e4e7",
+    surface: "#ffffff",
+    accent: "#be185d",
+    fg: "#3c1f26",
+    line: "#f0d7dc",
+    muted: "#c09ba3",
+  },
+  {
+    id: "sky",
+    name: "Sky",
+    sub: "Airy blue",
+    sidebar: "#dfebf6",
+    surface: "#ffffff",
+    accent: "#0369a1",
+    fg: "#102030",
+    line: "#d1e0ed",
+    muted: "#8fa8bd",
+  },
+  {
+    id: "sand",
+    name: "Sand",
+    sub: "Warm yellow",
+    sidebar: "#f6ecd2",
+    surface: "#ffffff",
+    accent: "#a16207",
+    fg: "#3b2f18",
+    line: "#ece0c4",
+    muted: "#b5a57c",
+  },
 ];
+
+function ThemeOption({
+  t,
+  active,
+  onSelect,
+}: {
+  t: ThemeDef;
+  active: boolean;
+  onSelect: (id: ThemeName) => void;
+}) {
+  return (
+    <button
+      className={`theme-option ${active ? "theme-option--active" : ""}`}
+      onClick={() => onSelect(t.id)}
+      type="button"
+    >
+      <div className="theme-preview" style={{ borderColor: t.line }}>
+        <div
+          className="theme-preview-sidebar"
+          style={{ background: t.sidebar }}
+        />
+        <div
+          className="theme-preview-body"
+          style={{ background: t.surface }}
+        >
+          <div
+            className="theme-preview-line"
+            style={{ background: t.fg, opacity: 0.8 }}
+          />
+          <div
+            className="theme-preview-line theme-preview-line--short"
+            style={{ background: t.muted }}
+          />
+          <div
+            className="theme-preview-line theme-preview-line--pill"
+            style={{ background: t.accent }}
+          />
+        </div>
+      </div>
+      <div className="theme-option-name">{t.name}</div>
+      <div className="theme-option-sub">{t.sub}</div>
+    </button>
+  );
+}
 
 function formatDate(iso: string | null | undefined): string {
   if (!iso) return "—";
@@ -100,46 +259,33 @@ export function SettingsPanel({
                   全体の配色を切り替えます。設定はこのブラウザに保存されます。
                 </div>
               </div>
-              <div className="theme-switch">
-                {THEMES.map((t) => (
-                  <button
-                    key={t.id}
-                    className={`theme-option ${
-                      theme === t.id ? "theme-option--active" : ""
-                    }`}
-                    onClick={() => setTheme(t.id)}
-                    type="button"
-                  >
-                    <div
-                      className="theme-preview"
-                      style={{ borderColor: t.line }}
-                    >
-                      <div
-                        className="theme-preview-sidebar"
-                        style={{ background: t.sidebar }}
+              <div className="theme-groups">
+                <div className="theme-group">
+                  <div className="theme-group-label">ダーク</div>
+                  <div className="theme-switch">
+                    {DARK_THEMES_LIST.map((t) => (
+                      <ThemeOption
+                        key={t.id}
+                        t={t}
+                        active={theme === t.id}
+                        onSelect={setTheme}
                       />
-                      <div
-                        className="theme-preview-body"
-                        style={{ background: t.surface }}
-                      >
-                        <div
-                          className="theme-preview-line"
-                          style={{ background: t.fg, opacity: 0.8 }}
-                        />
-                        <div
-                          className="theme-preview-line theme-preview-line--short"
-                          style={{ background: t.muted }}
-                        />
-                        <div
-                          className="theme-preview-line theme-preview-line--pill"
-                          style={{ background: t.accent }}
-                        />
-                      </div>
-                    </div>
-                    <div className="theme-option-name">{t.name}</div>
-                    <div className="theme-option-sub">{t.sub}</div>
-                  </button>
-                ))}
+                    ))}
+                  </div>
+                </div>
+                <div className="theme-group">
+                  <div className="theme-group-label">ライト</div>
+                  <div className="theme-switch">
+                    {LIGHT_THEMES_LIST.map((t) => (
+                      <ThemeOption
+                        key={t.id}
+                        t={t}
+                        active={theme === t.id}
+                        onSelect={setTheme}
+                      />
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           </div>

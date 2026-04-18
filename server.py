@@ -8,6 +8,7 @@ import asyncio
 import datetime
 import json
 import os
+import re
 import shutil
 import sqlite3
 import uuid
@@ -592,13 +593,18 @@ def process_todos(
                 title = content[len(tag) :].strip()
                 break
 
-        goal_id = todo.get("goalId", "")
+        # goalId: [GOAL:<id>] プレフィックスから抽出 ([GOAL:] は紐付け解除)。
+        goal_id: str | None = None
+        goal_match = re.match(r"^\[GOAL:([^\]]*)\]\s*", title)
+        if goal_match:
+            goal_id = goal_match.group(1).strip()
+            title = title[goal_match.end() :]
 
         if title in existing_task_map:
             task = existing_task_map[title].copy()
             task["column"] = status_to_column.get(status, "todo")
             task["priority"] = priority
-            if goal_id:
+            if goal_id is not None:
                 task["goalId"] = goal_id
         else:
             task = {
@@ -608,7 +614,7 @@ def process_todos(
                 "column": status_to_column.get(status, "todo"),
                 "priority": priority,
                 "memo": "",
-                "goalId": goal_id,
+                "goalId": goal_id or "",
                 "estimatedMinutes": 0,
                 "timeSpent": 0,
                 "timerStartedAt": "",
@@ -750,6 +756,7 @@ SYSTEM_PROMPT_APPEND = """\
 TodoWrite ツールで todos 配列を渡してタスクを管理する。
 - ステータス: pending=TODO, in_progress=進行中, completed=完了
 - 優先度: content の先頭に [HIGH] [MEDIUM] [LOW] を付ける
+- 目標との紐付け: 優先度タグの直後に [GOAL:<目標id>] を付ける (例: "[HIGH][GOAL:abc12345] 企画書を作成")。紐付けを外す場合は [GOAL:] と書く。省略時は既存の紐付けを維持する
 - TodoWrite を呼ぶ際は既存タスクも含めて全タスクリストを渡すこと
 
 ## 目標操作 (TodoWrite の特殊エントリ)
@@ -1053,6 +1060,7 @@ async def websocket_endpoint(ws: WebSocket):
                     tool_input: dict[str, Any],
                     context: ToolPermissionContext,
                 ) -> PermissionResultAllow:
+                    print(f"[can_use_tool] {tool_name} input={str(tool_input)[:200]}", flush=True)
                     if tool_name == "AskUserQuestion":
                         return await handle_ask_user_via_ws(ws, tool_input)
                     return PermissionResultAllow(updated_input=tool_input)
@@ -1078,6 +1086,7 @@ async def websocket_endpoint(ws: WebSocket):
                         permission_mode="acceptEdits",
                         thinking={"type": "enabled", "budget_tokens": 10000},
                         allowed_tools=["TodoWrite"],
+                        stderr=lambda s: print(f"[cli-stderr] {s}", flush=True),
                     )
                     client = ClaudeSDKClient(options=options)
                     await client.connect()
@@ -1092,6 +1101,7 @@ async def websocket_endpoint(ws: WebSocket):
                 result_sent = False
                 try:
                     async for msg in client.receive_response():
+                        print(f"[msg] {type(msg).__name__}", flush=True)
                         if isinstance(msg, StreamEvent):
                             event = msg.event
                             if event.get("type") == "content_block_delta":
@@ -1169,7 +1179,9 @@ async def websocket_endpoint(ws: WebSocket):
                                 }
                             )
                 except Exception as e:
+                    import traceback
                     print(f"response error: {e}")
+                    traceback.print_exc()
                 finally:
                     if not result_sent:
                         await ws.send_json(
