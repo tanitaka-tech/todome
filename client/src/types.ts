@@ -64,7 +64,8 @@ export interface BalanceWheelItem {
 export interface BalanceWheelCategory {
   id: string;
   name: string;
-  ideals: BalanceWheelItem[];
+  score?: number; // 1-10, バランスホイール上の現在スコア
+  icon?: string;  // 絵文字アイコン
 }
 
 export interface UserProfile {

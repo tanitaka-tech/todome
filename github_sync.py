@@ -201,7 +201,12 @@ def git_add_commit_push(
     token: str | None = None,
     paths: list[str] | None = None,
 ) -> bool:
-    """stage → commit → push。変更なしなら False を返し push もしない。"""
+    """stage → commit → push。変更なしなら False を返し push もしない。
+
+    push が remote divergence (non-fast-forward) で失敗した場合は
+    pull --rebase で取り込んでから retry する。binary な todome.db の
+    conflict は local を優先 (rebase 中の -X theirs = 差し戻される commit 側)。
+    """
     add_paths = paths or ["todome.db", ".gitattributes"]
     # 存在しないファイルの add は無視したいので --all を使う手もあるが、
     # 意図しない artefact を含めないため個別に add する。
@@ -214,10 +219,39 @@ def git_add_commit_push(
         ["git", "-C", str(dest), "commit", "-m", message],
         env=_git_env(),
     )
-    _run(
-        ["git", "-C", str(dest), *_auth_args(), "push"],
-        env=_git_env(),
-    )
+    try:
+        _run(
+            ["git", "-C", str(dest), *_auth_args(), "push"],
+            env=_git_env(),
+        )
+    except GitHubSyncError as push_err:
+        msg = str(push_err)
+        if "fetch first" not in msg and "non-fast-forward" not in msg and "rejected" not in msg:
+            raise
+        try:
+            _run(
+                [
+                    "git",
+                    "-C",
+                    str(dest),
+                    *_auth_args(),
+                    "pull",
+                    "--rebase",
+                    "--strategy-option=theirs",
+                ],
+                env=_git_env(),
+            )
+        except GitHubSyncError:
+            _run(
+                ["git", "-C", str(dest), "rebase", "--abort"],
+                env=_git_env(),
+                check=False,
+            )
+            raise
+        _run(
+            ["git", "-C", str(dest), *_auth_args(), "push"],
+            env=_git_env(),
+        )
     return True
 
 

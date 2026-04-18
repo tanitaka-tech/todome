@@ -65,28 +65,23 @@ cd ..
 
 ```bash
 # ターミナル 1: フロントエンド (HMR)
-cd client
-npm run dev
+cd client && npm run dev
 ```
 
 ```bash
 # ターミナル 2: バックエンド (ホットリロード)
 uv run uvicorn server:app --host 0.0.0.0 --port 3002 --reload
 ```
+</details>
 
-ブラウザで **http://localhost:5173** を開きます。右上が **connected** になれば準備完了です。
-
-### 本番モード (サーバー1つ)
+<details>
+<summary>本番モード (サーバー1つ)</summary>
 
 ```bash
-# フロントエンドをビルド
 cd client && npm run build && cd ..
-
-# サーバーが client/dist/ を静的配信
 uv run uvicorn server:app --host 0.0.0.0 --port 3002
 ```
-
-**http://localhost:3002** でアクセスできます。
+</details>
 
 ## 使い方
 

@@ -650,13 +650,15 @@ def build_profile_context(profile: ProfileData) -> str:
 
     bw = profile.get("balanceWheel", [])
     if bw:
-        lines.append("\nバランスホイール（理想の状態）:")
+        lines.append("\nバランスホイール（各領域の現在の充実度 1-10）:")
         for cat in bw:
-            ideals = [i["text"] for i in cat.get("ideals", []) if i.get("text")]
-            if ideals:
-                lines.append(f"  【{cat['name']}】")
-                for ideal in ideals:
-                    lines.append(f"    - {ideal}")
+            icon = cat.get("icon") or ""
+            prefix = f"{icon} " if icon else ""
+            score = cat.get("score")
+            if isinstance(score, (int, float)):
+                lines.append(f"  - {prefix}{cat['name']}: {int(score)}/10")
+            else:
+                lines.append(f"  - {prefix}{cat['name']}")
 
     principles = [p["text"] for p in profile.get("actionPrinciples", []) if p.get("text")]
     if principles:

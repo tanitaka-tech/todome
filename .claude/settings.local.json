@@ -5,7 +5,8 @@
       "Bash(npx tsc *)",
       "Bash(./node_modules/.bin/tsc -b)",
       "Bash(echo \"exit=$?\")",
-      "Bash(./node_modules/.bin/vite build *)"
+      "Bash(./node_modules/.bin/vite build *)",
+      "Bash(npm run *)"
     ]
   }
 }
