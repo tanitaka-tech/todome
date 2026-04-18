@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   areAllKpisAchieved,
   isKpiAchieved,
@@ -7,6 +7,7 @@ import {
   type KPI,
   type KPIUnit,
 } from "../types";
+import { useModalClose } from "../hooks/useModalClose";
 
 interface Props {
   goals: Goal[];
@@ -66,11 +67,15 @@ export function GoalPanel({ goals, setGoals, send }: Props) {
     setShowForm(true);
   };
 
-  const closeForm = () => {
+  const resetForm = useCallback(() => {
     setShowForm(false);
     setEditingGoal(null);
     setFormError("");
-  };
+  }, []);
+  const { closing: formClosing, close: closeForm } = useModalClose(resetForm);
+
+  const clearDeleteTarget = useCallback(() => setDeleteTarget(null), []);
+  const { closing: deleteClosing, close: closeDelete } = useModalClose(clearDeleteTarget);
 
   const handleSave = () => {
     if (!editingGoal) return;
@@ -126,7 +131,7 @@ export function GoalPanel({ goals, setGoals, send }: Props) {
     if (!deleteTarget) return;
     setGoals((prev) => prev.filter((g) => g.id !== deleteTarget.id));
     send({ type: "goal_delete", goalId: deleteTarget.id });
-    setDeleteTarget(null);
+    closeDelete();
   };
 
   const updateCardKpiCurrent = (
@@ -348,7 +353,7 @@ export function GoalPanel({ goals, setGoals, send }: Props) {
 
       {showForm && editingGoal && (
         <div
-          className="modal-overlay"
+          className={`modal-overlay${formClosing ? " is-closing" : ""}`}
           onMouseDown={(e) => {
             formOverlayMouseDownRef.current = e.target === e.currentTarget;
           }}
@@ -533,13 +538,13 @@ export function GoalPanel({ goals, setGoals, send }: Props) {
 
       {deleteTarget && (
         <div
-          className="modal-overlay"
+          className={`modal-overlay${deleteClosing ? " is-closing" : ""}`}
           onMouseDown={(e) => {
             deleteOverlayMouseDownRef.current = e.target === e.currentTarget;
           }}
           onClick={(e) => {
             if (e.target === e.currentTarget && deleteOverlayMouseDownRef.current) {
-              setDeleteTarget(null);
+              closeDelete();
             }
           }}
         >
@@ -551,7 +556,7 @@ export function GoalPanel({ goals, setGoals, send }: Props) {
               <h2 className="modal-title">目標を削除</h2>
               <button
                 className="modal-close"
-                onClick={() => setDeleteTarget(null)}
+                onClick={closeDelete}
               >
                 &times;
               </button>
@@ -565,7 +570,7 @@ export function GoalPanel({ goals, setGoals, send }: Props) {
             <div className="modal-footer">
               <button
                 className="modal-btn-secondary"
-                onClick={() => setDeleteTarget(null)}
+                onClick={closeDelete}
               >
                 キャンセル
               </button>

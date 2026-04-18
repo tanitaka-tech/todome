@@ -1,6 +1,7 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Goal, KanbanTask } from "../types";
 import { formatDuration } from "../types";
+import { useModalClose } from "../hooks/useModalClose";
 
 interface Props {
   task: KanbanTask;
@@ -9,122 +10,188 @@ interface Props {
   onClose: () => void;
 }
 
+const AUTOSAVE_DELAY = 400;
+
+const PRIORITY_OPTIONS: Array<{
+  value: KanbanTask["priority"];
+  label: string;
+}> = [
+  { value: "low", label: "低" },
+  { value: "medium", label: "中" },
+  { value: "high", label: "高" },
+];
+
 export function TaskDetailModal({ task, goals, onSave, onClose }: Props) {
   const [title, setTitle] = useState(task.title);
   const [memo, setMemo] = useState(task.memo);
   const [goalId, setGoalId] = useState(task.goalId);
+  const [priority, setPriority] = useState<KanbanTask["priority"]>(task.priority);
   const [estH, setEstH] = useState(Math.floor(task.estimatedMinutes / 60));
   const [estM, setEstM] = useState(task.estimatedMinutes % 60);
 
   const linkedGoal = goalId ? goals.find((g) => g.id === goalId) : undefined;
   const overlayMouseDownRef = useRef(false);
+  const { closing, close } = useModalClose(onClose);
+  const isFirstRender = useRef(true);
 
-  const handleSave = () => {
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
     const estimatedMinutes = Math.max(0, estH * 60 + estM);
-    onSave({ ...task, title: title.trim() || task.title, memo, goalId, estimatedMinutes });
-  };
+    const nextTitle = title.trim() || task.title;
+    if (
+      nextTitle === task.title &&
+      memo === task.memo &&
+      goalId === task.goalId &&
+      priority === task.priority &&
+      estimatedMinutes === task.estimatedMinutes
+    ) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      onSave({
+        ...task,
+        title: nextTitle,
+        memo,
+        goalId,
+        priority,
+        estimatedMinutes,
+      });
+    }, AUTOSAVE_DELAY);
+    return () => window.clearTimeout(timer);
+  }, [title, memo, goalId, priority, estH, estM, task, onSave]);
 
   return (
     <div
-      className="modal-overlay"
+      className={`modal-overlay${closing ? " is-closing" : ""}`}
       onMouseDown={(e) => {
         overlayMouseDownRef.current = e.target === e.currentTarget;
       }}
       onClick={(e) => {
         if (e.target === e.currentTarget && overlayMouseDownRef.current) {
-          onClose();
+          close();
         }
       }}
     >
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2 className="modal-title">タスク詳細</h2>
-          <button className="modal-close" onClick={onClose}>&times;</button>
+      <div
+        className="modal-content modal-content--detail"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="detail-topbar">
+          <button className="modal-close" onClick={close} aria-label="閉じる">
+            &times;
+          </button>
         </div>
 
-        <div className="modal-body">
-          {/* タイトル */}
-          <label className="modal-label">タイトル</label>
+        <div className="detail-body">
           <input
-            className="modal-input"
+            className="detail-title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
+            placeholder="無題"
           />
 
-          {/* メモ */}
-          <label className="modal-label">メモ</label>
-          <textarea
-            className="modal-textarea"
-            rows={4}
-            placeholder="メモを入力..."
-            value={memo}
-            onChange={(e) => setMemo(e.target.value)}
-          />
+          <div className="detail-properties">
+            <div className="detail-prop">
+              <div className="detail-prop-label">優先度</div>
+              <div className="detail-prop-value">
+                <div className="detail-priority-group">
+                  {PRIORITY_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      className={`detail-priority-chip detail-priority-chip--${opt.value}${
+                        priority === opt.value ? " is-active" : ""
+                      }`}
+                      onClick={() => setPriority(opt.value)}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
 
-          {/* 見積もり時間 */}
-          <label className="modal-label">見積もり時間</label>
-          <div className="estimate-row">
-            <input
-              className="estimate-input"
-              type="number"
-              min={0}
-              value={estH}
-              onChange={(e) => setEstH(Math.max(0, Number(e.target.value) || 0))}
-            />
-            <span className="estimate-unit">時間</span>
-            <input
-              className="estimate-input"
-              type="number"
-              min={0}
-              max={59}
-              value={estM}
-              onChange={(e) => setEstM(Math.max(0, Math.min(59, Number(e.target.value) || 0)))}
-            />
-            <span className="estimate-unit">分</span>
+            <div className="detail-prop">
+              <div className="detail-prop-label">目標</div>
+              <div className="detail-prop-value">
+                <select
+                  className="detail-prop-select"
+                  value={goalId}
+                  onChange={(e) => setGoalId(e.target.value)}
+                >
+                  <option value="">なし</option>
+                  {goals.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name}
+                    </option>
+                  ))}
+                </select>
+                {linkedGoal && (
+                  <div className="detail-prop-meta">
+                    {linkedGoal.deadline && (
+                      <span>期日 {linkedGoal.deadline}</span>
+                    )}
+                    {linkedGoal.kpis.length > 0 && (
+                      <span>KPI {linkedGoal.kpis.length}</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="detail-prop">
+              <div className="detail-prop-label">見積もり</div>
+              <div className="detail-prop-value">
+                <div className="detail-estimate">
+                  <input
+                    className="detail-estimate-input"
+                    type="number"
+                    min={0}
+                    value={estH}
+                    onChange={(e) =>
+                      setEstH(Math.max(0, Number(e.target.value) || 0))
+                    }
+                  />
+                  <span className="detail-estimate-unit">h</span>
+                  <input
+                    className="detail-estimate-input"
+                    type="number"
+                    min={0}
+                    max={59}
+                    value={estM}
+                    onChange={(e) =>
+                      setEstM(
+                        Math.max(0, Math.min(59, Number(e.target.value) || 0)),
+                      )
+                    }
+                  />
+                  <span className="detail-estimate-unit">m</span>
+                </div>
+              </div>
+            </div>
+
             {task.timeSpent > 0 && (
-              <span className="estimate-actual">
-                実績: {formatDuration(task.timeSpent)}
-              </span>
+              <div className="detail-prop">
+                <div className="detail-prop-label">実績</div>
+                <div className="detail-prop-value">
+                  <span className="detail-prop-static">
+                    {formatDuration(task.timeSpent)}
+                  </span>
+                </div>
+              </div>
             )}
           </div>
 
-          {/* 目標の紐付け */}
-          <label className="modal-label">紐付ける目標</label>
-          <select
-            className="modal-select"
-            value={goalId}
-            onChange={(e) => setGoalId(e.target.value)}
-          >
-            <option value="">なし</option>
-            {goals.map((g) => (
-              <option key={g.id} value={g.id}>{g.name}</option>
-            ))}
-          </select>
+          <div className="detail-divider" />
 
-          {linkedGoal && (
-            <div className="modal-goal-preview">
-              <div className="modal-goal-preview-name">{linkedGoal.name}</div>
-              {linkedGoal.deadline && (
-                <div className="modal-goal-preview-detail">
-                  期日: {linkedGoal.deadline}
-                </div>
-              )}
-              {linkedGoal.kpis.length > 0 && (
-                <div className="modal-goal-preview-detail">
-                  KPI: {linkedGoal.kpis.map((k) => k.name).join(", ")}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div className="modal-footer">
-          <button className="modal-btn-secondary" onClick={onClose}>
-            キャンセル
-          </button>
-          <button className="modal-btn-primary" onClick={handleSave}>
-            保存
-          </button>
+          <textarea
+            className="detail-memo"
+            placeholder="メモを書く..."
+            value={memo}
+            onChange={(e) => setMemo(e.target.value)}
+          />
         </div>
       </div>
     </div>

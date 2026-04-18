@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { AskUserRequest, ChatMessage } from "../types";
 import { AskUserCard } from "./AskUserCard";
+import { useModalClose } from "../hooks/useModalClose";
 
 interface Props {
   messages: ChatMessage[];
@@ -52,6 +53,8 @@ export function ChatPanel({
   const flowRef = useRef<HTMLDivElement>(null);
   const composing = useRef(false);
   const toolOverlayMouseDownRef = useRef(false);
+  const clearToolDetail = useCallback(() => setToolDetail(null), []);
+  const { closing: toolDetailClosing, close: closeToolDetail } = useModalClose(clearToolDetail);
 
   const handleSend = () => {
     const text = input.trim();
@@ -241,13 +244,13 @@ export function ChatPanel({
 
       {toolDetail && (
         <div
-          className="modal-overlay"
+          className={`modal-overlay${toolDetailClosing ? " is-closing" : ""}`}
           onMouseDown={(e) => {
             toolOverlayMouseDownRef.current = e.target === e.currentTarget;
           }}
           onClick={(e) => {
             if (e.target === e.currentTarget && toolOverlayMouseDownRef.current) {
-              setToolDetail(null);
+              closeToolDetail();
             }
           }}
         >
@@ -262,7 +265,7 @@ export function ChatPanel({
               </div>
               <button
                 className="modal-close"
-                onClick={() => setToolDetail(null)}
+                onClick={closeToolDetail}
                 aria-label="閉じる"
               >
                 &times;
