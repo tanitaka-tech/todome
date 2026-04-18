@@ -655,6 +655,7 @@ async def websocket_endpoint(ws: WebSocket):
                     )
                     options = ClaudeAgentOptions(
                         model="sonnet",
+                        cwd=str(Path(__file__).parent),
                         system_prompt={
                             "type": "preset",
                             "preset": "claude_code",
