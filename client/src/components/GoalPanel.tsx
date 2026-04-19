@@ -87,10 +87,7 @@ export function GoalPanel({
   const deleteOverlayMouseDownRef = useRef(false);
 
   useEffect(() => {
-    if (!iconPickerOpen) {
-      setPickerStyle(null);
-      return;
-    }
+    if (!iconPickerOpen) return;
     const compute = () => {
       const el = iconWrapRef.current;
       if (!el) return;
@@ -133,6 +130,7 @@ export function GoalPanel({
       window.removeEventListener("scroll", compute, true);
       document.removeEventListener("mousedown", onDocDown);
       document.removeEventListener("keydown", onKey);
+      setPickerStyle(null);
     };
   }, [iconPickerOpen]);
 

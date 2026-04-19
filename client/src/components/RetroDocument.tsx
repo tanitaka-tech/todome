@@ -51,11 +51,13 @@ function EditableMarkdownSection({
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
+  const [lastValue, setLastValue] = useState(value);
   const taRef = useRef<HTMLTextAreaElement>(null);
 
-  useEffect(() => {
+  if (value !== lastValue) {
+    setLastValue(value);
     if (!editing) setDraft(value);
-  }, [value, editing]);
+  }
 
   useEffect(() => {
     if (editing && taRef.current) {

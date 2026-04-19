@@ -40,11 +40,9 @@ export function TaskDetailModal({ task, goals, onSave, onClose }: Props) {
   const isFirstRender = useRef(true);
 
   // 目標が変わって紐付け先 KPI が存在しない場合は紐付けをクリアする。
-  useEffect(() => {
-    if (kpiId && !timeKpis.some((k) => k.id === kpiId)) {
-      setKpiId("");
-    }
-  }, [kpiId, timeKpis]);
+  if (kpiId && !timeKpis.some((k) => k.id === kpiId)) {
+    setKpiId("");
+  }
 
   useEffect(() => {
     if (isFirstRender.current) {

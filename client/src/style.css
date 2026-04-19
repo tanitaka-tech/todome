@@ -5025,3 +5025,87 @@ body {
   background: var(--surface-hover, rgba(127, 127, 127, 0.08));
   color: var(--fg);
 }
+
+/* === Keyboard focus on Kanban card === */
+.kanban-card--focused {
+  border-color: var(--accent, #4f7cf0);
+  box-shadow: 0 0 0 2px var(--accent-light, rgba(79, 124, 240, 0.25));
+}
+
+/* === Shortcuts help modal === */
+.shortcuts-modal {
+  width: 560px;
+  max-width: 92vw;
+}
+.shortcuts-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.shortcuts-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.shortcuts-group-title {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg-muted);
+  margin-bottom: 2px;
+}
+.shortcuts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.shortcuts-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 6px 4px;
+  border-radius: var(--radius);
+}
+.shortcuts-row:hover {
+  background: var(--surface-hover);
+}
+.shortcuts-keys {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.shortcuts-key-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.shortcuts-sep {
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+.shortcuts-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--fg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+}
+.shortcuts-desc {
+  font-size: 13px;
+  color: var(--fg-muted);
+  text-align: right;
+}
+

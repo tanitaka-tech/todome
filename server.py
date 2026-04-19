@@ -57,6 +57,7 @@ DEFAULT_PROFILE: ProfileData = {
 
 GOAL_ADD_PREFIX = "GOAL_ADD:"
 GOAL_UPDATE_PREFIX = "GOAL_UPDATE:"
+PROFILE_UPDATE_PREFIX = "PROFILE_UPDATE:"
 
 
 # --- SQLite storage ---
@@ -1000,15 +1001,35 @@ def _rebalance_kpi_contribution(
             task["kpiContributed"] = True
 
 
+def apply_profile_update(
+    profile: ProfileData, updates: dict[str, Any]
+) -> ProfileData:
+    """プロフィールの部分更新を適用した新オブジェクトを返す。
+
+    updates に含まれるキーのみ上書きし、未指定のキーは既存値を維持する。
+    対象キー: currentState(str), balanceWheel(list), actionPrinciples(list), wantToDo(list)。
+    """
+    allowed_list_keys = ("balanceWheel", "actionPrinciples", "wantToDo")
+    new_profile: ProfileData = dict(DEFAULT_PROFILE)
+    new_profile.update(profile)
+    if "currentState" in updates and isinstance(updates["currentState"], str):
+        new_profile["currentState"] = updates["currentState"]
+    for key in allowed_list_keys:
+        if key in updates and isinstance(updates[key], list):
+            new_profile[key] = updates[key]
+    return new_profile
+
+
 def process_todos(
     todos: list[dict],
     existing_tasks: list[KanbanTask],
     existing_goals: list[GoalData],
-) -> tuple[list[KanbanTask], list[GoalData]]:
-    """TodoWrite 出力をパースし、タスクと目標操作に分離する。
+    existing_profile: ProfileData,
+) -> tuple[list[KanbanTask], list[GoalData], ProfileData]:
+    """TodoWrite 出力をパースし、タスク/目標/プロフィール操作に分離する。
 
-    content が GOAL_ADD: / GOAL_UPDATE: で始まるエントリは目標操作として処理し、
-    それ以外は通常のカンバンタスクに変換する。
+    content が GOAL_ADD: / GOAL_UPDATE: / PROFILE_UPDATE: で始まるエントリは
+    それぞれ目標・プロフィール操作として処理し、それ以外は通常のカンバンタスクに変換する。
     """
     existing_task_map = {t["title"]: t for t in existing_tasks}
     existing_goal_map = {g["name"]: g for g in existing_goals}
@@ -1020,9 +1041,21 @@ def process_todos(
 
     tasks: list[KanbanTask] = []
     goals = list(existing_goals)
+    profile = dict(existing_profile)
 
     for todo in todos:
         content = todo.get("content", "")
+
+        # --- プロフィールの更新 ---
+        if content.startswith(PROFILE_UPDATE_PREFIX):
+            json_str = content[len(PROFILE_UPDATE_PREFIX) :].strip()
+            try:
+                updates = json.loads(json_str)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(updates, dict):
+                profile = apply_profile_update(profile, updates)
+            continue
 
         # --- 目標の追加 ---
         if content.startswith(GOAL_ADD_PREFIX):
@@ -1124,7 +1157,7 @@ def process_todos(
             }
         tasks.append(task)
 
-    return tasks, goals
+    return tasks, goals, profile
 
 
 async def handle_ask_user_via_ws(
@@ -1708,6 +1741,27 @@ content を以下の形式にする (status は "completed"):
 ### 例: タスク追加と目標追加を同時に行う
 TodoWrite の todos:
   [{{"content":"[HIGH] 企画書を作成","status":"pending"}},{{"content":"GOAL_ADD:{{\\\"name\\\":\\\"Q3売上目標\\\",\\\"memo\\\":\\\"前年比120%\\\",\\\"kpis\\\":[{{\\\"name\\\":\\\"月間売上(万円)\\\",\\\"unit\\\":\\\"number\\\",\\\"targetValue\\\":1000,\\\"currentValue\\\":0}}],\\\"deadline\\\":\\\"2026-09-30\\\"}}","status":"completed"}}]
+
+## プロフィール操作 (TodoWrite の特殊エントリ)
+ユーザーの「自分について」プロフィール（currentState / balanceWheel / actionPrinciples / wantToDo）を更新する場合、
+同じ TodoWrite の todos 配列に PROFILE_UPDATE 特殊エントリを含める。ユーザーから明示的な変更依頼
+（「現在の状態を○○に」「行動指針に○○を追加」等）があったときのみ使うこと。
+
+content を以下の形式にする (status は "completed"):
+  PROFILE_UPDATE:{{"currentState":"...","balanceWheel":[...],"actionPrinciples":[...],"wantToDo":[...]}}
+
+更新ルール:
+- 変更したいキーだけ含めればよい（未指定のキーは既存値を維持）。
+- 配列キー (balanceWheel / actionPrinciples / wantToDo) は **常に全要素を渡す**。差分追記ではなく丸ごと置き換えになる。
+  既存項目を残したい場合は、チャットコンテキスト末尾の「ユーザーについて」セクションから現在値を読み取り、
+  追加・削除・編集を反映した完全なリストを渡すこと。
+- 各要素の形式:
+  - balanceWheel 要素: {{"id":"...","name":"...","score":1-10,"icon":"絵文字"}} （id は既存のものを維持、新規追加時は任意文字列可）
+  - actionPrinciples / wantToDo 要素: {{"id":"...","text":"..."}}
+
+### 例: 現在の状態と行動指針を更新
+TodoWrite の todos:
+  [{{"content":"PROFILE_UPDATE:{{\\\"currentState\\\":\\\"転職活動中\\\",\\\"actionPrinciples\\\":[{{\\\"id\\\":\\\"p1\\\",\\\"text\\\":\\\"小さく始める\\\"}},{{\\\"id\\\":\\\"p2\\\",\\\"text\\\":\\\"毎日1つ進める\\\"}}]}}","status":"completed"}}]
 
 ## 目標に紐付いた GitHub リポジトリ
 目標には `repository` ("owner/name") を任意で紐付けられる。紐付いた目標については、
@@ -2479,13 +2533,22 @@ async def websocket_endpoint(ws: WebSocket):
                                     )
                                     if block.name == "TodoWrite":
                                         todos = block.input.get("todos", [])
-                                        kanban_tasks, goals = process_todos(
+                                        (
+                                            kanban_tasks,
+                                            goals,
+                                            new_profile,
+                                        ) = process_todos(
                                             todos,
                                             kanban_tasks,
                                             goals,
+                                            profile,
                                         )
                                         save_tasks(kanban_tasks)
                                         save_goals(goals)
+                                        profile_changed = new_profile != profile
+                                        if profile_changed:
+                                            profile = new_profile
+                                            save_profile(profile)
                                         schedule_autosync()
                                         await ws.send_json(
                                             {
@@ -2499,6 +2562,13 @@ async def websocket_endpoint(ws: WebSocket):
                                                 "goals": goals,
                                             }
                                         )
+                                        if profile_changed:
+                                            await ws.send_json(
+                                                {
+                                                    "type": "profile_sync",
+                                                    "profile": profile,
+                                                }
+                                            )
                             if text_parts:
                                 await ws.send_json(
                                     {

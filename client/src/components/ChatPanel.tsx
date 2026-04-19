@@ -17,12 +17,13 @@ interface Props {
   onCancel: () => void;
   onClearSession: () => void;
   onClose?: () => void;
+  inputRef?: React.RefObject<HTMLInputElement | null>;
 }
 
 const SUGGESTIONS = [
-  "今日やるべきタスクを提案して",
-  "タスクの優先度を見直して",
-  "このプロジェクトに足りないタスクは？",
+  "自己紹介するので、プロフィールに整理して登録して",
+  "達成したいことを話すので、目標とKPIに落とし込んで",
+  "プロフィールと目標を踏まえて、今日やるべきタスクを提案して",
 ];
 
 function formatToolInput(input: unknown): string {
@@ -47,6 +48,7 @@ export function ChatPanel({
   onCancel,
   onClearSession,
   onClose,
+  inputRef,
 }: Props) {
   const [input, setInput] = useState("");
   const [toolDetail, setToolDetail] = useState<ChatMessage | null>(null);
@@ -203,6 +205,7 @@ export function ChatPanel({
 
       <div className="chat-input-dock">
         <input
+          ref={inputRef}
           className="chat-input"
           placeholder={
             connected

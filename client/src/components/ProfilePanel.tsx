@@ -290,10 +290,7 @@ export function ProfilePanel({ profile, setProfile, send }: Props) {
   const pickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!iconPickerOpen) {
-      setPickerStyle(null);
-      return;
-    }
+    if (!iconPickerOpen) return;
     const compute = () => {
       const el = iconWrapRef.current;
       if (!el) return;
@@ -331,6 +328,7 @@ export function ProfilePanel({ profile, setProfile, send }: Props) {
       window.removeEventListener("scroll", compute, true);
       document.removeEventListener("mousedown", onDocDown);
       document.removeEventListener("keydown", onKey);
+      setPickerStyle(null);
     };
   }, [iconPickerOpen]);
   const cleanedRef = useRef(false);

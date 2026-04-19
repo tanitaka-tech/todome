@@ -149,6 +149,15 @@ export function RetroSession({
                 onKeyDown={(e) => {
                   if (
                     e.key === "Enter" &&
+                    (e.metaKey || e.ctrlKey) &&
+                    !composing.current
+                  ) {
+                    e.preventDefault();
+                    if (!waiting && !isCompleted) onComplete();
+                    return;
+                  }
+                  if (
+                    e.key === "Enter" &&
                     !e.shiftKey &&
                     !composing.current
                   ) {
