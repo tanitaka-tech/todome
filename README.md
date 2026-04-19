@@ -10,9 +10,9 @@
 - **プロフィール定義** — 現在の状態、バランスホイール、行動指針、やりたいことをAIコンテキストに反映
 - **GitHub連携** — 端末間でのデータを共有 & 目標にリポジトリを紐付けてAIコンテキストに反映
 
-| Kanban形式でのタスク管理 | タスク管理をAIにお任せ | AIと一緒に振り返り | テーマを切り替えて気分を変える |
-|:---:|:---:|:---:|:---:|
-| ![Kanban形式でのタスク管理](docs/manual/assets/animations/celebration.webp) | ![タスク管理をAIにお任せ](docs/manual/assets/animations/chat-ai.webp) | ![AIと一緒に振り返り](docs/manual/assets/animations/retro-ai.webp) | ![テーマを切り替えて気分を変える](docs/manual/assets/animations/theme-switch.webp) |
+| Kanban形式でのタスク管理 | タスク管理をAIにお任せ | AIと一緒に振り返り | テーマを切り替えて気分を変える | Gitによる履歴管理 |
+|:---:|:---:|:---:|:---:|:---:|
+| ![Kanban形式でのタスク管理](docs/manual/assets/animations/celebration.webp) | ![タスク管理をAIにお任せ](docs/manual/assets/animations/chat-ai.webp) | ![AIと一緒に振り返り](docs/manual/assets/animations/retro-ai.webp) | ![テーマを切り替えて気分を変える](docs/manual/assets/animations/theme-switch.webp) | ![Gitによる履歴管理](docs/manual/assets/animations/git-history.webp) |
 
 ## コンセプト
 
