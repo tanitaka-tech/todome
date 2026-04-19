@@ -314,7 +314,7 @@ export function GitHubSyncTab({
                           変更
                         </span>
                         <span className="sidebar-github-commit-tip-item-label">
-                          自分についての記述
+                          プロフィールの記述
                         </span>
                       </div>
                     </div>

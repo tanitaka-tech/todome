@@ -55,7 +55,7 @@ export async function seedGoals(page: Page): Promise<void> {
 }
 
 export async function seedProfile(page: Page): Promise<void> {
-  await clickNav(page, "自分について");
+  await clickNav(page, "プロフィール");
 
   const stateArea = page.locator(".profile-textarea").first();
   await stateArea.fill(

@@ -101,12 +101,12 @@ test.describe("画面説明書スクリーンショット", () => {
     await shot(page, "stats");
   });
 
-  test("07 自分について", async ({ page }) => {
+  test("07 プロフィール", async ({ page }) => {
     await gotoApp(page);
     await closeChat(page);
-    await clickNav(page, "自分について");
+    await clickNav(page, "プロフィール");
     await expect(
-      page.getByRole("heading", { name: "自分について", level: 1 }),
+      page.getByRole("heading", { name: "プロフィール", level: 1 }),
     ).toBeVisible();
     await shot(page, "profile");
   });

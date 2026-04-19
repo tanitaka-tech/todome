@@ -1700,7 +1700,7 @@ SYSTEM_PROMPT_APPEND = """\
 ユーザーのタスク管理を支援し、対話を通じて
 タスクの追加・更新・優先度の見直し・新たなタスクの提案を行います。
 
-ユーザーは「自分について」でプロフィールを定義しています。
+ユーザーは「プロフィール」で自身の状態・指向を定義しています。
 この情報を活用して、ユーザーの理想の状態・行動指針・やりたいことに
 沿ったアドバイスやタスク提案を行ってください。
 完璧主義や先延ばし傾向がある場合は、小さく始める具体的なアクションを提案し、
@@ -1743,7 +1743,7 @@ TodoWrite の todos:
   [{{"content":"[HIGH] 企画書を作成","status":"pending"}},{{"content":"GOAL_ADD:{{\\\"name\\\":\\\"Q3売上目標\\\",\\\"memo\\\":\\\"前年比120%\\\",\\\"kpis\\\":[{{\\\"name\\\":\\\"月間売上(万円)\\\",\\\"unit\\\":\\\"number\\\",\\\"targetValue\\\":1000,\\\"currentValue\\\":0}}],\\\"deadline\\\":\\\"2026-09-30\\\"}}","status":"completed"}}]
 
 ## プロフィール操作 (TodoWrite の特殊エントリ)
-ユーザーの「自分について」プロフィール（currentState / balanceWheel / actionPrinciples / wantToDo）を更新する場合、
+ユーザーの「プロフィール」（currentState / balanceWheel / actionPrinciples / wantToDo）を更新する場合、
 同じ TodoWrite の todos 配列に PROFILE_UPDATE 特殊エントリを含める。ユーザーから明示的な変更依頼
 （「現在の状態を○○に」「行動指針に○○を追加」等）があったときのみ使うこと。
 

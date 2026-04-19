@@ -47,10 +47,10 @@ test.describe("全画面の遷移", () => {
     ).toBeVisible();
   });
 
-  test("自分について: ページタイトル", async ({ page }) => {
-    await clickNav(page, "自分について");
+  test("プロフィール: ページタイトル", async ({ page }) => {
+    await clickNav(page, "プロフィール");
     await expect(
-      page.getByRole("heading", { name: "自分について", level: 1 }),
+      page.getByRole("heading", { name: "プロフィール", level: 1 }),
     ).toBeVisible();
   });
 
