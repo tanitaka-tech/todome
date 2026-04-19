@@ -846,8 +846,10 @@ body {
 .sidebar-github-commit-tip {
   position: fixed;
   z-index: 1000;
-  min-width: 200px;
-  max-width: 280px;
+  min-width: 220px;
+  max-width: 320px;
+  max-height: 420px;
+  overflow-y: auto;
   padding: 8px 10px;
   background: var(--surface-raised);
   border: 1px solid var(--border-strong);
@@ -855,7 +857,7 @@ body {
   box-shadow: var(--shadow-lg);
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   font-size: 11px;
   pointer-events: none;
 }
@@ -868,26 +870,43 @@ body {
   padding-bottom: 2px;
   border-bottom: 1px solid var(--border);
 }
-.sidebar-github-commit-tip-row {
+.sidebar-github-commit-tip-section {
   display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sidebar-github-commit-tip-section-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--fg-muted);
+}
+.sidebar-github-commit-tip-item {
+  display: grid;
+  grid-template-columns: 34px 1fr;
   gap: 6px;
   align-items: center;
+  padding: 2px 0;
 }
-.sidebar-github-commit-tip-label {
-  color: var(--fg-muted);
-  min-width: 64px;
+.sidebar-github-commit-tip-item-label {
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .sidebar-github-commit-tip-added {
   color: #16a34a;
   font-weight: 600;
+  font-size: 10px;
 }
 .sidebar-github-commit-tip-removed {
   color: #dc2626;
   font-weight: 600;
+  font-size: 10px;
 }
 .sidebar-github-commit-tip-modified {
   color: #d97706;
   font-weight: 600;
+  font-size: 10px;
 }
 .sidebar-github-commit-tip-loading,
 .sidebar-github-commit-tip-error,

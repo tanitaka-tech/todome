@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import type {
+  CommitDiffDetails,
   CommitDiffEntry,
-  CommitDiffSummary,
   GitCommit,
   GitHubStatus,
+  LabeledId,
 } from "../types";
 
 interface Props {
@@ -41,33 +42,54 @@ function formatFull(iso: string | null): string {
   return d.toLocaleString();
 }
 
-function hasAnyChange(summary: CommitDiffSummary): boolean {
-  const s = summary;
-  return (
-    s.tasks.added + s.tasks.removed + s.tasks.modified +
-      s.goals.added + s.goals.removed + s.goals.modified +
-      s.retros.added + s.retros.removed + s.retros.modified >
-      0 || s.profileChanged
-  );
+function hasAnyChangeInDetails(details: CommitDiffDetails): boolean {
+  const sections = [details.tasks, details.goals, details.retros];
+  for (const s of sections) {
+    if (s.added.length || s.removed.length || s.modified.length) return true;
+  }
+  return details.profileChanged;
 }
 
-function renderCounts(
-  label: string,
-  c: { added: number; removed: number; modified: number },
+type ChangeKind = "added" | "removed" | "modified";
+
+const KIND_LABEL: Record<ChangeKind, string> = {
+  added: "追加",
+  removed: "削除",
+  modified: "変更",
+};
+
+const KIND_CLASS: Record<ChangeKind, string> = {
+  added: "sidebar-github-commit-tip-added",
+  removed: "sidebar-github-commit-tip-removed",
+  modified: "sidebar-github-commit-tip-modified",
+};
+
+function renderSection(
+  title: string,
+  section: { added: LabeledId[]; removed: LabeledId[]; modified: LabeledId[] },
 ) {
-  if (c.added + c.removed + c.modified === 0) return null;
+  const kinds: ChangeKind[] = ["added", "removed", "modified"];
+  const items: { kind: ChangeKind; entry: LabeledId }[] = [];
+  for (const kind of kinds) {
+    for (const entry of section[kind]) {
+      items.push({ kind, entry });
+    }
+  }
+  if (items.length === 0) return null;
   return (
-    <div className="sidebar-github-commit-tip-row">
-      <span className="sidebar-github-commit-tip-label">{label}</span>
-      {c.added > 0 && (
-        <span className="sidebar-github-commit-tip-added">+{c.added}</span>
-      )}
-      {c.removed > 0 && (
-        <span className="sidebar-github-commit-tip-removed">-{c.removed}</span>
-      )}
-      {c.modified > 0 && (
-        <span className="sidebar-github-commit-tip-modified">~{c.modified}</span>
-      )}
+    <div className="sidebar-github-commit-tip-section">
+      <div className="sidebar-github-commit-tip-section-title">{title}</div>
+      {items.map(({ kind, entry }) => (
+        <div
+          key={`${kind}-${entry.id}`}
+          className="sidebar-github-commit-tip-item"
+        >
+          <span className={KIND_CLASS[kind]}>{KIND_LABEL[kind]}</span>
+          <span className="sidebar-github-commit-tip-item-label" title={entry.label}>
+            {entry.label}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -199,28 +221,6 @@ export function GitHubSyncTab({
           <div className="sidebar-github-popup-header">
             {status.owner}/{status.repo}
           </div>
-          <button
-            type="button"
-            className="sidebar-github-popup-btn"
-            onClick={() => {
-              onSyncNow();
-              setOpen(false);
-            }}
-            disabled={status.syncing}
-          >
-            ⇅ 同期 (Push)
-          </button>
-          <button
-            type="button"
-            className="sidebar-github-popup-btn"
-            onClick={() => {
-              onPullNow();
-              setOpen(false);
-            }}
-            disabled={status.syncing}
-          >
-            ↓ Pull
-          </button>
 
           <div className="sidebar-github-history-title">履歴から復元</div>
           <div className="sidebar-github-commits">
@@ -253,6 +253,30 @@ export function GitHubSyncTab({
               ))
             )}
           </div>
+
+          <button
+            type="button"
+            className="sidebar-github-popup-btn"
+            onClick={() => {
+              onSyncNow();
+              setOpen(false);
+            }}
+            disabled={status.syncing}
+          >
+            ⇅ 同期 (Push)
+          </button>
+          <button
+            type="button"
+            className="sidebar-github-popup-btn"
+            onClick={() => {
+              onPullNow();
+              setOpen(false);
+            }}
+            disabled={status.syncing}
+          >
+            ↓ Pull
+          </button>
+
           <div className="sidebar-github-popup-foot">
             {status.syncing
               ? "同期中…"
@@ -272,22 +296,27 @@ export function GitHubSyncTab({
                 <div className="sidebar-github-commit-tip-error">
                   {hoveredDiff.error}
                 </div>
-              ) : hoveredDiff.summary && hasAnyChange(hoveredDiff.summary) ? (
+              ) : hoveredDiff.details && hasAnyChangeInDetails(hoveredDiff.details) ? (
                 <>
                   <div className="sidebar-github-commit-tip-head">
                     復元した場合の変更
                   </div>
-                  {renderCounts("タスク", hoveredDiff.summary.tasks)}
-                  {renderCounts("ゴール", hoveredDiff.summary.goals)}
-                  {renderCounts("振り返り", hoveredDiff.summary.retros)}
-                  {hoveredDiff.summary.profileChanged && (
-                    <div className="sidebar-github-commit-tip-row">
-                      <span className="sidebar-github-commit-tip-label">
+                  {renderSection("タスク", hoveredDiff.details.tasks)}
+                  {renderSection("ゴール", hoveredDiff.details.goals)}
+                  {renderSection("振り返り", hoveredDiff.details.retros)}
+                  {hoveredDiff.details.profileChanged && (
+                    <div className="sidebar-github-commit-tip-section">
+                      <div className="sidebar-github-commit-tip-section-title">
                         プロフィール
-                      </span>
-                      <span className="sidebar-github-commit-tip-modified">
-                        変更あり
-                      </span>
+                      </div>
+                      <div className="sidebar-github-commit-tip-item">
+                        <span className="sidebar-github-commit-tip-modified">
+                          変更
+                        </span>
+                        <span className="sidebar-github-commit-tip-item-label">
+                          自分についての記述
+                        </span>
+                      </div>
                     </div>
                   )}
                 </>
