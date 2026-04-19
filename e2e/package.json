@@ -8,8 +8,12 @@
     "test:ui": "playwright test --ui",
     "test:clean": "rm -rf data-e2e test-results playwright-report",
     "precapture": "cd ../client && npm run build && rm -rf ../e2e/data-manual",
-    "capture": "playwright test --config=playwright.manual.config.ts",
-    "capture:clean": "rm -rf data-manual"
+    "capture": "playwright test --config=playwright.manual.config.ts manual/capture.spec.ts",
+    "capture:clean": "rm -rf data-manual",
+    "preanimate": "cd ../client && npm run build && rm -rf ../e2e/data-manual ../e2e/animation-frames",
+    "animate:capture": "playwright test --config=playwright.manual.config.ts manual/animations.spec.ts",
+    "animate:build": "node manual/frames-to-webp.js",
+    "animate": "npm run animate:capture && npm run animate:build"
   },
   "devDependencies": {
     "@playwright/test": "^1.48.0",
