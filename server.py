@@ -1944,6 +1944,12 @@ TodoWrite の todos:
 確認した状況（未対応 issue、直近の PR、README の ToDo など）から、目標達成に向けた
 具体的な次のタスクを提案・追加する。毎回機械的に叩かず、必要なときに限って使うこと。
 
+Bash は安全のため以下の prefix のみ許可されている。パイプ・リダイレクト・複文 (`|`, `>`, `;` など)
+は拒否されるので、結果を加工したい場合は出力を受け取ってから手元で解釈すること。
+- `gh issue list`, `gh issue view`, `gh pr list`, `gh pr view`, `gh repo view`
+- `git status`, `git log`, `git diff`
+- （設定で `gh api` が有効なときのみ）`gh api ...`
+
 ## 制約
 - AskUserQuestion: 質問は最大4つ、各質問の選択肢は2〜4個まで
 - 今日の日付: {today}
