@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>自分について — todome 画面説明書</title>
+    <link rel="stylesheet" href="../assets/css/manual.css" />
+  </head>
+  <body data-page="profile">
+    <header class="topbar">
+      <button class="menu-toggle" aria-label="メニューを開閉">☰ メニュー</button>
+      <a href="../index.html" class="topbar-brand">
+        <span class="topbar-logo">t</span>
+        <span class="topbar-title">todome <em>画面説明書</em></span>
+      </a>
+      <div class="topbar-right">
+        <a href="../index.html">トップ</a>
+        <a href="https://github.com/tanitaka-tech/todome" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </header>
+
+    <div class="layout">
+      <aside class="sidebar">
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">はじめに</div>
+          <ul class="sidebar-links">
+            <li><a class="sidebar-link" data-page="index" href="../index.html">トップ</a></li>
+          </ul>
+        </div>
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">基本</div>
+          <ul class="sidebar-links">
+            <li><a class="sidebar-link" data-page="overview" href="overview.html">Overview (ダッシュボード)</a></li>
+          </ul>
+        </div>
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">タスク管理</div>
+          <ul class="sidebar-links">
+            <li><a class="sidebar-link" data-page="board" href="board.html">ボード</a></li>
+          </ul>
+        </div>
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">目標とふりかえり</div>
+          <ul class="sidebar-links">
+            <li><a class="sidebar-link" data-page="goal" href="goal.html">目標</a></li>
+            <li><a class="sidebar-link" data-page="retrospective" href="retrospective.html">振り返り</a></li>
+          </ul>
+        </div>
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">その他</div>
+          <ul class="sidebar-links">
+            <li><a class="sidebar-link" data-page="stats" href="stats.html">統計</a></li>
+            <li><a class="sidebar-link" data-page="profile" href="profile.html">自分について</a></li>
+            <li><a class="sidebar-link" data-page="settings" href="settings.html">設定</a></li>
+          </ul>
+        </div>
+      </aside>
+
+      <main class="main">
+        <div class="container">
+          <div class="breadcrumb">
+            <a href="../index.html">トップ</a><span class="sep">›</span>自分について
+          </div>
+          <h1 class="page-title">自分について</h1>
+          <p class="page-lead">
+            AI アシスタントのコンテキストとして使われるプロフィールを編集します。
+            現在の状態・バランスホイール・行動指針・やりたいことを記録することで、AI の提案がパーソナライズされます。
+          </p>
+
+          <figure class="hero-shot">
+            <img src="../assets/screenshots/profile.png" alt="自分について画面" />
+          </figure>
+
+          <h2 class="section-title">画面の見方</h2>
+
+          <table class="feature-table">
+            <tbody>
+              <tr>
+                <th>現在の自分の状態</th>
+                <td>
+                  いまの仕事や生活の状況を自由記述。AI が提案を作る際に一番よく参照します。
+                  入力した瞬間に自動保存されます。
+                </td>
+              </tr>
+              <tr>
+                <th>バランスホイール</th>
+                <td>
+                  仕事 / 健康 / 学び / 人間関係 など、人生のカテゴリごとに 1〜10 の充実度を付けます。
+                  カテゴリが 3 つ以上になるとレーダーチャートとして可視化されます。
+                </td>
+              </tr>
+              <tr>
+                <th>行動指針 (画面下部)</th>
+                <td>大事にしたい価値観・ポリシー。AI が判断に迷ったときの指針として使われます。</td>
+              </tr>
+              <tr>
+                <th>やりたいこと</th>
+                <td>いつかやりたい大小さまざまな TODO。振り返りや目標設定の種になります。</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="callout">
+            <strong>ヒント:</strong>
+            バランスホイールのスコアはチャート上の頂点をドラッグして直感的に変えられます。
+            カテゴリ名クリックで名前の編集・削除ができます。
+          </div>
+
+          <div class="pager">
+            <a href="stats.html" class="pager-prev">
+              <div class="pager-label">← 前へ</div>
+              <div class="pager-title">統計</div>
+            </a>
+            <a href="settings.html" class="pager-next">
+              <div class="pager-label">次へ →</div>
+              <div class="pager-title">設定</div>
+            </a>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <footer class="footer">
+      <p>todome 画面説明書 — <a href="https://github.com/tanitaka-tech/todome" target="_blank" rel="noopener">GitHub repository</a></p>
+    </footer>
+
+    <script src="../assets/js/manual.js"></script>
+  </body>
+</html>

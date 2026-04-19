@@ -6,7 +6,10 @@
     "pretest": "cd ../client && npm run build",
     "test": "playwright test",
     "test:ui": "playwright test --ui",
-    "test:clean": "rm -rf data-e2e test-results playwright-report"
+    "test:clean": "rm -rf data-e2e test-results playwright-report",
+    "precapture": "cd ../client && npm run build && rm -rf ../e2e/data-manual",
+    "capture": "playwright test --config=playwright.manual.config.ts",
+    "capture:clean": "rm -rf data-manual"
   },
   "devDependencies": {
     "@playwright/test": "^1.48.0",

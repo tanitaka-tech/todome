@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>統計 — todome 画面説明書</title>
+    <link rel="stylesheet" href="../assets/css/manual.css" />
+  </head>
+  <body data-page="stats">
+    <header class="topbar">
+      <button class="menu-toggle" aria-label="メニューを開閉">☰ メニュー</button>
+      <a href="../index.html" class="topbar-brand">
+        <span class="topbar-logo">t</span>
+        <span class="topbar-title">todome <em>画面説明書</em></span>
+      </a>
+      <div class="topbar-right">
+        <a href="../index.html">トップ</a>
+        <a href="https://github.com/tanitaka-tech/todome" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </header>
+
+    <div class="layout">
+      <aside class="sidebar">
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">はじめに</div>
+          <ul class="sidebar-links">
+            <li><a class="sidebar-link" data-page="index" href="../index.html">トップ</a></li>
+          </ul>
+        </div>
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">基本</div>
+          <ul class="sidebar-links">
+            <li><a class="sidebar-link" data-page="overview" href="overview.html">Overview (ダッシュボード)</a></li>
+          </ul>
+        </div>
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">タスク管理</div>
+          <ul class="sidebar-links">
+            <li><a class="sidebar-link" data-page="board" href="board.html">ボード</a></li>
+          </ul>
+        </div>
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">目標とふりかえり</div>
+          <ul class="sidebar-links">
+            <li><a class="sidebar-link" data-page="goal" href="goal.html">目標</a></li>
+            <li><a class="sidebar-link" data-page="retrospective" href="retrospective.html">振り返り</a></li>
+          </ul>
+        </div>
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">その他</div>
+          <ul class="sidebar-links">
+            <li><a class="sidebar-link" data-page="stats" href="stats.html">統計</a></li>
+            <li><a class="sidebar-link" data-page="profile" href="profile.html">自分について</a></li>
+            <li><a class="sidebar-link" data-page="settings" href="settings.html">設定</a></li>
+          </ul>
+        </div>
+      </aside>
+
+      <main class="main">
+        <div class="container">
+          <div class="breadcrumb">
+            <a href="../index.html">トップ</a><span class="sep">›</span>統計
+          </div>
+          <h1 class="page-title">統計</h1>
+          <p class="page-lead">
+            記録した作業時間とタスクの進捗を可視化します。
+            目標別の時間配分と、日/月/年の推移を把握できます。
+          </p>
+
+          <figure class="hero-shot">
+            <img src="../assets/screenshots/stats.png" alt="統計画面" />
+          </figure>
+
+          <h2 class="section-title">画面の見方</h2>
+
+          <table class="feature-table">
+            <tbody>
+              <tr>
+                <th>合計作業時間</th>
+                <td>これまでに記録した全タスクの累積作業時間。</td>
+              </tr>
+              <tr>
+                <th>完了タスク / 全タスク</th>
+                <td>完了カラムに入っているカード数と、全体のカード数。</td>
+              </tr>
+              <tr>
+                <th>目標別 作業時間</th>
+                <td>各目標ごとに積み上がった作業時間の内訳。どの目標に時間を使えているかを確認できます。</td>
+              </tr>
+              <tr>
+                <th>作業時間の推移 (日 / 月 / 年)</th>
+                <td>選択した粒度での時系列チャート。直近の作業量の傾向を把握できます。</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="callout">
+            <strong>ヒント:</strong>
+            グラフが空の場合は、ボードでタスクを開いてタイマー(<code>▶</code>)で計測を開始すれば、リアルタイムに積み上がっていきます。
+          </div>
+
+          <div class="pager">
+            <a href="retrospective.html" class="pager-prev">
+              <div class="pager-label">← 前へ</div>
+              <div class="pager-title">振り返り</div>
+            </a>
+            <a href="profile.html" class="pager-next">
+              <div class="pager-label">次へ →</div>
+              <div class="pager-title">自分について</div>
+            </a>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <footer class="footer">
+      <p>todome 画面説明書 — <a href="https://github.com/tanitaka-tech/todome" target="_blank" rel="noopener">GitHub repository</a></p>
+    </footer>
+
+    <script src="../assets/js/manual.js"></script>
+  </body>
+</html>

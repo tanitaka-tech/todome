@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>設定 — todome 画面説明書</title>
+    <link rel="stylesheet" href="../assets/css/manual.css" />
+  </head>
+  <body data-page="settings">
+    <header class="topbar">
+      <button class="menu-toggle" aria-label="メニューを開閉">☰ メニュー</button>
+      <a href="../index.html" class="topbar-brand">
+        <span class="topbar-logo">t</span>
+        <span class="topbar-title">todome <em>画面説明書</em></span>
+      </a>
+      <div class="topbar-right">
+        <a href="../index.html">トップ</a>
+        <a href="https://github.com/tanitaka-tech/todome" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </header>
+
+    <div class="layout">
+      <aside class="sidebar">
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">はじめに</div>
+          <ul class="sidebar-links">
+            <li><a class="sidebar-link" data-page="index" href="../index.html">トップ</a></li>
+          </ul>
+        </div>
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">基本</div>
+          <ul class="sidebar-links">
+            <li><a class="sidebar-link" data-page="overview" href="overview.html">Overview (ダッシュボード)</a></li>
+          </ul>
+        </div>
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">タスク管理</div>
+          <ul class="sidebar-links">
+            <li><a class="sidebar-link" data-page="board" href="board.html">ボード</a></li>
+          </ul>
+        </div>
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">目標とふりかえり</div>
+          <ul class="sidebar-links">
+            <li><a class="sidebar-link" data-page="goal" href="goal.html">目標</a></li>
+            <li><a class="sidebar-link" data-page="retrospective" href="retrospective.html">振り返り</a></li>
+          </ul>
+        </div>
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">その他</div>
+          <ul class="sidebar-links">
+            <li><a class="sidebar-link" data-page="stats" href="stats.html">統計</a></li>
+            <li><a class="sidebar-link" data-page="profile" href="profile.html">自分について</a></li>
+            <li><a class="sidebar-link" data-page="settings" href="settings.html">設定</a></li>
+          </ul>
+        </div>
+      </aside>
+
+      <main class="main">
+        <div class="container">
+          <div class="breadcrumb">
+            <a href="../index.html">トップ</a><span class="sep">›</span>設定
+          </div>
+          <h1 class="page-title">設定</h1>
+          <p class="page-lead">
+            アプリの外観・外部連携・AI ツール権限を設定します。
+            設定はすべてブラウザ・サーバー側に保存され、リロードしても保持されます。
+          </p>
+
+          <figure class="hero-shot">
+            <img src="../assets/screenshots/settings.png" alt="設定画面" />
+          </figure>
+
+          <h2 class="section-title">Appearance (外観)</h2>
+          <p>
+            全 12 テーマ（ダーク 6 + ライト 6）から配色を切り替えられます。
+            カードをクリックするだけで即座に反映され、選択はブラウザの <code>localStorage</code> に保存されます。
+          </p>
+
+          <table class="feature-table">
+            <tbody>
+              <tr>
+                <th>ダーク系</th>
+                <td>Dark / Midnight / Forest / Sunset / Ocean / Slate</td>
+              </tr>
+              <tr>
+                <th>ライト系</th>
+                <td>Beige / Paper / Mint / Rose / Sky / Sand</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h2 class="section-title">GitHub 連携</h2>
+          <p>
+            <code>gh</code> CLI を通じて GitHub アカウントと連携し、任意のリポジトリを「保存先」にできます。
+            設定後は <code>todome.db</code> が定期的にコミット・プッシュされ、端末間でデータを同期できます。
+          </p>
+          <ul>
+            <li><strong>認証</strong>: 未連携時は「連携する」ボタンから <code>gh auth login</code> フローを起動</li>
+            <li><strong>リポジトリ選択</strong>: 認証後に自分の管理リポジトリから保存先を選択 (新規作成も可)</li>
+            <li><strong>同期タブ</strong>: 連携済みの場合、プッシュ状況や差分を確認できるタブが表示されます</li>
+          </ul>
+
+          <h2 class="section-title">AI ツール権限</h2>
+          <p>
+            AI アシスタントが使えるツール (<code>TodoWrite</code> / <code>Bash</code> / <code>WebFetch</code> など) を制限できます。
+            デフォルトでは安全側に振り、ボード更新に必要な最小限だけが許可されています。
+          </p>
+
+          <div class="callout">
+            <strong>注意:</strong>
+            <code>Bash</code> 等の外部実行ツールを許可する場合は信頼できる環境でのみ使用してください。
+            AI 側からの操作はチャット内で確認プロンプトとして表示されます。
+          </div>
+
+          <div class="pager">
+            <a href="profile.html" class="pager-prev">
+              <div class="pager-label">← 前へ</div>
+              <div class="pager-title">自分について</div>
+            </a>
+            <a href="../index.html" class="pager-next">
+              <div class="pager-label">最後です →</div>
+              <div class="pager-title">トップへ戻る</div>
+            </a>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <footer class="footer">
+      <p>todome 画面説明書 — <a href="https://github.com/tanitaka-tech/todome" target="_blank" rel="noopener">GitHub repository</a></p>
+    </footer>
+
+    <script src="../assets/js/manual.js"></script>
+  </body>
+</html>

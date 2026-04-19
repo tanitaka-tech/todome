@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>振り返り — todome 画面説明書</title>
+    <link rel="stylesheet" href="../assets/css/manual.css" />
+  </head>
+  <body data-page="retrospective">
+    <header class="topbar">
+      <button class="menu-toggle" aria-label="メニューを開閉">☰ メニュー</button>
+      <a href="../index.html" class="topbar-brand">
+        <span class="topbar-logo">t</span>
+        <span class="topbar-title">todome <em>画面説明書</em></span>
+      </a>
+      <div class="topbar-right">
+        <a href="../index.html">トップ</a>
+        <a href="https://github.com/tanitaka-tech/todome" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </header>
+
+    <div class="layout">
+      <aside class="sidebar">
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">はじめに</div>
+          <ul class="sidebar-links">
+            <li><a class="sidebar-link" data-page="index" href="../index.html">トップ</a></li>
+          </ul>
+        </div>
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">基本</div>
+          <ul class="sidebar-links">
+            <li><a class="sidebar-link" data-page="overview" href="overview.html">Overview (ダッシュボード)</a></li>
+          </ul>
+        </div>
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">タスク管理</div>
+          <ul class="sidebar-links">
+            <li><a class="sidebar-link" data-page="board" href="board.html">ボード</a></li>
+          </ul>
+        </div>
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">目標とふりかえり</div>
+          <ul class="sidebar-links">
+            <li><a class="sidebar-link" data-page="goal" href="goal.html">目標</a></li>
+            <li><a class="sidebar-link" data-page="retrospective" href="retrospective.html">振り返り</a></li>
+          </ul>
+        </div>
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">その他</div>
+          <ul class="sidebar-links">
+            <li><a class="sidebar-link" data-page="stats" href="stats.html">統計</a></li>
+            <li><a class="sidebar-link" data-page="profile" href="profile.html">自分について</a></li>
+            <li><a class="sidebar-link" data-page="settings" href="settings.html">設定</a></li>
+          </ul>
+        </div>
+      </aside>
+
+      <main class="main">
+        <div class="container">
+          <div class="breadcrumb">
+            <a href="../index.html">トップ</a><span class="sep">›</span>振り返り
+          </div>
+          <h1 class="page-title">振り返り</h1>
+          <p class="page-lead">
+            日 / 週 / 月 / 年 の 4 粒度で、AI と対話しながら振り返りドキュメントを作成します。
+            その期間に完了したタスク・KPI 進捗を自動で読み込み、AI が気づきを促す質問を投げかけます。
+          </p>
+
+          <figure class="hero-shot">
+            <img src="../assets/screenshots/retrospective.png" alt="振り返り画面" />
+          </figure>
+
+          <h2 class="section-title">画面の見方</h2>
+
+          <table class="feature-table">
+            <tbody>
+              <tr>
+                <th>期間タブ (日 / 週 / 月 / 年)</th>
+                <td>振り返りの粒度を選択します。タブ切替で対象期間と AI のプロンプトが変わります。</td>
+              </tr>
+              <tr>
+                <th>対象日</th>
+                <td>
+                  デフォルトは今日。過去日を指定すると「今日に戻す」ボタンが表示され、ワンクリックで戻せます。
+                  週次は対象日を含む週、月次は対象月を指定します。
+                </td>
+              </tr>
+              <tr>
+                <th>振り返りを始める</th>
+                <td>AI セッションを開始。 <strong>Did / Learned / Next</strong> の 3 項目を AI との対話で埋めていきます。</td>
+              </tr>
+              <tr>
+                <th>履歴 (リスト / カレンダー)</th>
+                <td>
+                  完了済みの振り返りの一覧。カレンダービューでは月ごとのヒートマップ風に表示されます。
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h2 class="section-title">振り返りの流れ</h2>
+          <ol>
+            <li>期間タブと対象日を選ぶ</li>
+            <li>「振り返りを始める」でセッション開始</li>
+            <li>
+              AI が「この期間で何をしましたか？」「学んだことは？」「次に何をしますか？」と順に質問
+            </li>
+            <li>回答を入力すると AI がまとめ、ドキュメントに反映</li>
+            <li>最後に日評価 (1〜5) をつけて完了</li>
+          </ol>
+
+          <div class="callout">
+            <strong>ヒント:</strong>
+            途中で離脱してもドラフトとして自動保存されます。履歴から再開 / 破棄を選択できます。
+            詳しい仕様は <a href="https://github.com/tanitaka-tech/todome/blob/master/docs/retrospective-mode-spec.md">retrospective-mode-spec</a> を参照してください。
+          </div>
+
+          <div class="pager">
+            <a href="goal.html" class="pager-prev">
+              <div class="pager-label">← 前へ</div>
+              <div class="pager-title">目標</div>
+            </a>
+            <a href="stats.html" class="pager-next">
+              <div class="pager-label">次へ →</div>
+              <div class="pager-title">統計</div>
+            </a>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <footer class="footer">
+      <p>todome 画面説明書 — <a href="https://github.com/tanitaka-tech/todome" target="_blank" rel="noopener">GitHub repository</a></p>
+    </footer>
+
+    <script src="../assets/js/manual.js"></script>
+  </body>
+</html>
