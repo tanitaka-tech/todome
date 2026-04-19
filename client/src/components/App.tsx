@@ -23,6 +23,7 @@ import { StatsPanel } from "./StatsPanel";
 import { OverviewPanel } from "./OverviewPanel";
 import { SettingsPanel } from "./SettingsPanel";
 import { RetroPanel } from "./RetroPanel";
+import { GitHubSyncTab } from "./GitHubSyncTab";
 
 let msgId = 0;
 const nextId = () => String(++msgId);
@@ -632,6 +633,14 @@ export function App() {
               <span className="sidebar-nav-label">{item.label}</span>
             </button>
           ))}
+          {githubStatus?.authOk && githubStatus?.linked && (
+            <GitHubSyncTab
+              status={githubStatus}
+              tick={tick}
+              onSyncNow={handleSyncNow}
+              onPullNow={handlePullNow}
+            />
+          )}
         </nav>
       </aside>
 

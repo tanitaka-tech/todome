@@ -133,6 +133,7 @@ export interface GitHubStatus {
   syncing: boolean;
   lastSyncAt: string | null;
   lastError: string | null;
+  pendingSync: boolean;
 }
 
 export interface RepoInfo {

@@ -293,6 +293,7 @@ github_state: dict[str, Any] = {
     "syncing": False,
     "lastSyncAt": None,
     "lastError": None,
+    "pendingSync": False,
     "debounce_task": None,
     "sync_lock": None,  # lazy init inside async context
 }
@@ -332,8 +333,13 @@ async def _build_github_status() -> dict[str, Any]:
             "syncing": github_state["syncing"],
             "lastSyncAt": github_state["lastSyncAt"] or cfg.get("lastSyncAt"),
             "lastError": github_state["lastError"],
+            "pendingSync": bool(github_state.get("pendingSync", False)),
         },
     }
+
+
+async def _broadcast_github_status() -> None:
+    await broadcast(await _build_github_status())
 
 
 def _get_sync_lock() -> asyncio.Lock:
@@ -346,7 +352,12 @@ def _get_sync_lock() -> asyncio.Lock:
 
 def schedule_autosync() -> None:
     cfg = _load_github_config()
-    if not (cfg.get("linked") and cfg.get("autoSync", True)):
+    if not cfg.get("linked"):
+        return
+    if not github_state.get("pendingSync"):
+        github_state["pendingSync"] = True
+        asyncio.create_task(_broadcast_github_status())
+    if not cfg.get("autoSync", True):
         return
     t: asyncio.Task | None = github_state.get("debounce_task")
     if t and not t.done():
@@ -390,6 +401,7 @@ async def _do_push(message: str) -> None:
                 github_state["lastSyncAt"] = now_iso
                 cfg["lastSyncAt"] = now_iso
                 _save_github_config(cfg)
+            github_state["pendingSync"] = False
         except github_sync.GitHubSyncError as e:
             github_state["lastError"] = str(e)
         except Exception as e:
