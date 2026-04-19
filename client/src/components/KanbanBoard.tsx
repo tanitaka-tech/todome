@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ColumnId, Goal, KanbanTask } from "../types";
 import { formatDuration, totalSeconds } from "../types";
 
@@ -55,6 +55,7 @@ export function KanbanBoard({
   const [newPriority, setNewPriority] = useState<"low" | "medium" | "high">("medium");
   const [goalFilter, setGoalFilter] = useState<string>("");
   const [recentDays, setRecentDays] = useState<number>(0);
+  const [focusedId, setFocusedId] = useState<string | null>(null);
   const addInputRef = useRef<HTMLInputElement>(null);
 
   const cardRefs = useRef(new Map<string, HTMLElement>());
@@ -348,6 +349,7 @@ export function KanbanBoard({
   const visibleTasks = useMemo(() => {
     if (!goalFilter && recentDays === 0) return tasks;
     const cutoff =
+      // eslint-disable-next-line react-hooks/purity
       recentDays > 0 ? Date.now() - recentDays * 24 * 60 * 60 * 1000 : 0;
     return tasks.filter((t) => {
       if (goalFilter) {
@@ -366,6 +368,101 @@ export function KanbanBoard({
   }, [tasks, goalFilter, recentDays]);
 
   const hiddenCount = tasks.length - visibleTasks.length;
+
+  const effectiveFocusedId =
+    focusedId && visibleTasks.some((t) => t.id === focusedId)
+      ? focusedId
+      : (visibleTasks[0]?.id ?? null);
+
+  useEffect(() => {
+    const isTypingTarget = (el: EventTarget | null): boolean => {
+      if (!(el instanceof HTMLElement)) return false;
+      const tag = el.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+      if (el.isContentEditable) return true;
+      return false;
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (isTypingTarget(e.target)) return;
+      if (addingTo) return;
+
+      if (e.key === "n" || e.key === "N") {
+        e.preventDefault();
+        const col =
+          (effectiveFocusedId &&
+            visibleTasks.find((t) => t.id === effectiveFocusedId)?.column) ||
+          "todo";
+        handleAdd(col as ColumnId);
+        return;
+      }
+
+      if (!effectiveFocusedId) return;
+      const focused = visibleTasks.find((t) => t.id === effectiveFocusedId);
+      if (!focused) return;
+
+      if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+        e.preventDefault();
+        const col = focused.column;
+        const colTasks = visibleTasks.filter((t) => t.column === col);
+        const idx = colTasks.findIndex((t) => t.id === effectiveFocusedId);
+        const next =
+          e.key === "ArrowUp"
+            ? colTasks[Math.max(0, idx - 1)]
+            : colTasks[Math.min(colTasks.length - 1, idx + 1)];
+        if (next) setFocusedId(next.id);
+        return;
+      }
+
+      if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        e.preventDefault();
+        const colIdx = COLUMNS.findIndex((c) => c.id === focused.column);
+        const nextColIdx =
+          e.key === "ArrowLeft"
+            ? Math.max(0, colIdx - 1)
+            : Math.min(COLUMNS.length - 1, colIdx + 1);
+        if (nextColIdx === colIdx) return;
+        onMoveColumn(focused.id, COLUMNS[nextColIdx].id);
+        return;
+      }
+
+      if (e.key === "Enter") {
+        e.preventDefault();
+        onCardClick(focused);
+        return;
+      }
+
+      if (e.key === " ") {
+        e.preventDefault();
+        onTimerToggle(focused.id);
+        return;
+      }
+
+      if (e.key === "d" || e.key === "D") {
+        e.preventDefault();
+        if (focused.column !== "done") onMoveColumn(focused.id, "done");
+        return;
+      }
+
+      if (e.key === "Delete" || e.key === "Backspace") {
+        e.preventDefault();
+        setTasks((prev) => prev.filter((t) => t.id !== focused.id));
+        send({ type: "kanban_delete", taskId: focused.id });
+        return;
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [
+    effectiveFocusedId,
+    visibleTasks,
+    addingTo,
+    onCardClick,
+    onMoveColumn,
+    onTimerToggle,
+    send,
+    setTasks,
+  ]);
 
   return (
     <div className="kanban-wrap">
@@ -456,13 +553,16 @@ export function KanbanBoard({
                   <div
                     key={task.id}
                     ref={setCardRef(task.id)}
-                    className={`kanban-card ${dragId === task.id ? "kanban-card--dragging" : ""} ${running ? "kanban-card--running" : ""} ${showInsertAbove ? "kanban-card--insert-above" : ""} ${showInsertBelow ? "kanban-card--insert-below" : ""}`}
+                    className={`kanban-card ${dragId === task.id ? "kanban-card--dragging" : ""} ${running ? "kanban-card--running" : ""} ${showInsertAbove ? "kanban-card--insert-above" : ""} ${showInsertBelow ? "kanban-card--insert-below" : ""} ${effectiveFocusedId === task.id ? "kanban-card--focused" : ""}`}
                     draggable
                     onDragStart={(e) => handleDragStart(e, task.id)}
                     onDragEnd={handleDragEnd}
                     onDragOver={(e) => handleCardDragOver(e, task.id, col.id)}
                     onDrop={(e) => handleCardDrop(e, task.id, col.id)}
-                    onClick={() => onCardClick(task)}
+                    onClick={() => {
+                      setFocusedId(task.id);
+                      onCardClick(task);
+                    }}
                   >
                     <div className="kanban-card-top">
                       <button

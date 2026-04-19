@@ -25,6 +25,8 @@ from server import (
     _strip_retrodoc_block,
     _summarize_diff,
     _sync_goal_achievement,
+    apply_profile_update,
+    process_todos,
 )
 
 
@@ -633,3 +635,110 @@ class TestSummarizeDiff:
         # dict が無い / 値が truthy な非 bool でも bool 化される
         assert _summarize_diff({"profileChanged": 1})["profileChanged"] is True
         assert _summarize_diff({"profileChanged": 0})["profileChanged"] is False
+
+
+class TestApplyProfileUpdate:
+    def _base_profile(self):
+        return {
+            "currentState": "既存の状態",
+            "balanceWheel": [{"id": "b1", "name": "仕事", "score": 5}],
+            "actionPrinciples": [{"id": "p1", "text": "小さく始める"}],
+            "wantToDo": [{"id": "w1", "text": "本を読む"}],
+        }
+
+    def test_updates_current_state_only(self):
+        # 正常系: 単一キーだけ更新し、他は既存値を維持
+        result = apply_profile_update(
+            self._base_profile(), {"currentState": "転職活動中"}
+        )
+        assert result["currentState"] == "転職活動中"
+        assert result["balanceWheel"] == [{"id": "b1", "name": "仕事", "score": 5}]
+        assert result["actionPrinciples"] == [{"id": "p1", "text": "小さく始める"}]
+
+    def test_replaces_list_fields_entirely(self):
+        # 境界値: 配列は差分追記ではなく丸ごと置き換えになる
+        updates = {
+            "actionPrinciples": [
+                {"id": "p2", "text": "毎日1つ進める"},
+                {"id": "p3", "text": "完璧を求めない"},
+            ]
+        }
+        result = apply_profile_update(self._base_profile(), updates)
+        assert [p["text"] for p in result["actionPrinciples"]] == [
+            "毎日1つ進める",
+            "完璧を求めない",
+        ]
+        # 他のキーは維持
+        assert result["currentState"] == "既存の状態"
+        assert result["wantToDo"] == [{"id": "w1", "text": "本を読む"}]
+
+    def test_ignores_invalid_types_and_unknown_keys(self):
+        # 異常系: 型が合わないキーや未知キーは無視し、既存値を維持
+        updates = {
+            "currentState": 123,  # str じゃない → 無視
+            "balanceWheel": "not a list",  # list じゃない → 無視
+            "unknownKey": "ignored",  # 未知キー → 無視
+        }
+        result = apply_profile_update(self._base_profile(), updates)
+        assert result["currentState"] == "既存の状態"
+        assert result["balanceWheel"] == [{"id": "b1", "name": "仕事", "score": 5}]
+        assert "unknownKey" not in result
+
+    def test_applies_to_empty_profile_via_defaults(self):
+        # 空プロフィールに対しても DEFAULT_PROFILE で埋めた上で更新が効く
+        result = apply_profile_update({}, {"currentState": "新規"})
+        assert result["currentState"] == "新規"
+        assert result["balanceWheel"] == []
+        assert result["actionPrinciples"] == []
+        assert result["wantToDo"] == []
+
+
+class TestProcessTodosProfileUpdate:
+    def _base_profile(self):
+        return {
+            "currentState": "旧状態",
+            "balanceWheel": [],
+            "actionPrinciples": [{"id": "p1", "text": "旧指針"}],
+            "wantToDo": [],
+        }
+
+    def test_profile_update_entry_is_applied(self):
+        # PROFILE_UPDATE 特殊エントリはカンバンタスクにならず profile に反映される
+        todos = [
+            {
+                "content": 'PROFILE_UPDATE:{"currentState":"新状態"}',
+                "status": "completed",
+            }
+        ]
+        tasks, goals, profile = process_todos(
+            todos, [], [], self._base_profile()
+        )
+        assert tasks == []
+        assert goals == []
+        assert profile["currentState"] == "新状態"
+        # 他のキーは既存値を維持
+        assert profile["actionPrinciples"] == [{"id": "p1", "text": "旧指針"}]
+
+    def test_profile_update_coexists_with_task_entry(self):
+        # 通常タスクと PROFILE_UPDATE を同時に渡せる
+        todos = [
+            {"content": "[HIGH] 企画書作成", "status": "pending"},
+            {
+                "content": 'PROFILE_UPDATE:{"currentState":"集中期間"}',
+                "status": "completed",
+            },
+        ]
+        tasks, _, profile = process_todos(
+            todos, [], [], self._base_profile()
+        )
+        assert len(tasks) == 1
+        assert tasks[0]["title"] == "企画書作成"
+        assert profile["currentState"] == "集中期間"
+
+    def test_malformed_profile_json_is_ignored(self):
+        # 異常系: JSON が壊れているエントリは無視され、既存 profile が返る
+        todos = [
+            {"content": "PROFILE_UPDATE:{broken json", "status": "completed"}
+        ]
+        _, _, profile = process_todos(todos, [], [], self._base_profile())
+        assert profile == self._base_profile()

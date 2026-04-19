@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   AIToolConfig,
   AskUserRequest,
@@ -27,6 +27,7 @@ import { OverviewPanel } from "./OverviewPanel";
 import { SettingsPanel } from "./SettingsPanel";
 import { RetroPanel } from "./RetroPanel";
 import { GitHubSyncTab } from "./GitHubSyncTab";
+import { ShortcutsHelpModal } from "./ShortcutsHelpModal";
 
 let msgId = 0;
 const nextId = () => String(++msgId);
@@ -72,11 +73,11 @@ const NAV_ITEMS: {
   icon: string;
   group: "work" | "app";
 }[] = [
-  { id: "overview", label: "Overview", icon: "▦", group: "work" },
-  { id: "board", label: "ボード", icon: "▤", group: "work" },
-  { id: "goals", label: "目標", icon: "◎", group: "work" },
+  { id: "overview", label: "Overview", icon: "⌂", group: "work" },
+  { id: "board", label: "ボード", icon: "⫴", group: "work" },
+  { id: "goals", label: "目標", icon: "⌖", group: "work" },
   { id: "retro", label: "振り返り", icon: "↻", group: "work" },
-  { id: "stats", label: "統計", icon: "▨", group: "work" },
+  { id: "stats", label: "統計", icon: "〽", group: "work" },
   { id: "profile", label: "自分について", icon: "◉", group: "app" },
   { id: "settings", label: "設定", icon: "⚙", group: "app" },
 ];
@@ -151,6 +152,9 @@ export function App() {
   const [activeRetro, setActiveRetro] = useState<Retrospective | null>(null);
   const [retroStreamText, setRetroStreamText] = useState("");
   const [retroWaiting, setRetroWaiting] = useState(false);
+  const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
+  const chatInputRef = useRef<HTMLInputElement>(null);
+  const gChordRef = useRef<number | null>(null);
 
   useEffect(() => {
     applyTheme(theme);
@@ -714,6 +718,127 @@ export function App() {
     [send],
   );
 
+  useEffect(() => {
+    const isTypingTarget = (el: EventTarget | null): boolean => {
+      if (!(el instanceof HTMLElement)) return false;
+      const tag = el.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+      if (el.isContentEditable) return true;
+      return false;
+    };
+    const armGChord = () => {
+      if (gChordRef.current !== null) window.clearTimeout(gChordRef.current);
+      gChordRef.current = window.setTimeout(() => {
+        gChordRef.current = null;
+      }, 1500);
+    };
+    const consumeGChord = (): boolean => {
+      if (gChordRef.current === null) return false;
+      window.clearTimeout(gChordRef.current);
+      gChordRef.current = null;
+      return true;
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey;
+      const typing = isTypingTarget(e.target);
+
+      if (e.key === "Escape") {
+        if (showShortcutsHelp) {
+          e.preventDefault();
+          setShowShortcutsHelp(false);
+          return;
+        }
+        if (selectedTask) {
+          e.preventDefault();
+          setSelectedTask(null);
+          return;
+        }
+        return;
+      }
+
+      if (mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "b") {
+        e.preventDefault();
+        setChatOpen((p) => !p);
+        return;
+      }
+
+      if (mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "k") {
+        if (connected) {
+          e.preventDefault();
+          handleClearSession();
+        }
+        return;
+      }
+
+      if (mod && !e.shiftKey && !e.altKey && e.key === ".") {
+        if (waiting && connected) {
+          e.preventDefault();
+          handleCancel();
+        }
+        return;
+      }
+
+      if (typing) return;
+      if (e.altKey || e.metaKey || e.ctrlKey) return;
+
+      if (e.key === "?") {
+        e.preventDefault();
+        setShowShortcutsHelp((p) => !p);
+        return;
+      }
+      if (e.key === "/") {
+        e.preventDefault();
+        setChatOpen(true);
+        setTimeout(() => chatInputRef.current?.focus(), 0);
+        return;
+      }
+
+      if (consumeGChord()) {
+        const k = e.key.toLowerCase();
+        const map: Record<string, ActiveView> = {
+          o: "overview",
+          b: "board",
+          g: "goals",
+          r: "retro",
+          s: "stats",
+          p: "profile",
+        };
+        if (map[k]) {
+          e.preventDefault();
+          setActiveView(map[k]);
+          return;
+        }
+        if (e.key === ",") {
+          e.preventDefault();
+          setActiveView("settings");
+          return;
+        }
+        return;
+      }
+
+      if (e.key === "g" || e.key === "G") {
+        e.preventDefault();
+        armGChord();
+        return;
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      if (gChordRef.current !== null) {
+        window.clearTimeout(gChordRef.current);
+        gChordRef.current = null;
+      }
+    };
+  }, [
+    showShortcutsHelp,
+    selectedTask,
+    connected,
+    waiting,
+    handleCancel,
+    handleClearSession,
+  ]);
+
   const popupTask = useMemo(() => {
     if (!popupTaskId) return undefined;
     return tasks.find((t) => t.id === popupTaskId);
@@ -912,7 +1037,12 @@ export function App() {
         onCancel={handleCancel}
         onClearSession={handleClearSession}
         onClose={() => setChatOpen(false)}
+        inputRef={chatInputRef}
       />
+
+      {showShortcutsHelp && (
+        <ShortcutsHelpModal onClose={() => setShowShortcutsHelp(false)} />
+      )}
 
       {selectedTask && (
         <TaskDetailModal

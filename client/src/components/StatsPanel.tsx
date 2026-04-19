@@ -129,17 +129,22 @@ function PieChart({ slices }: { slices: { label: string; value: number; color: s
     return <div className="stats-empty">データがありません</div>;
   }
 
-  let cumAngle = -Math.PI / 2;
-  const paths = slices.filter((s) => s.value > 0).map((slice) => {
-    const angle = (slice.value / total) * Math.PI * 2;
-    const startX = 100 + 80 * Math.cos(cumAngle);
-    const startY = 100 + 80 * Math.sin(cumAngle);
-    cumAngle += angle;
-    const endX = 100 + 80 * Math.cos(cumAngle);
-    const endY = 100 + 80 * Math.sin(cumAngle);
+  const filtered = slices.filter((s) => s.value > 0);
+  const angles = filtered.map((s) => (s.value / total) * Math.PI * 2);
+  const startAngles = angles.map((_, i) =>
+    angles.slice(0, i).reduce((acc, a) => acc + a, -Math.PI / 2),
+  );
+  const paths = filtered.map((slice, i) => {
+    const angle = angles[i];
+    const startAngle = startAngles[i];
+    const endAngle = startAngle + angle;
+    const startX = 100 + 80 * Math.cos(startAngle);
+    const startY = 100 + 80 * Math.sin(startAngle);
+    const endX = 100 + 80 * Math.cos(endAngle);
+    const endY = 100 + 80 * Math.sin(endAngle);
     const large = angle > Math.PI ? 1 : 0;
     const d =
-      slices.filter((s) => s.value > 0).length === 1
+      filtered.length === 1
         ? `M 100 20 A 80 80 0 1 1 99.99 20 Z`
         : `M 100 100 L ${startX} ${startY} A 80 80 0 ${large} 1 ${endX} ${endY} Z`;
     return { ...slice, d, pct: ((slice.value / total) * 100).toFixed(1) };
@@ -258,6 +263,7 @@ export function StatsPanel({ tasks, goals, tick: _tick }: Props) {
     goalTimeMap[gId] = (goalTimeMap[gId] || 0) + task.timeSpent;
     if (task.timerStartedAt) {
       const running = Math.floor(
+        // eslint-disable-next-line react-hooks/purity
         (Date.now() - new Date(task.timerStartedAt).getTime()) / 1000,
       );
       goalTimeMap[gId] = (goalTimeMap[gId] || 0) + running;
