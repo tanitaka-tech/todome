@@ -279,7 +279,7 @@ def _migrate_retro_document(doc: dict[str, Any]) -> dict[str, Any]:
     migrated.setdefault("did", "")
     migrated.setdefault("learned", "")
     migrated.setdefault("next", "")
-    migrated.setdefault("completedTasks", doc.get("completedTasks", []))
+    migrated.pop("completedTasks", None)
 
     if "dayRating" not in migrated:
         legacy_energy = doc.get("energy")
@@ -1413,8 +1413,12 @@ def _merge_retro_document(
 
 
 def _retro_done_tasks_context(
-    task_ids: list[str], tasks: list[KanbanTask], goals: list[GoalData]
+    tasks: list[KanbanTask],
+    period_start: str,
+    period_end: str,
+    goals: list[GoalData],
 ) -> str:
+    task_ids = _completed_task_ids_in_period(tasks, period_start, period_end)
     if not task_ids:
         return "(この期間中に完了したタスクはありません)"
     goal_map = {g["id"]: g for g in goals}
@@ -1440,7 +1444,7 @@ def _build_retro_system_prompt(
 ) -> str:
     profile_ctx = build_profile_context(profile)
     done_ctx = _retro_done_tasks_context(
-        retro["document"].get("completedTasks", []), tasks, goals
+        tasks, retro["periodStart"], retro["periodEnd"], goals
     )
     doc = retro["document"]
     type_label = RETRO_TYPE_LABEL.get(retro["type"], "振り返り")
@@ -1608,7 +1612,6 @@ async def run_retro_turn(
     new_retro["updatedAt"] = now_iso
     if doc_updates:
         merged = _merge_retro_document(retro["document"], doc_updates)
-        merged["completedTasks"] = retro["document"].get("completedTasks", [])
         new_retro["document"] = merged
 
     # ドキュメントが空のままの場合は DB に保存せず、ドラフト化しない。
@@ -1635,18 +1638,18 @@ async def run_retro_turn(
     return new_retro
 
 
-async def finalize_retro(
+async def _generate_retro_review_text(
     ws: WebSocket,
     retro: RetrospectiveData,
     tasks: list[KanbanTask],
     goals: list[GoalData],
     profile: ProfileData,
-) -> RetrospectiveData:
-    """振り返りを完了状態にし、AI 評価コメントを生成して保存する。"""
+) -> str:
+    """振り返り用の総評コメントを Claude で生成し、ストリーミング配信する。"""
     profile_ctx = build_profile_context(profile)
     doc = retro["document"]
     done_ctx = _retro_done_tasks_context(
-        doc.get("completedTasks", []), tasks, goals
+        tasks, retro["periodStart"], retro["periodEnd"], goals
     )
     type_label = RETRO_TYPE_LABEL.get(retro["type"], "振り返り")
     doc_snapshot: dict[str, Any] = {
@@ -1713,7 +1716,20 @@ async def finalize_retro(
         except Exception:
             pass
 
-    ai_comment = "".join(text_parts).strip() or "お疲れさまでした。振り返りの積み重ねが次の一歩に繋がります。"
+    return "".join(text_parts).strip() or "お疲れさまでした。振り返りの積み重ねが次の一歩に繋がります。"
+
+
+async def finalize_retro(
+    ws: WebSocket,
+    retro: RetrospectiveData,
+    tasks: list[KanbanTask],
+    goals: list[GoalData],
+    profile: ProfileData,
+) -> RetrospectiveData:
+    """振り返りを完了状態にし、AI 評価コメントを生成して保存する。"""
+    ai_comment = await _generate_retro_review_text(
+        ws, retro, tasks, goals, profile
+    )
 
     now_iso = datetime.datetime.now().isoformat(timespec="seconds")
     new_retro = dict(retro)
@@ -2266,9 +2282,6 @@ async def websocket_endpoint(ws: WebSocket):
                     period_start, period_end = _compute_retro_period(
                         retro_type, anchor_date
                     )
-                    completed_ids = _completed_task_ids_in_period(
-                        kanban_tasks, period_start, period_end
-                    )
                     now_iso = datetime.datetime.now().isoformat(
                         timespec="seconds"
                     )
@@ -2287,7 +2300,6 @@ async def websocket_endpoint(ws: WebSocket):
                             "dayRating": 0,
                             "wakeUpTime": "",
                             "bedtime": "",
-                            "completedTasks": completed_ids,
                         },
                         "messages": [
                             {"role": "assistant", "text": welcome}
@@ -2406,6 +2418,41 @@ async def websocket_endpoint(ws: WebSocket):
                     await ws.send_json(
                         {"type": "retro_session_waiting", "waiting": False}
                     )
+                continue
+
+            if data["type"] == "retro_reopen":
+                rid = data.get("retroId", "")
+                retro_entry = get_retro(rid)
+                if retro_entry is None or not retro_entry.get("completedAt"):
+                    await ws.send_json(
+                        {
+                            "type": "retro_error",
+                            "message": "完了済みの振り返りが見つかりません",
+                        }
+                    )
+                    continue
+                now_iso = datetime.datetime.now().isoformat(timespec="seconds")
+                welcome = _retro_welcome_text(
+                    retro_entry["type"],
+                    retro_entry["periodStart"],
+                    retro_entry["periodEnd"],
+                )
+                reopened = dict(retro_entry)
+                reopened["completedAt"] = ""
+                reopened["aiComment"] = ""
+                reopened["messages"] = [
+                    {"role": "assistant", "text": welcome}
+                ]
+                reopened["updatedAt"] = now_iso
+                save_retro(reopened)
+                schedule_autosync()
+                await ws.send_json({"type": "retro_sync", "retro": reopened})
+                await broadcast(
+                    {
+                        "type": "retro_list_sync",
+                        "retros": load_retros(),
+                    }
+                )
                 continue
 
             if data["type"] == "retro_edit_document":

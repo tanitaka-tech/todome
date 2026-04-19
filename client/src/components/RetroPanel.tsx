@@ -4,7 +4,7 @@ import { RetroSession } from "./RetroSession";
 import { RetroCalendar } from "./RetroCalendar";
 import { useModalClose } from "../hooks/useModalClose";
 
-type ViewMode = "list" | "calendar";
+export type RetroViewMode = "list" | "calendar";
 
 interface Props {
   retros: Retrospective[];
@@ -12,9 +12,14 @@ interface Props {
   tasks: KanbanTask[];
   streamText: string;
   waiting: boolean;
+  tab: RetroType;
+  setTab: (tab: RetroType) => void;
+  viewMode: RetroViewMode;
+  setViewMode: (mode: RetroViewMode) => void;
   onStart: (type: RetroType, anchorDate?: string, resumeDraftId?: string) => void;
   onSend: (text: string) => void;
   onComplete: () => void;
+  onReopen: () => void;
   onCloseSession: () => void;
   onOpenRetro: (retro: Retrospective) => void;
   onDiscardDraft: (draftId: string) => void;
@@ -113,9 +118,14 @@ export function RetroPanel({
   tasks,
   streamText,
   waiting,
+  tab,
+  setTab,
+  viewMode,
+  setViewMode,
   onStart,
   onSend,
   onComplete,
+  onReopen,
   onCloseSession,
   onOpenRetro,
   onDiscardDraft,
@@ -124,8 +134,6 @@ export function RetroPanel({
   onEditDayRating,
   onEditSleep,
 }: Props) {
-  const [tab, setTab] = useState<RetroType>("weekly");
-  const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [anchorDate, setAnchorDate] = useState<string>(() => todayIsoDate());
   const [discardTarget, setDiscardTarget] = useState<Retrospective | null>(
     null,
@@ -185,6 +193,7 @@ export function RetroPanel({
         waiting={waiting}
         onSend={onSend}
         onComplete={onComplete}
+        onReopen={onReopen}
         onClose={onCloseSession}
         onEditField={onEditField}
         onEditDayRating={onEditDayRating}

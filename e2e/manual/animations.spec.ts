@@ -437,7 +437,6 @@ test.describe("画面説明書ハイライト用アニメーション", () => {
         learned: "",
         next: "",
         dayRating: 0,
-        completedTasks: ["t-r1", "t-r2", "t-r3"],
       },
       messages: [],
       aiComment: "",

@@ -16,6 +16,16 @@ import type {
 } from "../types";
 import { formatDuration, totalSeconds } from "../types";
 import { applyTheme, getInitialTheme, type ThemeName } from "../theme";
+import {
+  loadBoardGoalFilter,
+  loadBoardRecentDays,
+  loadRetroTab,
+  loadRetroViewMode,
+  saveBoardGoalFilter,
+  saveBoardRecentDays,
+  saveRetroTab,
+  saveRetroViewMode,
+} from "../viewState";
 import { useWebSocket } from "../hooks/useWebSocket";
 import { KanbanBoard } from "./KanbanBoard";
 import { ChatPanel } from "./ChatPanel";
@@ -25,7 +35,7 @@ import { ProfilePanel } from "./ProfilePanel";
 import { StatsPanel } from "./StatsPanel";
 import { OverviewPanel } from "./OverviewPanel";
 import { SettingsPanel } from "./SettingsPanel";
-import { RetroPanel } from "./RetroPanel";
+import { RetroPanel, type RetroViewMode } from "./RetroPanel";
 import { GitHubSyncTab } from "./GitHubSyncTab";
 import { ShortcutsHelpModal } from "./ShortcutsHelpModal";
 
@@ -153,6 +163,33 @@ export function App() {
   const [retroStreamText, setRetroStreamText] = useState("");
   const [retroWaiting, setRetroWaiting] = useState(false);
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
+  const [boardGoalFilter, setBoardGoalFilterState] = useState<string>(() =>
+    loadBoardGoalFilter(),
+  );
+  const [boardRecentDays, setBoardRecentDaysState] = useState<number>(() =>
+    loadBoardRecentDays(),
+  );
+  const [retroTab, setRetroTabState] = useState<RetroType>(() => loadRetroTab());
+  const [retroViewMode, setRetroViewModeState] = useState<RetroViewMode>(() =>
+    loadRetroViewMode(),
+  );
+
+  const setBoardGoalFilter = useCallback((value: string) => {
+    setBoardGoalFilterState(value);
+    saveBoardGoalFilter(value);
+  }, []);
+  const setBoardRecentDays = useCallback((value: number) => {
+    setBoardRecentDaysState(value);
+    saveBoardRecentDays(value);
+  }, []);
+  const setRetroTab = useCallback((value: RetroType) => {
+    setRetroTabState(value);
+    saveRetroTab(value);
+  }, []);
+  const setRetroViewMode = useCallback((value: RetroViewMode) => {
+    setRetroViewModeState(value);
+    saveRetroViewMode(value);
+  }, []);
   const chatInputRef = useRef<HTMLInputElement>(null);
   const gChordRef = useRef<number | null>(null);
 
@@ -639,6 +676,12 @@ export function App() {
     send({ type: "retro_complete", retroId: activeRetro.id });
   }, [activeRetro, send]);
 
+  const handleRetroReopen = useCallback(() => {
+    if (!activeRetro || !activeRetro.completedAt) return;
+    setRetroStreamText("");
+    send({ type: "retro_reopen", retroId: activeRetro.id });
+  }, [activeRetro, send]);
+
   const handleRetroCloseSession = useCallback(() => {
     setActiveRetro(null);
     setRetroStreamText("");
@@ -1002,6 +1045,10 @@ export function App() {
             onTimerToggle={handleTimerToggle}
             onMoveColumn={handleMoveColumn}
             tick={tick}
+            goalFilter={boardGoalFilter}
+            setGoalFilter={setBoardGoalFilter}
+            recentDays={boardRecentDays}
+            setRecentDays={setBoardRecentDays}
           />
         ) : activeView === "goals" ? (
           <GoalPanel
@@ -1019,9 +1066,14 @@ export function App() {
             tasks={tasks}
             streamText={retroStreamText}
             waiting={retroWaiting}
+            tab={retroTab}
+            setTab={setRetroTab}
+            viewMode={retroViewMode}
+            setViewMode={setRetroViewMode}
             onStart={handleRetroStart}
             onSend={handleRetroSend}
             onComplete={handleRetroComplete}
+            onReopen={handleRetroReopen}
             onCloseSession={handleRetroCloseSession}
             onOpenRetro={handleRetroOpen}
             onDiscardDraft={handleRetroDiscardDraft}

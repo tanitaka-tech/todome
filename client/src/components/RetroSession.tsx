@@ -16,6 +16,7 @@ interface Props {
   waiting: boolean;
   onSend: (text: string) => void;
   onComplete: () => void;
+  onReopen: () => void;
   onClose: () => void;
   onEditField: (
     retroId: string,
@@ -38,6 +39,7 @@ export function RetroSession({
   waiting,
   onSend,
   onComplete,
+  onReopen,
   onClose,
   onEditField,
   onEditDayRating,
@@ -81,7 +83,16 @@ export function RetroSession({
           </span>
         </div>
         <div className="retro-session-head-actions">
-          {!isCompleted && (
+          {isCompleted ? (
+            <button
+              className="btn retro-complete-btn"
+              onClick={onReopen}
+              disabled={waiting}
+              title="AIとの会話を再開する"
+            >
+              会話を再開
+            </button>
+          ) : (
             <button
               className="btn btn--primary retro-complete-btn"
               onClick={onComplete}

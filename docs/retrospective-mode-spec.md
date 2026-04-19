@@ -163,13 +163,13 @@ createdAt    TEXT
   "next":           "次やること（テキスト）",
   "dayRating":      7,
   "wakeUpTime":     "06:30",
-  "bedtime":        "23:30",
-  "completedTasks": ["タスクID", ...]
+  "bedtime":        "23:30"
 }
 ```
 
 - `dayRating` は 1〜10 の整数（0 = 未評価）。主に日次振り返りで使用し、それ以外の種別では 0 のまま運用
 - `wakeUpTime` / `bedtime` は `"HH:MM"` (24時間) 文字列。未設定は `""`。日次振り返りのみで利用し、AI とユーザー双方が編集できる
+- 達成タスクは振り返り時のスナップショットを持たず、表示・AI 入力ともに現在のタスク状態 (`column == "done"` かつ `completedAt` が期間内) から都度計算する
 - 旧スキーマ (`findings` / `improvements` / `idealState` / `actions` / `energy`) を持つ既存データは読み取り時に自動マッピングされる:
   - `findings` → `learned`
   - `improvements` + `idealState` + `actions` → `next` に結合

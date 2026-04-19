@@ -338,9 +338,9 @@ class TestMergeRetroDocument:
         assert merged["learned"] == "also new"
 
     def test_preserves_unrelated_fields(self):
-        current = {"did": "x", "completedTasks": ["t1"]}
+        current = {"did": "x", "dayRating": 7}
         merged = _merge_retro_document(current, {"did": "y"})
-        assert merged["completedTasks"] == ["t1"]
+        assert merged["dayRating"] == 7
 
     def test_accepts_valid_sleep_times(self):
         merged = _merge_retro_document(

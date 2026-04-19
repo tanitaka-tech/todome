@@ -11,7 +11,13 @@ interface Props {
   onTimerToggle: (taskId: string) => void;
   onMoveColumn: (taskId: string, column: string) => void;
   tick: number;
+  goalFilter: string;
+  setGoalFilter: (value: string) => void;
+  recentDays: number;
+  setRecentDays: (value: number) => void;
 }
+
+export const KANBAN_GOAL_FILTER_NONE = "__none__";
 
 const COLUMNS: { id: ColumnId; label: string; color: string }[] = [
   { id: "todo", label: "TODO", color: "#6b7280" },
@@ -25,7 +31,7 @@ const PRIORITY_LABELS: Record<string, { label: string; className: string }> = {
   low: { label: "低", className: "priority-low" },
 };
 
-const GOAL_FILTER_NONE = "__none__";
+const GOAL_FILTER_NONE = KANBAN_GOAL_FILTER_NONE;
 const RECENT_DAYS_OPTIONS: { value: number; label: string }[] = [
   { value: 0, label: "全期間" },
   { value: 1, label: "1日" },
@@ -45,6 +51,10 @@ export function KanbanBoard({
   onTimerToggle,
   onMoveColumn,
   tick: _tick,
+  goalFilter,
+  setGoalFilter,
+  recentDays,
+  setRecentDays,
 }: Props) {
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<ColumnId | null>(null);
@@ -53,8 +63,6 @@ export function KanbanBoard({
   const [addingTo, setAddingTo] = useState<ColumnId | null>(null);
   const [newTitle, setNewTitle] = useState("");
   const [newPriority, setNewPriority] = useState<"low" | "medium" | "high">("medium");
-  const [goalFilter, setGoalFilter] = useState<string>("");
-  const [recentDays, setRecentDays] = useState<number>(0);
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const addInputRef = useRef<HTMLInputElement>(null);
 
