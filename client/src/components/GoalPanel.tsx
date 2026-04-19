@@ -11,6 +11,7 @@ import {
   type Goal,
   type KPI,
   type KPIUnit,
+  type RepoInfo,
 } from "../types";
 import { DARK_THEMES, type ThemeName } from "../theme";
 import { useModalClose } from "../hooks/useModalClose";
@@ -26,6 +27,9 @@ interface Props {
   goals: Goal[];
   setGoals: React.Dispatch<React.SetStateAction<Goal[]>>;
   send: (data: unknown) => void;
+  githubRepos: RepoInfo[];
+  onRequestRepoList: () => void;
+  githubAuthOk: boolean;
 }
 
 function generateId() {
@@ -58,7 +62,16 @@ function newKpi(): KPI {
   };
 }
 
-export function GoalPanel({ goals, setGoals, send }: Props) {
+const REPO_PATTERN = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
+
+export function GoalPanel({
+  goals,
+  setGoals,
+  send,
+  githubRepos,
+  onRequestRepoList,
+  githubAuthOk,
+}: Props) {
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [tab, setTab] = useState<"active" | "achieved">("active");
@@ -123,6 +136,12 @@ export function GoalPanel({ goals, setGoals, send }: Props) {
     };
   }, [iconPickerOpen]);
 
+  const ensureRepoList = useCallback(() => {
+    if (githubAuthOk && githubRepos.length === 0) {
+      onRequestRepoList();
+    }
+  }, [githubAuthOk, githubRepos.length, onRequestRepoList]);
+
   const openNew = () => {
     setEditingGoal({
       id: "",
@@ -132,15 +151,18 @@ export function GoalPanel({ goals, setGoals, send }: Props) {
       deadline: "",
       achieved: false,
       achievedAt: "",
+      repository: "",
     });
     setFormError("");
     setShowForm(true);
+    ensureRepoList();
   };
 
   const openEdit = (goal: Goal) => {
     setEditingGoal({ ...goal, kpis: goal.kpis.map((k) => ({ ...k })) });
     setFormError("");
     setShowForm(true);
+    ensureRepoList();
   };
 
   const resetForm = useCallback(() => {
@@ -175,10 +197,17 @@ export function GoalPanel({ goals, setGoals, send }: Props) {
       }
     }
 
+    const repoTrimmed = (editingGoal.repository || "").trim();
+    if (repoTrimmed && !REPO_PATTERN.test(repoTrimmed)) {
+      setFormError("リポジトリは owner/name 形式で入力してください");
+      return;
+    }
+
     const nowAchieved = areAllKpisAchieved(editingGoal.kpis);
     const wasAchieved = editingGoal.achieved;
     const finalGoal: Goal = {
       ...editingGoal,
+      repository: repoTrimmed || undefined,
       achieved: nowAchieved,
       achievedAt: nowAchieved
         ? wasAchieved && editingGoal.achievedAt
@@ -252,9 +281,14 @@ export function GoalPanel({ goals, setGoals, send }: Props) {
     if (!editingGoal) return;
     setEditingGoal({
       ...editingGoal,
-      kpis: editingGoal.kpis.map((k) =>
-        k.id === kpiId ? { ...k, [field]: value } : k,
-      ),
+      kpis: editingGoal.kpis.map((k) => {
+        if (k.id !== kpiId) return k;
+        const next = { ...k, [field]: value };
+        if (field === "unit" && value === "percent") {
+          next.targetValue = 100;
+        }
+        return next;
+      }),
     });
   };
 
@@ -351,6 +385,20 @@ export function GoalPanel({ goals, setGoals, send }: Props) {
                 {goal.achieved && goal.achievedAt && (
                   <div className="goal-card-meta">
                     達成: {goal.achievedAt.slice(0, 10)}
+                  </div>
+                )}
+                {goal.repository && (
+                  <div className="goal-card-meta">
+                    <a
+                      className="goal-card-repo"
+                      href={`https://github.com/${goal.repository}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <span className="goal-card-repo-mark">⎇</span>
+                      {goal.repository}
+                    </a>
                   </div>
                 )}
                 {goal.memo && <div className="goal-card-memo">{goal.memo}</div>}
@@ -557,6 +605,32 @@ export function GoalPanel({ goals, setGoals, send }: Props) {
                 }
               />
 
+              <label className="modal-label">
+                リポジトリ{" "}
+                <span className="modal-label-hint">
+                  (任意 / owner/name 形式)
+                </span>
+              </label>
+              <input
+                className="modal-input"
+                placeholder="例: tanitaka_tech/todome"
+                list="goal-repo-suggest"
+                value={editingGoal.repository ?? ""}
+                onChange={(e) =>
+                  setEditingGoal({
+                    ...editingGoal,
+                    repository: e.target.value,
+                  })
+                }
+              />
+              {githubRepos.length > 0 && (
+                <datalist id="goal-repo-suggest">
+                  {githubRepos.map((r) => (
+                    <option key={r.nameWithOwner} value={r.nameWithOwner} />
+                  ))}
+                </datalist>
+              )}
+
               <div className="modal-label-row">
                 <label className="modal-label" style={{ marginBottom: 0 }}>
                   KPI <span className="modal-label-hint">(最低1つ必須)</span>
@@ -638,7 +712,8 @@ export function GoalPanel({ goals, setGoals, send }: Props) {
                             inputMode="numeric"
                             step={1}
                             min={0}
-                            value={kpi.targetValue}
+                            value={kpi.unit === "percent" ? 100 : kpi.targetValue}
+                            disabled={kpi.unit === "percent"}
                             onChange={(e) =>
                               updateKpi(
                                 kpi.id,

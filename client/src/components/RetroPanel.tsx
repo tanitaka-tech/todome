@@ -1,7 +1,10 @@
 import { useMemo, useRef, useState } from "react";
 import type { KanbanTask, RetroType, Retrospective } from "../types";
 import { RetroSession } from "./RetroSession";
+import { RetroCalendar } from "./RetroCalendar";
 import { useModalClose } from "../hooks/useModalClose";
+
+type ViewMode = "list" | "calendar";
 
 interface Props {
   retros: Retrospective[];
@@ -116,6 +119,7 @@ export function RetroPanel({
   onEditDayRating,
 }: Props) {
   const [tab, setTab] = useState<RetroType>("weekly");
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [anchorDate, setAnchorDate] = useState<string>(() => todayIsoDate());
   const [discardTarget, setDiscardTarget] = useState<Retrospective | null>(
     null,
@@ -278,7 +282,30 @@ export function RetroPanel({
           )}
         </div>
 
-        <div className="retro-history-title">履歴</div>
+        <div className="retro-history-title-row">
+          <div className="retro-history-title">履歴</div>
+          <div className="retro-view-toggle">
+            <button
+              className={`retro-view-toggle-btn ${viewMode === "list" ? "retro-view-toggle-btn--active" : ""}`}
+              onClick={() => setViewMode("list")}
+            >
+              リスト
+            </button>
+            <button
+              className={`retro-view-toggle-btn ${viewMode === "calendar" ? "retro-view-toggle-btn--active" : ""}`}
+              onClick={() => setViewMode("calendar")}
+            >
+              カレンダー
+            </button>
+          </div>
+        </div>
+        {viewMode === "calendar" ? (
+          <RetroCalendar
+            retros={currentList}
+            type={tab}
+            onOpenRetro={onOpenRetro}
+          />
+        ) : (
         <div className="retro-history">
           {[...(draft ? [draft] : []), ...otherDrafts].map((d) => (
             <div key={d.id} className="retro-history-card-wrap">
@@ -354,6 +381,7 @@ export function RetroPanel({
             </div>
           ))}
         </div>
+        )}
       </div>
 
       {discardTarget && (

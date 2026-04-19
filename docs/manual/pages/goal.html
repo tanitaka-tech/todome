@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>目標 — todome 画面説明書</title>
+    <link rel="stylesheet" href="../assets/css/manual.css" />
+  </head>
+  <body data-page="goal">
+    <header class="topbar">
+      <button class="menu-toggle" aria-label="メニューを開閉">☰ メニュー</button>
+      <a href="../index.html" class="topbar-brand">
+        <span class="topbar-logo">t</span>
+        <span class="topbar-title">todome <em>画面説明書</em></span>
+      </a>
+      <div class="topbar-right">
+        <a href="../index.html">トップ</a>
+        <a href="https://github.com/tanitaka-tech/todome" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </header>
+
+    <div class="layout">
+      <aside class="sidebar">
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">はじめに</div>
+          <ul class="sidebar-links">
+            <li><a class="sidebar-link" data-page="index" href="../index.html">トップ</a></li>
+          </ul>
+        </div>
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">基本</div>
+          <ul class="sidebar-links">
+            <li><a class="sidebar-link" data-page="overview" href="overview.html">Overview (ダッシュボード)</a></li>
+          </ul>
+        </div>
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">タスク管理</div>
+          <ul class="sidebar-links">
+            <li><a class="sidebar-link" data-page="board" href="board.html">ボード</a></li>
+          </ul>
+        </div>
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">目標とふりかえり</div>
+          <ul class="sidebar-links">
+            <li><a class="sidebar-link" data-page="goal" href="goal.html">目標</a></li>
+            <li><a class="sidebar-link" data-page="retrospective" href="retrospective.html">振り返り</a></li>
+          </ul>
+        </div>
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">その他</div>
+          <ul class="sidebar-links">
+            <li><a class="sidebar-link" data-page="stats" href="stats.html">統計</a></li>
+            <li><a class="sidebar-link" data-page="profile" href="profile.html">自分について</a></li>
+            <li><a class="sidebar-link" data-page="settings" href="settings.html">設定</a></li>
+          </ul>
+        </div>
+      </aside>
+
+      <main class="main">
+        <div class="container">
+          <div class="breadcrumb">
+            <a href="../index.html">トップ</a><span class="sep">›</span>目標
+          </div>
+          <h1 class="page-title">目標</h1>
+          <p class="page-lead">
+            達成したいゴールを定量的な KPI とともに登録します。
+            各目標はボード上のタスクと紐付けられ、進捗は自動集計されます。
+          </p>
+
+          <figure class="hero-shot">
+            <img src="../assets/screenshots/goal.png" alt="目標管理画面" />
+          </figure>
+
+          <h2 class="section-title">画面の見方</h2>
+
+          <table class="feature-table">
+            <tbody>
+              <tr>
+                <th>進行中 / 達成済み タブ</th>
+                <td>まだ達成していない目標と、すべての KPI を達成した目標を切り替えて表示します。</td>
+              </tr>
+              <tr>
+                <th>+ 新しい目標</th>
+                <td>右上のボタンから目標作成モーダルを開きます。</td>
+              </tr>
+              <tr>
+                <th>目標カード</th>
+                <td>
+                  各目標は全体進捗バーと、複数 KPI の進捗バーで構成されます。
+                  カードクリックで編集モーダルが開きます。
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h2 class="section-title">主な操作</h2>
+
+          <h3 class="subsection-title">目標を追加する</h3>
+          <ol>
+            <li>右上の <strong>+ 新しい目標</strong> をクリック</li>
+            <li>目標名を入力（絵文字アイコンも選択可）</li>
+            <li>KPI 名と目標値を入力（単位は 数値 / パーセント から選択）</li>
+            <li>複数 KPI を追加する場合は「+ KPI を追加」</li>
+            <li>「保存」で確定</li>
+          </ol>
+
+          <h3 class="subsection-title">KPI の進捗を更新する</h3>
+          <p>
+            目標カード内の KPI スライダーをドラッグするか、カードを開いて現在値を直接入力することで進捗を更新できます。
+            ボード上のタスクで目標を選択して作業時間を記録すると、紐付いた目標の時間集計が自動的に積み上がります。
+          </p>
+
+          <h3 class="subsection-title">GitHub リポジトリを紐付ける</h3>
+          <p>
+            目標編集モーダルでリポジトリ名を <code>owner/repo</code> 形式で指定すると、GitHub 連携時にコミット数・PR 数などを KPI として自動反映できます。
+            利用には「設定」画面での GitHub 認証が必要です。
+          </p>
+
+          <div class="callout">
+            <strong>ヒント:</strong>
+            目標を達成するとカードは自動で「達成済み」タブに移動します。
+            AI に「今月の目標を提案して」と伝えると、プロフィール情報を踏まえて具体案を返してくれます。
+          </div>
+
+          <div class="pager">
+            <a href="board.html" class="pager-prev">
+              <div class="pager-label">← 前へ</div>
+              <div class="pager-title">ボード</div>
+            </a>
+            <a href="retrospective.html" class="pager-next">
+              <div class="pager-label">次へ →</div>
+              <div class="pager-title">振り返り</div>
+            </a>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <footer class="footer">
+      <p>todome 画面説明書 — <a href="https://github.com/tanitaka-tech/todome" target="_blank" rel="noopener">GitHub repository</a></p>
+    </footer>
+
+    <script src="../assets/js/manual.js"></script>
+  </body>
+</html>

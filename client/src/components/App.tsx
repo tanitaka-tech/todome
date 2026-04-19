@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
+  AIToolConfig,
   AskUserRequest,
   ChatMessage,
   GitHubStatus,
@@ -137,6 +138,9 @@ export function App() {
   const [chatOpen, setChatOpen] = useState(true);
   const [githubStatus, setGithubStatus] = useState<GitHubStatus | null>(null);
   const [githubRepos, setGithubRepos] = useState<RepoInfo[]>([]);
+  const [aiConfig, setAIConfig] = useState<AIToolConfig>({
+    allowedTools: ["TodoWrite", "Bash"],
+  });
   const [retros, setRetros] = useState<Retrospective[]>([]);
   const [activeRetro, setActiveRetro] = useState<Retrospective | null>(null);
   const [retroStreamText, setRetroStreamText] = useState("");
@@ -239,6 +243,9 @@ export function App() {
         break;
       case "github_repo_list":
         setGithubRepos(msg.repos);
+        break;
+      case "ai_config_sync":
+        setAIConfig(msg.config);
         break;
       case "result":
         setStreamText("");
@@ -396,6 +403,14 @@ export function App() {
   const handleToggleAutoSync = useCallback(
     (value: boolean) => {
       send({ type: "github_set_auto_sync", value });
+    },
+    [send],
+  );
+
+  const handleUpdateAIConfig = useCallback(
+    (config: AIToolConfig) => {
+      setAIConfig(config);
+      send({ type: "ai_config_update", config });
     },
     [send],
   );
@@ -769,7 +784,14 @@ export function App() {
             tick={tick}
           />
         ) : activeView === "goals" ? (
-          <GoalPanel goals={goals} setGoals={setGoals} send={send} />
+          <GoalPanel
+            goals={goals}
+            setGoals={setGoals}
+            send={send}
+            githubRepos={githubRepos}
+            onRequestRepoList={handleRequestRepoList}
+            githubAuthOk={!!githubStatus?.authOk}
+          />
         ) : activeView === "retro" ? (
           <RetroPanel
             retros={retros}
@@ -803,6 +825,8 @@ export function App() {
             onSyncNow={handleSyncNow}
             onPullNow={handlePullNow}
             onToggleAutoSync={handleToggleAutoSync}
+            aiConfig={aiConfig}
+            onUpdateAIConfig={handleUpdateAIConfig}
           />
         )}
       </main>

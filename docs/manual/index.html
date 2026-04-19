@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>todome 画面説明書</title>
+    <meta name="description" content="TrelloライクなKanbanボードとAIアシスタントでタスク管理を助けるtodomeの画面説明書。" />
+    <link rel="stylesheet" href="assets/css/manual.css" />
+  </head>
+  <body data-page="index">
+    <header class="topbar">
+      <button class="menu-toggle" aria-label="メニューを開閉">☰ メニュー</button>
+      <a href="index.html" class="topbar-brand">
+        <span class="topbar-logo">t</span>
+        <span class="topbar-title">todome <em>画面説明書</em></span>
+      </a>
+      <div class="topbar-right">
+        <a href="index.html">トップ</a>
+        <a href="https://github.com/tanitaka-tech/todome" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </header>
+
+    <div class="layout">
+      <aside class="sidebar">
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">はじめに</div>
+          <ul class="sidebar-links">
+            <li><a class="sidebar-link" data-page="index" href="index.html">トップ</a></li>
+          </ul>
+        </div>
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">基本</div>
+          <ul class="sidebar-links">
+            <li><a class="sidebar-link" data-page="overview" href="pages/overview.html">Overview (ダッシュボード)</a></li>
+          </ul>
+        </div>
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">タスク管理</div>
+          <ul class="sidebar-links">
+            <li><a class="sidebar-link" data-page="board" href="pages/board.html">ボード</a></li>
+          </ul>
+        </div>
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">目標とふりかえり</div>
+          <ul class="sidebar-links">
+            <li><a class="sidebar-link" data-page="goal" href="pages/goal.html">目標</a></li>
+            <li><a class="sidebar-link" data-page="retrospective" href="pages/retrospective.html">振り返り</a></li>
+          </ul>
+        </div>
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">その他</div>
+          <ul class="sidebar-links">
+            <li><a class="sidebar-link" data-page="stats" href="pages/stats.html">統計</a></li>
+            <li><a class="sidebar-link" data-page="profile" href="pages/profile.html">自分について</a></li>
+            <li><a class="sidebar-link" data-page="settings" href="pages/settings.html">設定</a></li>
+          </ul>
+        </div>
+      </aside>
+
+      <main class="main">
+        <div class="container">
+          <section class="hero">
+            <h1>todome 画面説明書</h1>
+            <p>
+              TrelloライクなKanbanボードでタスクを管理しつつ、
+              目標やふりかえりの文脈を把握したAIアシスタントに相談できるアプリ — todome の各画面を紹介します。
+            </p>
+          </section>
+
+          <h2 class="section-title">画面一覧</h2>
+
+          <div class="card-grid">
+            <a class="card" href="pages/overview.html">
+              <div class="card-thumb"><img src="assets/screenshots/overview.png" alt="Overview" /></div>
+              <div class="card-body">
+                <div class="card-title">Overview</div>
+                <p class="card-desc">今日の作業時間、進行中タスク、完了履歴などを一画面で俯瞰するダッシュボード。</p>
+              </div>
+            </a>
+            <a class="card" href="pages/board.html">
+              <div class="card-thumb"><img src="assets/screenshots/board.png" alt="ボード" /></div>
+              <div class="card-body">
+                <div class="card-title">ボード</div>
+                <p class="card-desc">TODO / 進行中 / 完了 の3カラムのKanbanボード。タスクの追加・移動・時間計測ができます。</p>
+              </div>
+            </a>
+            <a class="card" href="pages/goal.html">
+              <div class="card-thumb"><img src="assets/screenshots/goal.png" alt="目標" /></div>
+              <div class="card-body">
+                <div class="card-title">目標</div>
+                <p class="card-desc">達成したいゴールとKPIを登録し、進捗を追跡します。</p>
+              </div>
+            </a>
+            <a class="card" href="pages/retrospective.html">
+              <div class="card-thumb"><img src="assets/screenshots/retrospective.png" alt="振り返り" /></div>
+              <div class="card-body">
+                <div class="card-title">振り返り</div>
+                <p class="card-desc">日/週/月/年の4粒度でAIと対話しながら振り返りを記録します。</p>
+              </div>
+            </a>
+            <a class="card" href="pages/stats.html">
+              <div class="card-thumb"><img src="assets/screenshots/stats.png" alt="統計" /></div>
+              <div class="card-body">
+                <div class="card-title">統計</div>
+                <p class="card-desc">作業時間の可視化と、目標との紐付け分析。</p>
+              </div>
+            </a>
+            <a class="card" href="pages/profile.html">
+              <div class="card-thumb"><img src="assets/screenshots/profile.png" alt="自分について" /></div>
+              <div class="card-body">
+                <div class="card-title">自分について</div>
+                <p class="card-desc">現在の状態・バランスホイール・行動指針をAIに渡すコンテキストとして整理。</p>
+              </div>
+            </a>
+            <a class="card" href="pages/settings.html">
+              <div class="card-thumb"><img src="assets/screenshots/settings.png" alt="設定" /></div>
+              <div class="card-body">
+                <div class="card-title">設定</div>
+                <p class="card-desc">テーマ切り替え・GitHub 連携・AI ツール権限の設定。</p>
+              </div>
+            </a>
+          </div>
+
+          <h2 class="section-title">共通機能</h2>
+
+          <h3 class="subsection-title">AIアシスタントパネル</h3>
+          <p>
+            どの画面からも右側の AI パネルを使って Claude Agent SDK (Sonnet) に相談できます。
+            現在表示中のボード・目標・プロフィールが文脈として渡されるため、
+            「今日やるべきタスクを提案して」のような曖昧な指示でも状況に沿った回答が返ります。
+          </p>
+
+          <figure class="hero-shot">
+            <img src="assets/screenshots/chat.png" alt="AI アシスタント展開時" />
+          </figure>
+
+          <div class="callout">
+            <strong>ヒント:</strong>
+            AI はタスクの追加・並び替え・目標の更新など、ツール呼び出しで実際にボードを書き換えます。
+            承認が必要な操作はチャット内で確認プロンプトが表示されます。
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <footer class="footer">
+      <p>todome 画面説明書 — <a href="https://github.com/tanitaka-tech/todome" target="_blank" rel="noopener">GitHub repository</a></p>
+    </footer>
+
+    <script src="assets/js/manual.js"></script>
+  </body>
+</html>

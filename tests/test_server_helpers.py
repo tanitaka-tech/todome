@@ -5,6 +5,7 @@ import datetime
 import pytest
 
 from server import (
+    AI_DEFAULT_ALLOWED_TOOLS,
     _apply_kpi_time_delta,
     _compute_retro_period,
     _completed_task_ids_in_period,
@@ -14,6 +15,8 @@ from server import (
     _is_goal_all_kpis_achieved,
     _merge_retro_document,
     _migrate_retro_document,
+    _normalize_ai_config,
+    _normalize_goal_repository,
     _rebalance_kpi_contribution,
     _short_id,
     _strip_retrodoc_block,
@@ -46,12 +49,21 @@ class TestEnsureKpiIds:
         assert _ensure_kpi_ids(kpis)[0]["unit"] == "number"
 
     def test_preserves_percent_unit(self):
-        kpis = [{"name": "a", "unit": "percent", "targetValue": 50}]
+        kpis = [{"name": "a", "unit": "percent", "targetValue": 100}]
         assert _ensure_kpi_ids(kpis)[0]["unit"] == "percent"
 
     def test_preserves_time_unit(self):
         kpis = [{"name": "a", "unit": "time", "targetValue": 3600}]
         assert _ensure_kpi_ids(kpis)[0]["unit"] == "time"
+
+    def test_percent_unit_forces_target_to_100(self):
+        # percent は常に 100% 固定 (フォームと一貫)
+        kpis = [{"name": "a", "unit": "percent", "targetValue": 50}]
+        assert _ensure_kpi_ids(kpis)[0]["targetValue"] == 100
+
+    def test_percent_unit_with_missing_target_defaults_to_100(self):
+        kpis = [{"name": "a", "unit": "percent"}]
+        assert _ensure_kpi_ids(kpis)[0]["targetValue"] == 100
 
     def test_coerces_non_numeric_to_zero(self):
         kpis = [{"name": "a", "targetValue": "x", "currentValue": None}]
@@ -126,6 +138,73 @@ class TestSyncGoalAchievement:
         }
         result = _sync_goal_achievement(goal)
         assert result["achievedAt"] == "2026-01-01T00:00:00"
+
+
+class TestNormalizeGoalRepository:
+    def test_keeps_valid_owner_name(self):
+        goal = {"repository": "tanitaka_tech/todome"}
+        assert _normalize_goal_repository(goal)["repository"] == "tanitaka_tech/todome"
+
+    def test_trims_surrounding_whitespace(self):
+        goal = {"repository": "  owner/repo  "}
+        assert _normalize_goal_repository(goal)["repository"] == "owner/repo"
+
+    def test_drops_empty_string(self):
+        goal = {"repository": "   ", "name": "x"}
+        result = _normalize_goal_repository(goal)
+        assert "repository" not in result
+        assert result["name"] == "x"
+
+    def test_drops_bad_format(self):
+        # スラッシュなしや空白混入は不正扱い
+        for bad in ["owner", "owner/", "/repo", "owner/repo/extra", "own er/repo"]:
+            goal = {"repository": bad}
+            assert "repository" not in _normalize_goal_repository(goal)
+
+    def test_drops_non_string(self):
+        goal = {"repository": 123}
+        assert "repository" not in _normalize_goal_repository(goal)
+
+    def test_missing_key_is_noop(self):
+        goal = {"name": "a"}
+        assert _normalize_goal_repository(goal) == {"name": "a"}
+
+
+class TestNormalizeAIConfig:
+    def test_keeps_valid_tools(self):
+        cfg = {"allowedTools": ["TodoWrite", "Bash", "Read"]}
+        assert _normalize_ai_config(cfg) == {
+            "allowedTools": ["TodoWrite", "Bash", "Read"]
+        }
+
+    def test_drops_unknown_tools(self):
+        cfg = {"allowedTools": ["TodoWrite", "Evil", "Bash"]}
+        assert _normalize_ai_config(cfg)["allowedTools"] == ["TodoWrite", "Bash"]
+
+    def test_dedupes_tools(self):
+        cfg = {"allowedTools": ["Bash", "Bash", "TodoWrite"]}
+        assert _normalize_ai_config(cfg)["allowedTools"] == ["Bash", "TodoWrite"]
+
+    def test_empty_list_is_empty(self):
+        # 空リストは「全部オフ」を許容する
+        assert _normalize_ai_config({"allowedTools": []}) == {"allowedTools": []}
+
+    def test_missing_key_uses_defaults(self):
+        assert _normalize_ai_config({})["allowedTools"] == list(
+            AI_DEFAULT_ALLOWED_TOOLS
+        )
+
+    def test_non_dict_falls_back_to_defaults(self):
+        assert _normalize_ai_config(None)["allowedTools"] == list(
+            AI_DEFAULT_ALLOWED_TOOLS
+        )
+        assert _normalize_ai_config("bogus")["allowedTools"] == list(
+            AI_DEFAULT_ALLOWED_TOOLS
+        )
+
+    def test_non_string_entries_ignored(self):
+        cfg = {"allowedTools": [1, None, "TodoWrite"]}
+        assert _normalize_ai_config(cfg)["allowedTools"] == ["TodoWrite"]
 
 
 class TestComputeRetroPeriod:

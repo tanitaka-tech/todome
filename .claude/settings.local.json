@@ -6,7 +6,14 @@
       "Bash(./node_modules/.bin/tsc -b)",
       "Bash(echo \"exit=$?\")",
       "Bash(./node_modules/.bin/vite build *)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "mcp__Claude_in_Chrome__find",
+      "mcp__Claude_in_Chrome__form_input",
+      "mcp__Claude_in_Chrome__computer",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "mcp__Claude_in_Chrome__read_page",
+      "mcp__Claude_in_Chrome__navigate",
+      "mcp__Claude_in_Chrome__javascript_tool"
     ]
   }
 }
