@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import EmojiPicker, { EmojiStyle, Theme } from "emoji-picker-react";
+import { useTranslation } from "react-i18next";
 import type { BalanceWheelCategory, UserProfile } from "../types";
 import { DARK_THEMES, type ThemeName } from "../theme";
 
@@ -55,15 +56,14 @@ function BalanceDiagram({
   onSelectCategory: (catId: string) => void;
   selectedCatId: string | null;
 }) {
+  const { t } = useTranslation("profile");
   const svgRef = useRef<SVGSVGElement>(null);
   const [draggingIdx, setDraggingIdx] = useState<number | null>(null);
   const n = categories.length;
 
   if (n < 3) {
     return (
-      <div className="bw-diagram-empty">
-        カテゴリを3つ以上追加するとダイヤグラムが表示されます
-      </div>
+      <div className="bw-diagram-empty">{t("diagramEmpty")}</div>
     );
   }
 
@@ -259,15 +259,15 @@ function BalanceDiagram({
   );
 }
 
-const DEFAULT_CATEGORIES: { name: string; icon: string }[] = [
-  { name: "趣味", icon: "🎨" },
-  { name: "人間関係", icon: "💖" },
-  { name: "健康", icon: "💪" },
-  { name: "仕事", icon: "💼" },
-  { name: "ファイナンス", icon: "💰" },
-  { name: "学び", icon: "📚" },
-  { name: "家族", icon: "👨‍👩‍👧" },
-  { name: "環境", icon: "🌱" },
+const DEFAULT_CATEGORIES: { labelKey: string; icon: string }[] = [
+  { labelKey: "defaultCatHobby", icon: "🎨" },
+  { labelKey: "defaultCatRelationships", icon: "💖" },
+  { labelKey: "defaultCatHealth", icon: "💪" },
+  { labelKey: "defaultCatWork", icon: "💼" },
+  { labelKey: "defaultCatFinance", icon: "💰" },
+  { labelKey: "defaultCatLearning", icon: "📚" },
+  { labelKey: "defaultCatFamily", icon: "👨‍👩‍👧" },
+  { labelKey: "defaultCatEnvironment", icon: "🌱" },
 ];
 
 function getEmojiPickerTheme(): Theme {
@@ -278,6 +278,7 @@ function getEmojiPickerTheme(): Theme {
 }
 
 export function ProfilePanel({ profile, setProfile, send }: Props) {
+  const { t } = useTranslation("profile");
   const [newCatName, setNewCatName] = useState("");
   const [editingCatId, setEditingCatId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
@@ -492,17 +493,15 @@ export function ProfilePanel({ profile, setProfile, send }: Props) {
 
   const existingNames = new Set(profile.balanceWheel.map((c) => c.name));
   const suggestedCats = DEFAULT_CATEGORIES.filter(
-    (d) => !existingNames.has(d.name),
+    (d) => !existingNames.has(t(d.labelKey)),
   );
 
   return (
     <div className="profile-panel">
       <div className="page-head">
         <div className="page-head-title-wrap">
-          <h1 className="page-title">プロフィール</h1>
-          <div className="page-subtitle">
-            AIアシスタントのコンテキストとして使われます
-          </div>
+          <h1 className="page-title">{t("pageTitle")}</h1>
+          <div className="page-subtitle">{t("pageSubtitle")}</div>
         </div>
       </div>
 
@@ -511,13 +510,13 @@ export function ProfilePanel({ profile, setProfile, send }: Props) {
           {/* 現在の自分の状態 */}
           <div className="widget col-12">
             <div className="widget-head">
-              <span className="widget-title">現在の自分の状態</span>
+              <span className="widget-title">{t("currentStateTitle")}</span>
             </div>
             <div className="widget-body">
               <textarea
                 className="profile-textarea"
                 rows={3}
-                placeholder="例: Unityエンジニアで、個人でもゲームを作っているが完璧主義でなかなか進まない"
+                placeholder={t("currentStatePlaceholder")}
                 value={profile.currentState}
                 onChange={(e) => updateCurrentState(e.target.value)}
               />
@@ -527,15 +526,15 @@ export function ProfilePanel({ profile, setProfile, send }: Props) {
           {/* バランスホイール */}
           <div className="widget col-12">
             <div className="widget-head">
-              <span className="widget-title">バランスホイール</span>
+              <span className="widget-title">{t("balanceWheelTitle")}</span>
               <span className="widget-sub">
-                {profile.balanceWheel.length} categories
+                {t("balanceWheelCategoriesSub", {
+                  count: profile.balanceWheel.length,
+                })}
               </span>
             </div>
             <div className="widget-body">
-              <p className="profile-section-desc">
-                人生の各領域の現在の充実度を1〜10で評価します。頂点をドラッグでスコアを調整、カテゴリ名をクリックで編集・削除できます。
-              </p>
+              <p className="profile-section-desc">{t("balanceWheelDesc")}</p>
               <div className="bw-diagram-wrap">
                 <BalanceDiagram
                   categories={profile.balanceWheel}
@@ -562,8 +561,8 @@ export function ProfilePanel({ profile, setProfile, send }: Props) {
                           className={`bw-cat-editor-icon-btn ${iconPickerOpen ? "is-active" : ""}`}
                           onMouseDown={(e) => e.preventDefault()}
                           onClick={() => setIconPickerOpen((v) => !v)}
-                          title="アイコンを選択"
-                          aria-label="アイコンを選択"
+                          title={t("iconSelect")}
+                          aria-label={t("iconSelect")}
                         >
                           {currentIcon || (
                             <span className="bw-cat-editor-icon-placeholder">
@@ -597,7 +596,7 @@ export function ProfilePanel({ profile, setProfile, send }: Props) {
                                     setIconPickerOpen(false);
                                   }}
                                 >
-                                  アイコンなし
+                                  {t("iconNone")}
                                 </button>
                               </div>
                               <EmojiPicker
@@ -607,7 +606,7 @@ export function ProfilePanel({ profile, setProfile, send }: Props) {
                                 }}
                                 theme={getEmojiPickerTheme()}
                                 emojiStyle={EmojiStyle.NATIVE}
-                                searchPlaceHolder="検索"
+                                searchPlaceHolder={t("iconSearchPlaceholder")}
                                 lazyLoadEmojis
                                 width="100%"
                                 height={380}
@@ -622,7 +621,7 @@ export function ProfilePanel({ profile, setProfile, send }: Props) {
                         ref={editingInputRef}
                         className="bw-cat-editor-input"
                         value={editingName}
-                        placeholder="カテゴリ名"
+                        placeholder={t("categoryNamePlaceholder")}
                         onChange={(e) => setEditingName(e.target.value)}
                         onBlur={(e) => {
                           const related = e.relatedTarget as HTMLElement | null;
@@ -657,15 +656,15 @@ export function ProfilePanel({ profile, setProfile, send }: Props) {
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={deleteFromEditor}
                       >
-                        削除
+                        {t("categoryEditorDelete")}
                       </button>
                       <button
                         type="button"
                         className="bw-cat-editor-close"
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={closeEditor}
-                        aria-label="閉じる"
-                        title="閉じる"
+                        aria-label={t("categoryEditorClose")}
+                        title={t("categoryEditorClose")}
                       >
                         &times;
                       </button>
@@ -677,7 +676,7 @@ export function ProfilePanel({ profile, setProfile, send }: Props) {
               <div className="bw-add-category">
                 <input
                   className="bw-cat-input"
-                  placeholder="カテゴリ名を入力..."
+                  placeholder={t("addCategoryPlaceholder")}
                   value={newCatName}
                   onChange={(e) => setNewCatName(e.target.value)}
                   onKeyDown={(e) => {
@@ -688,20 +687,23 @@ export function ProfilePanel({ profile, setProfile, send }: Props) {
                   className="bw-cat-submit"
                   onClick={() => addCategory(newCatName)}
                 >
-                  追加
+                  {t("addCategorySubmit")}
                 </button>
               </div>
               {suggestedCats.length > 0 && (
                 <div className="bw-suggestions">
-                  {suggestedCats.map((s) => (
-                    <button
-                      key={s.name}
-                      className="bw-suggestion-chip"
-                      onClick={() => addCategory(s.name, s.icon)}
-                    >
-                      + {s.icon} {s.name}
-                    </button>
-                  ))}
+                  {suggestedCats.map((s) => {
+                    const label = t(s.labelKey);
+                    return (
+                      <button
+                        key={s.labelKey}
+                        className="bw-suggestion-chip"
+                        onClick={() => addCategory(label, s.icon)}
+                      >
+                        + {s.icon} {label}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -710,7 +712,7 @@ export function ProfilePanel({ profile, setProfile, send }: Props) {
           {/* 行動指針 */}
           <div className="widget col-6">
             <div className="widget-head">
-              <span className="widget-title">心がけたい行動指針</span>
+              <span className="widget-title">{t("principlesTitle")}</span>
               <span className="widget-sub">
                 {profile.actionPrinciples.length}
               </span>
@@ -721,7 +723,7 @@ export function ProfilePanel({ profile, setProfile, send }: Props) {
                   <div key={p.id} className="profile-list-row">
                     <input
                       className="profile-list-input"
-                      placeholder="例: 常に「今やれること」に集中する"
+                      placeholder={t("principlePlaceholder")}
                       value={p.text}
                       onChange={(e) => updatePrinciple(p.id, e.target.value)}
                     />
@@ -734,7 +736,7 @@ export function ProfilePanel({ profile, setProfile, send }: Props) {
                   </div>
                 ))}
                 <button className="profile-list-add" onClick={addPrinciple}>
-                  + 行動指針を追加
+                  {t("principleAdd")}
                 </button>
               </div>
             </div>
@@ -743,7 +745,7 @@ export function ProfilePanel({ profile, setProfile, send }: Props) {
           {/* やりたいこと */}
           <div className="widget col-6">
             <div className="widget-head">
-              <span className="widget-title">やりたいこと</span>
+              <span className="widget-title">{t("wantToDoTitle")}</span>
               <span className="widget-sub">{profile.wantToDo.length}</span>
             </div>
             <div className="widget-body">
@@ -752,7 +754,7 @@ export function ProfilePanel({ profile, setProfile, send }: Props) {
                   <div key={w.id} className="profile-list-row">
                     <input
                       className="profile-list-input"
-                      placeholder="例: Godotで作品を作る"
+                      placeholder={t("wantToDoPlaceholder")}
                       value={w.text}
                       onChange={(e) => updateWant(w.id, e.target.value)}
                     />
@@ -765,7 +767,7 @@ export function ProfilePanel({ profile, setProfile, send }: Props) {
                   </div>
                 ))}
                 <button className="profile-list-add" onClick={addWant}>
-                  + やりたいことを追加
+                  {t("wantToDoAdd")}
                 </button>
               </div>
             </div>

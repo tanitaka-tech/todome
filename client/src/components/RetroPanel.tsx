@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type {
   KanbanTask,
   RetroDocument,
@@ -43,27 +44,19 @@ interface Props {
   ) => void;
 }
 
-const RETRO_TABS: { id: RetroType; label: string }[] = [
-  { id: "daily", label: "日" },
-  { id: "weekly", label: "週" },
-  { id: "monthly", label: "月" },
-  { id: "yearly", label: "年" },
+const RETRO_TABS: { id: RetroType; labelKey: string }[] = [
+  { id: "daily", labelKey: "tabDaily" },
+  { id: "weekly", labelKey: "tabWeekly" },
+  { id: "monthly", labelKey: "tabMonthly" },
+  { id: "yearly", labelKey: "tabYearly" },
 ];
 
-const TYPE_LABEL: Record<RetroType, string> = {
-  daily: "日次振り返り",
-  weekly: "週次振り返り",
-  monthly: "月次振り返り",
-  yearly: "年次振り返り",
+const TYPE_LABEL_KEYS: Record<RetroType, string> = {
+  daily: "typeDaily",
+  weekly: "typeWeekly",
+  monthly: "typeMonthly",
+  yearly: "typeYearly",
 };
-
-function formatDailyMeta(doc: RetroDocument): string {
-  const parts: string[] = [];
-  if (doc.dayRating > 0) parts.push(`評価 ${doc.dayRating}/10`);
-  if (doc.wakeUpTime) parts.push(`起床 ${doc.wakeUpTime}`);
-  if (doc.bedtime) parts.push(`就寝 ${doc.bedtime}`);
-  return parts.join(" · ");
-}
 
 function RetroHistoryDoneTasks({
   tasks,
@@ -74,17 +67,18 @@ function RetroHistoryDoneTasks({
   periodStart: string;
   periodEnd: string;
 }) {
+  const { t } = useTranslation("retro");
   const doneTasks = tasks.filter((t) =>
     isTaskCompletedInPeriod(t, periodStart, periodEnd),
   );
   return (
     <div className="retro-history-tasks">
       <div className="retro-history-tasks-title">
-        ✅ 達成タスク ({doneTasks.length}件)
+        ✅ {t("doneTasksTitle", { count: doneTasks.length })}
       </div>
       {doneTasks.length === 0 ? (
         <div className="retro-history-tasks-empty">
-          この期間に完了したタスクはありません。
+          {t("doneTasksEmpty")}
         </div>
       ) : (
         <ul className="retro-history-tasks-list">
@@ -165,6 +159,7 @@ export function RetroPanel({
   onEditDayRating,
   onEditSleep,
 }: Props) {
+  const { t } = useTranslation("retro");
   const [anchorDate, setAnchorDate] = useState<string>(() => todayIsoDate());
   const [discardTarget, setDiscardTarget] = useState<Retrospective | null>(
     null,
@@ -181,6 +176,16 @@ export function RetroPanel({
   const { closing: deleteClosing, close: closeDelete } = useModalClose(
     clearDeleteTarget,
   );
+
+  const formatDailyMeta = (doc: RetroDocument): string => {
+    const parts: string[] = [];
+    if (doc.dayRating > 0)
+      parts.push(t("dailyMetaRating", { value: doc.dayRating }));
+    if (doc.wakeUpTime)
+      parts.push(t("dailyMetaWakeUp", { time: doc.wakeUpTime }));
+    if (doc.bedtime) parts.push(t("dailyMetaBedtime", { time: doc.bedtime }));
+    return parts.join(" · ");
+  };
 
   const retrosByType = useMemo(() => {
     const map: Record<RetroType, Retrospective[]> = {
@@ -219,7 +224,7 @@ export function RetroPanel({
       <RetroSession
         retro={activeRetro}
         tasks={tasks}
-        typeLabel={TYPE_LABEL[activeRetro.type]}
+        typeLabel={t(TYPE_LABEL_KEYS[activeRetro.type])}
         streamText={streamText}
         waiting={waiting}
         onSend={onSend}
@@ -237,22 +242,27 @@ export function RetroPanel({
     <div className="retro-panel">
       <div className="page-head">
         <div className="page-head-title-wrap">
-          <h1 className="page-title">振り返り</h1>
+          <h1 className="page-title">{t("pageTitle")}</h1>
           <div className="page-subtitle">
-            {retros.filter((r) => !!r.completedAt).length} completed ·{" "}
-            {retros.filter((r) => !r.completedAt).length} drafts
+            {t("summaryCompleted", {
+              count: retros.filter((r) => !!r.completedAt).length,
+            })}{" "}
+            ·{" "}
+            {t("summaryDrafts", {
+              count: retros.filter((r) => !r.completedAt).length,
+            })}
           </div>
         </div>
       </div>
 
       <div className="retro-tabs">
-        {RETRO_TABS.map((t) => (
+        {RETRO_TABS.map((tb) => (
           <button
-            key={t.id}
-            className={`retro-tab ${tab === t.id ? "retro-tab--active" : ""}`}
-            onClick={() => setTab(t.id)}
+            key={tb.id}
+            className={`retro-tab ${tab === tb.id ? "retro-tab--active" : ""}`}
+            onClick={() => setTab(tb.id)}
           >
-            {t.label}
+            {t(tb.labelKey)}
           </button>
         ))}
       </div>
@@ -260,7 +270,9 @@ export function RetroPanel({
       <div className="page-body">
         <div className="retro-start-card">
           <div className="retro-start-period-row">
-            <label className="retro-start-period-label">対象日</label>
+            <label className="retro-start-period-label">
+              {t("targetDate")}
+            </label>
             <input
               type="date"
               className="retro-start-date-input"
@@ -273,7 +285,9 @@ export function RetroPanel({
                 ? targetPeriod.start
                 : `${targetPeriod.start} 〜 ${targetPeriod.end}`}
               {isPastPeriod && (
-                <span className="retro-start-period-tag">過去</span>
+                <span className="retro-start-period-tag">
+                  {t("periodPast")}
+                </span>
               )}
             </span>
             {anchorDate !== today && (
@@ -281,48 +295,50 @@ export function RetroPanel({
                 className="retro-start-period-today"
                 onClick={() => setAnchorDate(today)}
               >
-                今日に戻す
+                {t("backToToday")}
               </button>
             )}
           </div>
           {draft ? (
             <>
               <div className="retro-start-title">
-                この期間のドラフトがあります
+                {t("draftExistsTitle")}
               </div>
               <div className="retro-start-meta">
-                {draft.periodStart} 〜 {draft.periodEnd} · 最終更新{" "}
-                {formatDateTime(draft.updatedAt)}
+                {draft.periodStart} 〜 {draft.periodEnd} ·{" "}
+                {t("draftMetaUpdated", {
+                  date: formatDateTime(draft.updatedAt),
+                })}
               </div>
               <div className="retro-start-actions">
                 <button
                   className="btn btn--primary"
                   onClick={() => onStart(tab, anchorDate, draft.id)}
                 >
-                  前回の続きから再開
+                  {t("resumeDraft")}
                 </button>
                 <button
                   className="btn"
                   onClick={() => setDiscardTarget(draft)}
                 >
-                  ドラフトを破棄して新規作成
+                  {t("discardDraftAndCreate")}
                 </button>
               </div>
             </>
           ) : (
             <>
               <div className="retro-start-title">
-                {TYPE_LABEL[tab]}をはじめましょう
+                {t("startTitle", { type: t(TYPE_LABEL_KEYS[tab]) })}
               </div>
               <div className="retro-start-meta">
-                AI との対話で、この期間の振り返りをまとめます。
+                {t("startDescription")}
               </div>
               <div className="retro-start-actions">
                 <button
                   className="btn btn--primary"
                   onClick={() => onStart(tab, anchorDate)}
                 >
-                  振り返りを始める
+                  {t("startButton")}
                 </button>
               </div>
             </>
@@ -330,19 +346,19 @@ export function RetroPanel({
         </div>
 
         <div className="retro-history-title-row">
-          <div className="retro-history-title">履歴</div>
+          <div className="retro-history-title">{t("historyTitle")}</div>
           <div className="retro-view-toggle">
             <button
               className={`retro-view-toggle-btn ${viewMode === "list" ? "retro-view-toggle-btn--active" : ""}`}
               onClick={() => setViewMode("list")}
             >
-              リスト
+              {t("viewList")}
             </button>
             <button
               className={`retro-view-toggle-btn ${viewMode === "calendar" ? "retro-view-toggle-btn--active" : ""}`}
               onClick={() => setViewMode("calendar")}
             >
-              カレンダー
+              {t("viewCalendar")}
             </button>
           </div>
         </div>
@@ -363,7 +379,7 @@ export function RetroPanel({
               >
                 <div className="retro-history-card-head">
                   <span className="retro-history-badge retro-history-badge--draft">
-                    ドラフト
+                    {t("badgeDraft")}
                   </span>
                   <span className="retro-history-period">
                     {d.periodStart} 〜 {d.periodEnd}
@@ -377,7 +393,7 @@ export function RetroPanel({
                 {d.document.learned && (
                   <div className="retro-history-learned">
                     <div className="retro-history-learned-title">
-                      わかったこと
+                      {t("learnedTitle")}
                     </div>
                     <div className="retro-history-learned-body">
                       {d.document.learned}
@@ -391,12 +407,16 @@ export function RetroPanel({
                 />
                 {d.aiComment && (
                   <div className="retro-history-ai">
-                    <div className="retro-history-ai-title">AI コメント</div>
+                    <div className="retro-history-ai-title">
+                      {t("aiCommentTitle")}
+                    </div>
                     <div className="retro-history-ai-body">{d.aiComment}</div>
                   </div>
                 )}
                 <div className="retro-history-meta">
-                  最終更新 {formatDateTime(d.updatedAt)}
+                  {t("historyUpdated", {
+                    date: formatDateTime(d.updatedAt),
+                  })}
                 </div>
               </button>
               <button
@@ -405,8 +425,8 @@ export function RetroPanel({
                   e.stopPropagation();
                   setDeleteTarget(d);
                 }}
-                title="削除"
-                aria-label="削除"
+                title={t("deleteLabel")}
+                aria-label={t("deleteLabel")}
               >
                 &times;
               </button>
@@ -414,7 +434,7 @@ export function RetroPanel({
           ))}
           {completed.length === 0 && !draft && otherDrafts.length === 0 && (
             <div className="retro-history-empty">
-              まだ{TYPE_LABEL[tab]}の履歴はありません。
+              {t("historyEmpty", { type: t(TYPE_LABEL_KEYS[tab]) })}
             </div>
           )}
           {completed.map((r) => (
@@ -425,7 +445,7 @@ export function RetroPanel({
               >
                 <div className="retro-history-card-head">
                   <span className="retro-history-badge">
-                    {TYPE_LABEL[r.type]}
+                    {t(TYPE_LABEL_KEYS[r.type])}
                   </span>
                   <span className="retro-history-period">
                     {r.periodStart} 〜 {r.periodEnd}
@@ -439,7 +459,7 @@ export function RetroPanel({
                 {r.document.learned && (
                   <div className="retro-history-learned">
                     <div className="retro-history-learned-title">
-                      わかったこと
+                      {t("learnedTitle")}
                     </div>
                     <div className="retro-history-learned-body">
                       {r.document.learned}
@@ -453,12 +473,16 @@ export function RetroPanel({
                 />
                 {r.aiComment && (
                   <div className="retro-history-ai">
-                    <div className="retro-history-ai-title">AI コメント</div>
+                    <div className="retro-history-ai-title">
+                      {t("aiCommentTitle")}
+                    </div>
                     <div className="retro-history-ai-body">{r.aiComment}</div>
                   </div>
                 )}
                 <div className="retro-history-meta">
-                  完了 {formatDateTime(r.completedAt)}
+                  {t("historyCompleted", {
+                    date: formatDateTime(r.completedAt),
+                  })}
                 </div>
               </button>
               <button
@@ -467,8 +491,8 @@ export function RetroPanel({
                   e.stopPropagation();
                   setDeleteTarget(r);
                 }}
-                title="削除"
-                aria-label="削除"
+                title={t("deleteLabel")}
+                aria-label={t("deleteLabel")}
               >
                 &times;
               </button>
@@ -498,23 +522,25 @@ export function RetroPanel({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="modal-header">
-              <h2 className="modal-title">ドラフトを破棄</h2>
+              <h2 className="modal-title">{t("modalDiscardTitle")}</h2>
               <button className="modal-close" onClick={closeDiscard}>
                 &times;
               </button>
             </div>
             <div className="modal-body">
               <p className="modal-confirm-text">
-                進行中のドラフト ({discardTarget.periodStart} 〜{" "}
-                {discardTarget.periodEnd}) を破棄して新規作成しますか？
+                {t("modalDiscardConfirm", {
+                  start: discardTarget.periodStart,
+                  end: discardTarget.periodEnd,
+                })}
               </p>
               <p className="modal-confirm-sub">
-                この操作は元に戻せません。
+                {t("modalIrreversible")}
               </p>
             </div>
             <div className="modal-footer">
               <button className="modal-btn-secondary" onClick={closeDiscard}>
-                キャンセル
+                {t("modalCancel")}
               </button>
               <button
                 className="modal-btn-primary modal-btn-danger"
@@ -525,7 +551,7 @@ export function RetroPanel({
                   setTimeout(() => onStart(tab, anchorDate), 0);
                 }}
               >
-                破棄して新規作成
+                {t("modalDiscardAndCreate")}
               </button>
             </div>
           </div>
@@ -552,23 +578,26 @@ export function RetroPanel({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="modal-header">
-              <h2 className="modal-title">振り返りを削除</h2>
+              <h2 className="modal-title">{t("modalDeleteTitle")}</h2>
               <button className="modal-close" onClick={closeDelete}>
                 &times;
               </button>
             </div>
             <div className="modal-body">
               <p className="modal-confirm-text">
-                {TYPE_LABEL[deleteTarget.type]} ({deleteTarget.periodStart}{" "}
-                〜 {deleteTarget.periodEnd}) を削除しますか？
+                {t("modalDeleteConfirm", {
+                  type: t(TYPE_LABEL_KEYS[deleteTarget.type]),
+                  start: deleteTarget.periodStart,
+                  end: deleteTarget.periodEnd,
+                })}
               </p>
               <p className="modal-confirm-sub">
-                この操作は元に戻せません。
+                {t("modalIrreversible")}
               </p>
             </div>
             <div className="modal-footer">
               <button className="modal-btn-secondary" onClick={closeDelete}>
-                キャンセル
+                {t("modalCancel")}
               </button>
               <button
                 className="modal-btn-primary modal-btn-danger"
@@ -577,7 +606,7 @@ export function RetroPanel({
                   closeDelete();
                 }}
               >
-                削除
+                {t("modalDelete")}
               </button>
             </div>
           </div>

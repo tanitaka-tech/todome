@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { KanbanTask, RetroDocument as RetroDocumentT, RetroType } from "../types";
@@ -24,23 +25,23 @@ interface Props {
 
 const SECTIONS: {
   key: DocFieldKey;
-  label: string;
-  placeholder: string;
+  labelKey: string;
+  placeholderKey: string;
 }[] = [
   {
     key: "did",
-    label: "やったこと",
-    placeholder: "期間内に実際にやったこと・起きた出来事。",
+    labelKey: "docSectionDid",
+    placeholderKey: "placeholderDid",
   },
   {
     key: "learned",
-    label: "わかったこと",
-    placeholder: "気づき・学び・うまくいった / いかなかった原因。",
+    labelKey: "docSectionLearned",
+    placeholderKey: "placeholderLearned",
   },
   {
     key: "next",
-    label: "次やること",
-    placeholder: "次の期間で取り組むアクション (やる / 辞める)。",
+    labelKey: "docSectionNext",
+    placeholderKey: "placeholderNext",
   },
 ];
 
@@ -53,6 +54,7 @@ function EditableMarkdownSection({
   placeholder: string;
   onSave?: (next: string) => void;
 }) {
+  const { t } = useTranslation("retro");
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
   const [lastValue, setLastValue] = useState(value);
@@ -105,10 +107,10 @@ function EditableMarkdownSection({
         />
         <div className="retro-doc-edit-actions">
           <button className="btn" onClick={cancel}>
-            キャンセル
+            {t("editCancel")}
           </button>
           <button className="btn btn--primary" onClick={save}>
-            保存
+            {t("editSave")}
           </button>
         </div>
       </div>
@@ -128,7 +130,7 @@ function EditableMarkdownSection({
           startEdit();
         }
       }}
-      title={onSave ? "クリックして編集" : undefined}
+      title={onSave ? t("editClickHint") : undefined}
     >
       {value ? (
         <ReactMarkdown remarkPlugins={[remarkGfm]}>{value}</ReactMarkdown>
@@ -148,11 +150,12 @@ function SleepTimeRow({
   bedtime: string;
   onChange?: (key: SleepKey, value: string) => void;
 }) {
+  const { t } = useTranslation("retro");
   const readonly = !onChange;
   return (
     <div className="retro-sleep">
       <label className="retro-sleep-field">
-        <span className="retro-sleep-label">起床</span>
+        <span className="retro-sleep-label">{t("sleepWakeUp")}</span>
         <input
           type="time"
           className="retro-sleep-input"
@@ -166,12 +169,12 @@ function SleepTimeRow({
             className="retro-sleep-clear"
             onClick={() => onChange?.("wakeUpTime", "")}
           >
-            クリア
+            {t("sleepClear")}
           </button>
         )}
       </label>
       <label className="retro-sleep-field">
-        <span className="retro-sleep-label">就寝</span>
+        <span className="retro-sleep-label">{t("sleepBedtime")}</span>
         <input
           type="time"
           className="retro-sleep-input"
@@ -185,7 +188,7 @@ function SleepTimeRow({
             className="retro-sleep-clear"
             onClick={() => onChange?.("bedtime", "")}
           >
-            クリア
+            {t("sleepClear")}
           </button>
         )}
       </label>
@@ -200,6 +203,7 @@ function DayRatingSlider({
   value: number;
   onChange?: (v: number) => void;
 }) {
+  const { t } = useTranslation("retro");
   const readonly = !onChange;
   const rated = value > 0;
   const sliderValue = rated ? value : 5;
@@ -216,7 +220,7 @@ function DayRatingSlider({
           value={sliderValue}
           disabled={readonly}
           onChange={(e) => onChange?.(Number(e.target.value))}
-          aria-label="今日の評価"
+          aria-label={t("ratingAriaLabel")}
         />
         <span className="retro-rating-end">10</span>
       </div>
@@ -224,7 +228,7 @@ function DayRatingSlider({
         <span
           className={`retro-rating-value${rated ? "" : " retro-rating-value--unset"}`}
         >
-          {rated ? `${value} / 10` : "未評価"}
+          {rated ? t("ratingValue", { value }) : t("ratingUnset")}
         </span>
         {rated && !readonly && (
           <button
@@ -232,7 +236,7 @@ function DayRatingSlider({
             className="retro-rating-clear"
             onClick={() => onChange?.(0)}
           >
-            クリア
+            {t("ratingClear")}
           </button>
         )}
       </div>
@@ -252,6 +256,7 @@ export function RetroDocumentView({
   onEditDayRating,
   onEditSleep,
 }: Props) {
+  const { t } = useTranslation("retro");
   const completedTasks = tasks.filter((t) =>
     isTaskCompletedInPeriod(t, periodStart, periodEnd),
   );
@@ -268,7 +273,7 @@ export function RetroDocumentView({
 
       {isDaily && (
         <section className="retro-doc-section">
-          <h3 className="retro-doc-section-title">今日の評価</h3>
+          <h3 className="retro-doc-section-title">{t("docSectionRating")}</h3>
           <div className="retro-doc-section-body">
             <DayRatingSlider
               value={document.dayRating || 0}
@@ -280,7 +285,7 @@ export function RetroDocumentView({
 
       {isDaily && (
         <section className="retro-doc-section">
-          <h3 className="retro-doc-section-title">睡眠</h3>
+          <h3 className="retro-doc-section-title">{t("docSectionSleep")}</h3>
           <div className="retro-doc-section-body">
             <SleepTimeRow
               wakeUpTime={document.wakeUpTime || ""}
@@ -293,11 +298,11 @@ export function RetroDocumentView({
 
       {SECTIONS.map((s) => (
         <section key={s.key} className="retro-doc-section">
-          <h3 className="retro-doc-section-title">{s.label}</h3>
+          <h3 className="retro-doc-section-title">{t(s.labelKey)}</h3>
           <div className="retro-doc-section-body">
             <EditableMarkdownSection
               value={document[s.key]}
-              placeholder={s.placeholder}
+              placeholder={t(s.placeholderKey)}
               onSave={
                 onEditField
                   ? (next) => onEditField(s.key, next)
@@ -310,12 +315,12 @@ export function RetroDocumentView({
 
       <section className="retro-doc-section">
         <h3 className="retro-doc-section-title">
-          ✅ 達成タスク ({completedTasks.length}件)
+          ✅ {t("docSectionDoneTasks", { count: completedTasks.length })}
         </h3>
         <div className="retro-doc-section-body">
           {completedTasks.length === 0 ? (
             <div className="retro-doc-placeholder">
-              この期間に完了したタスクはありません。
+              {t("placeholderDoneTasksEmpty")}
             </div>
           ) : (
             <ul className="retro-doc-task-list">
@@ -329,11 +334,11 @@ export function RetroDocumentView({
 
       {(aiComment || onEditField) && (
         <section className="retro-doc-section retro-doc-section--ai">
-          <h3 className="retro-doc-section-title">AI からのコメント</h3>
+          <h3 className="retro-doc-section-title">{t("docSectionAiComment")}</h3>
           <div className="retro-doc-section-body">
             <EditableMarkdownSection
               value={aiComment || ""}
-              placeholder="AI からのコメントはまだありません。"
+              placeholder={t("placeholderAiCommentEmpty")}
               onSave={
                 onEditField
                   ? (next) => onEditField("aiComment", next)

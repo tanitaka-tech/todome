@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type {
@@ -45,6 +46,7 @@ export function RetroSession({
   onEditDayRating,
   onEditSleep,
 }: Props) {
+  const { t } = useTranslation("retro");
   const [input, setInput] = useState("");
   const flowRef = useRef<HTMLDivElement>(null);
   const composing = useRef(false);
@@ -71,10 +73,10 @@ export function RetroSession({
         <button
           className="retro-session-back"
           onClick={onClose}
-          title="一覧に戻る"
-          aria-label="一覧に戻る"
+          title={t("sessionBack")}
+          aria-label={t("sessionBack")}
         >
-          &lsaquo; 一覧に戻る
+          &lsaquo; {t("sessionBack")}
         </button>
         <div className="retro-session-head-title">
           <span className="retro-session-head-type">{typeLabel}</span>
@@ -88,18 +90,18 @@ export function RetroSession({
               className="btn retro-complete-btn"
               onClick={onReopen}
               disabled={waiting}
-              title="AIとの会話を再開する"
+              title={t("sessionReopenTitle")}
             >
-              会話を再開
+              {t("sessionReopen")}
             </button>
           ) : (
             <button
               className="btn btn--primary retro-complete-btn"
               onClick={onComplete}
               disabled={waiting}
-              title="完了"
+              title={t("sessionCompleteTitle")}
             >
-              完了
+              {t("sessionComplete")}
             </button>
           )}
         </div>
@@ -152,7 +154,11 @@ export function RetroSession({
             <div className="retro-chat-dock">
               <textarea
                 className="retro-chat-input"
-                placeholder={waiting ? "AIが応答中..." : "回答を入力..."}
+                placeholder={
+                  waiting
+                    ? t("sessionInputWaiting")
+                    : t("sessionInputPlaceholder")
+                }
                 value={input}
                 disabled={waiting}
                 rows={2}
@@ -188,12 +194,12 @@ export function RetroSession({
                 disabled={waiting || !input.trim()}
                 onClick={handleSend}
               >
-                送信
+                {t("sessionSend")}
               </button>
             </div>
           ) : (
             <div className="retro-chat-dock retro-chat-dock--completed">
-              この振り返りは完了済みです。
+              {t("sessionCompletedNote")}
             </div>
           )}
         </div>

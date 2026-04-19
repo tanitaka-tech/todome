@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { Goal, KanbanTask } from "../types";
 import { formatDuration, formatKpiTimeValue } from "../types";
 import { useModalClose } from "../hooks/useModalClose";
@@ -14,14 +15,15 @@ const AUTOSAVE_DELAY = 400;
 
 const PRIORITY_OPTIONS: Array<{
   value: KanbanTask["priority"];
-  label: string;
+  labelKey: string;
 }> = [
-  { value: "low", label: "低" },
-  { value: "medium", label: "中" },
-  { value: "high", label: "高" },
+  { value: "low", labelKey: "priorityLow" },
+  { value: "medium", labelKey: "priorityMedium" },
+  { value: "high", labelKey: "priorityHigh" },
 ];
 
 export function TaskDetailModal({ task, goals, onSave, onClose }: Props) {
+  const { t } = useTranslation("taskDetail");
   const [title, setTitle] = useState(task.title);
   const [memo, setMemo] = useState(task.memo);
   const [goalId, setGoalId] = useState(task.goalId);
@@ -93,7 +95,7 @@ export function TaskDetailModal({ task, goals, onSave, onClose }: Props) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="detail-topbar">
-          <button className="modal-close" onClick={close} aria-label="閉じる">
+          <button className="modal-close" onClick={close} aria-label={t("close")}>
             &times;
           </button>
         </div>
@@ -103,12 +105,12 @@ export function TaskDetailModal({ task, goals, onSave, onClose }: Props) {
             className="detail-title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="無題"
+            placeholder={t("untitled")}
           />
 
           <div className="detail-properties">
             <div className="detail-prop">
-              <div className="detail-prop-label">優先度</div>
+              <div className="detail-prop-label">{t("priority")}</div>
               <div className="detail-prop-value">
                 <div className="detail-priority-group">
                   {PRIORITY_OPTIONS.map((opt) => (
@@ -119,7 +121,7 @@ export function TaskDetailModal({ task, goals, onSave, onClose }: Props) {
                       }`}
                       onClick={() => setPriority(opt.value)}
                     >
-                      {opt.label}
+                      {t(opt.labelKey)}
                     </button>
                   ))}
                 </div>
@@ -127,14 +129,14 @@ export function TaskDetailModal({ task, goals, onSave, onClose }: Props) {
             </div>
 
             <div className="detail-prop">
-              <div className="detail-prop-label">目標</div>
+              <div className="detail-prop-label">{t("goal")}</div>
               <div className="detail-prop-value">
                 <select
                   className="detail-prop-select"
                   value={goalId}
                   onChange={(e) => setGoalId(e.target.value)}
                 >
-                  <option value="">なし</option>
+                  <option value="">{t("none")}</option>
                   {goals.map((g) => (
                     <option key={g.id} value={g.id}>
                       {g.name}
@@ -144,10 +146,10 @@ export function TaskDetailModal({ task, goals, onSave, onClose }: Props) {
                 {linkedGoal && (
                   <div className="detail-prop-meta">
                     {linkedGoal.deadline && (
-                      <span>期日 {linkedGoal.deadline}</span>
+                      <span>{t("deadline", { date: linkedGoal.deadline })}</span>
                     )}
                     {linkedGoal.kpis.length > 0 && (
-                      <span>KPI {linkedGoal.kpis.length}</span>
+                      <span>{t("kpiCount", { count: linkedGoal.kpis.length })}</span>
                     )}
                   </div>
                 )}
@@ -156,14 +158,14 @@ export function TaskDetailModal({ task, goals, onSave, onClose }: Props) {
 
             {linkedGoal && timeKpis.length > 0 && (
               <div className="detail-prop">
-                <div className="detail-prop-label">KPI紐付け</div>
+                <div className="detail-prop-label">{t("kpiLink")}</div>
                 <div className="detail-prop-value">
                   <select
                     className="detail-prop-select"
                     value={kpiId}
                     onChange={(e) => setKpiId(e.target.value)}
                   >
-                    <option value="">なし</option>
+                    <option value="">{t("none")}</option>
                     {timeKpis.map((k) => (
                       <option key={k.id} value={k.id}>
                         {k.name} ({formatKpiTimeValue(k.currentValue)}/
@@ -173,15 +175,15 @@ export function TaskDetailModal({ task, goals, onSave, onClose }: Props) {
                   </select>
                   <div className="detail-prop-meta">
                     {task.kpiContributed
-                      ? "完了済み: 計測時間が加算されています"
-                      : "完了すると計測時間がKPIに加算されます"}
+                      ? t("kpiDoneHint")
+                      : t("kpiPendingHint")}
                   </div>
                 </div>
               </div>
             )}
 
             <div className="detail-prop">
-              <div className="detail-prop-label">見積もり</div>
+              <div className="detail-prop-label">{t("estimate")}</div>
               <div className="detail-prop-value">
                 <div className="detail-estimate">
                   <input
@@ -193,7 +195,7 @@ export function TaskDetailModal({ task, goals, onSave, onClose }: Props) {
                       setEstH(Math.max(0, Number(e.target.value) || 0))
                     }
                   />
-                  <span className="detail-estimate-unit">h</span>
+                  <span className="detail-estimate-unit">{t("hoursUnit")}</span>
                   <input
                     className="detail-estimate-input"
                     type="number"
@@ -206,14 +208,14 @@ export function TaskDetailModal({ task, goals, onSave, onClose }: Props) {
                       )
                     }
                   />
-                  <span className="detail-estimate-unit">m</span>
+                  <span className="detail-estimate-unit">{t("minutesUnit")}</span>
                 </div>
               </div>
             </div>
 
             {task.timeSpent > 0 && (
               <div className="detail-prop">
-                <div className="detail-prop-label">実績</div>
+                <div className="detail-prop-label">{t("actual")}</div>
                 <div className="detail-prop-value">
                   <span className="detail-prop-static">
                     {formatDuration(task.timeSpent)}
@@ -227,7 +229,7 @@ export function TaskDetailModal({ task, goals, onSave, onClose }: Props) {
 
           <textarea
             className="detail-memo"
-            placeholder="メモを書く..."
+            placeholder={t("memoPlaceholder")}
             value={memo}
             onChange={(e) => setMemo(e.target.value)}
           />

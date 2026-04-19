@@ -1,4 +1,6 @@
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
+import { formatDate, formatDateTime } from "../i18n/format";
 import type { Goal, KanbanTask } from "../types";
 import { formatDuration, totalSeconds } from "../types";
 
@@ -47,6 +49,7 @@ export function OverviewPanel({
   onOpenBoard,
   onCardClick,
 }: Props) {
+  const { t } = useTranslation("overview");
   const activeTask = tasks.find((t) => t.timerStartedAt);
 
   const todaySeconds = useMemo(() => {
@@ -107,9 +110,9 @@ export function OverviewPanel({
     <div className="overview-panel">
       <div className="page-head">
         <div className="page-head-title-wrap">
-          <h1 className="page-title">Overview</h1>
+          <h1 className="page-title">{t("pageTitle")}</h1>
           <div className="page-subtitle">
-            {new Date().toLocaleDateString("ja-JP", {
+            {formatDate(new Date(), {
               year: "numeric",
               month: "long",
               day: "numeric",
@@ -119,7 +122,7 @@ export function OverviewPanel({
         </div>
         <div className="page-actions">
           <button className="btn btn--primary" onClick={onOpenBoard}>
-            ボードを開く →
+            {t("openBoard")}
           </button>
         </div>
       </div>
@@ -128,34 +131,36 @@ export function OverviewPanel({
         <div className="overview-grid">
           <div className="widget col-3">
             <div className="kpi-tile">
-              <div className="kpi-label">Today · 作業時間</div>
+              <div className="kpi-label">{t("kpiTodayWork")}</div>
               <div className="kpi-value kpi-value--accent">
                 {formatDuration(todaySeconds)}
               </div>
               <div className="kpi-delta">
-                累計 {formatDuration(totalTimeSeconds)}
+                {t("kpiTotalSuffix", { total: formatDuration(totalTimeSeconds) })}
               </div>
             </div>
           </div>
           <div className="widget col-3">
             <div className="kpi-tile">
-              <div className="kpi-label">Today · 完了</div>
+              <div className="kpi-label">{t("kpiTodayDone")}</div>
               <div className="kpi-value">{completedToday}</div>
-              <div className="kpi-delta">累計 {totalCompleted}</div>
+              <div className="kpi-delta">
+                {t("kpiTotalSuffix", { total: totalCompleted })}
+              </div>
             </div>
           </div>
           <div className="widget col-3">
             <div className="kpi-tile">
-              <div className="kpi-label">進行中タスク</div>
+              <div className="kpi-label">{t("kpiInProgress")}</div>
               <div className="kpi-value">{inProgress}</div>
               <div className="kpi-delta">
-                TODO {todoCount} · 全 {tasks.length}
+                {t("kpiInProgressSub", { todo: todoCount, total: tasks.length })}
               </div>
             </div>
           </div>
           <div className="widget col-3">
             <div className="kpi-tile">
-              <div className="kpi-label">Active timer</div>
+              <div className="kpi-label">{t("kpiActiveTimer")}</div>
               <div
                 className="kpi-value"
                 style={{
@@ -173,19 +178,21 @@ export function OverviewPanel({
                   textOverflow: "ellipsis",
                 }}
               >
-                {activeTask ? activeTask.title : "計測中のタスクなし"}
+                {activeTask ? activeTask.title : t("kpiNoActiveTask")}
               </div>
             </div>
           </div>
 
           <div className="widget col-8">
             <div className="widget-head">
-              <span className="widget-title">作業中のタスク</span>
-              <span className="widget-sub">{recentActive.length} items</span>
+              <span className="widget-title">{t("sectionActive")}</span>
+              <span className="widget-sub">
+                {t("sectionActiveCount", { count: recentActive.length })}
+              </span>
             </div>
             <div className="widget-body widget-body--flush">
               {recentActive.length === 0 ? (
-                <div className="overview-empty">進行中のタスクはありません</div>
+                <div className="overview-empty">{t("emptyActive")}</div>
               ) : (
                 recentActive.map((t) => (
                   <div
@@ -211,13 +218,11 @@ export function OverviewPanel({
 
           <div className="widget col-4">
             <div className="widget-head">
-              <span className="widget-title">目標別 作業時間</span>
+              <span className="widget-title">{t("sectionGoalTime")}</span>
             </div>
             <div className="widget-body widget-body--flush">
               {goalProgress.length === 0 ? (
-                <div className="overview-empty">
-                  目標に紐付いた作業記録はありません
-                </div>
+                <div className="overview-empty">{t("emptyGoalTime")}</div>
               ) : (
                 goalProgress.map((g) => (
                   <div key={g.id} className="goal-progress-row">
@@ -241,12 +246,14 @@ export function OverviewPanel({
 
           <div className="widget col-12">
             <div className="widget-head">
-              <span className="widget-title">最近完了</span>
-              <span className="widget-sub">last {recentDone.length}</span>
+              <span className="widget-title">{t("sectionRecentDone")}</span>
+              <span className="widget-sub">
+                {t("sectionRecentDoneCount", { count: recentDone.length })}
+              </span>
             </div>
             <div className="widget-body widget-body--flush">
               {recentDone.length === 0 ? (
-                <div className="overview-empty">完了したタスクはまだありません</div>
+                <div className="overview-empty">{t("emptyRecentDone")}</div>
               ) : (
                 recentDone.map((t) => (
                   <div
@@ -261,7 +268,7 @@ export function OverviewPanel({
                     <span className="overview-task-title">{t.title}</span>
                     <span className="overview-task-time">
                       {t.completedAt &&
-                        new Date(t.completedAt).toLocaleString("ja-JP", {
+                        formatDateTime(new Date(t.completedAt), {
                           month: "short",
                           day: "numeric",
                           hour: "2-digit",

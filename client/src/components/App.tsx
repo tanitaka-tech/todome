@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import i18n from "../i18n";
 import type {
   AIToolConfig,
   AskUserRequest,
@@ -16,6 +18,11 @@ import type {
 } from "../types";
 import { formatDuration, totalSeconds } from "../types";
 import { applyTheme, getInitialTheme, type ThemeName } from "../theme";
+import {
+  applyLanguage,
+  getInitialLanguage,
+  type Language,
+} from "../i18n/language";
 import {
   loadBoardGoalFilter,
   loadBoardRecentDays,
@@ -81,28 +88,17 @@ let celebrationId = 0;
 
 const NAV_ITEMS: {
   id: ActiveView;
-  label: string;
   icon: string;
   group: "work" | "app";
 }[] = [
-  { id: "overview", label: "Overview", icon: "⌂", group: "work" },
-  { id: "board", label: "ボード", icon: "⫴", group: "work" },
-  { id: "goals", label: "目標", icon: "⌖", group: "work" },
-  { id: "retro", label: "振り返り", icon: "↻", group: "work" },
-  { id: "stats", label: "統計", icon: "〽", group: "work" },
-  { id: "profile", label: "プロフィール", icon: "◉", group: "app" },
-  { id: "settings", label: "設定", icon: "⚙", group: "app" },
+  { id: "overview", icon: "⌂", group: "work" },
+  { id: "board", icon: "⫴", group: "work" },
+  { id: "goals", icon: "⌖", group: "work" },
+  { id: "retro", icon: "↻", group: "work" },
+  { id: "stats", icon: "〽", group: "work" },
+  { id: "profile", icon: "◉", group: "app" },
+  { id: "settings", icon: "⚙", group: "app" },
 ];
-
-const VIEW_LABEL: Record<ActiveView, string> = {
-  overview: "Overview",
-  board: "ボード",
-  goals: "目標管理",
-  retro: "振り返り",
-  stats: "統計",
-  profile: "プロフィール",
-  settings: "設定",
-};
 
 const GITHUB_MARK = (
   <svg
@@ -136,6 +132,7 @@ function renderNavIcon(
 }
 
 export function App() {
+  const { t: tNav } = useTranslation("nav");
   const [tasks, setTasks] = useState<KanbanTask[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [profile, setProfile] = useState<UserProfile>(EMPTY_PROFILE);
@@ -152,6 +149,13 @@ export function App() {
   );
   const [celebrations, setCelebrations] = useState<Celebration[]>([]);
   const [theme, setThemeState] = useState<ThemeName>(() => getInitialTheme());
+  const [language, setLanguageState] = useState<Language>(() =>
+    getInitialLanguage(),
+  );
+  const setLanguage = useCallback((lang: Language) => {
+    setLanguageState(lang);
+    applyLanguage(lang);
+  }, []);
   const [chatOpen, setChatOpen] = useState(true);
   const [githubStatus, setGithubStatus] = useState<GitHubStatus | null>(null);
   const [githubRepos, setGithubRepos] = useState<RepoInfo[]>([]);
@@ -207,6 +211,10 @@ export function App() {
   }, [theme]);
 
   useEffect(() => {
+    applyLanguage(language);
+  }, [language]);
+
+  useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 1000);
     return () => clearInterval(id);
   }, []);
@@ -244,11 +252,11 @@ export function App() {
         const label =
           msg.name === "TodoWrite"
             ? hasGoalOp
-              ? "ボード・目標を更新中"
-              : "ボードを更新中"
+              ? i18n.t("nav:toolUseTodoWriteGoal")
+              : i18n.t("nav:toolUseTodoWrite")
             : msg.name === "AskUserQuestion"
               ? ""
-              : `${msg.name} を実行中`;
+              : i18n.t("nav:toolUseGeneric", { name: msg.name });
         if (label) {
           setMessages((p) => [
             ...p,
@@ -326,7 +334,10 @@ export function App() {
           {
             id: nextId(),
             role: "system",
-            text: `完了 — $${msg.cost.toFixed(4)} / ${msg.turns} turns`,
+            text: i18n.t("nav:resultMessage", {
+              cost: msg.cost.toFixed(4),
+              turns: msg.turns,
+            }),
           },
         ]);
         break;
@@ -954,7 +965,7 @@ export function App() {
             href="https://github.com/tanitaka-tech/todome"
             target="_blank"
             rel="noopener noreferrer"
-            title="GitHub リポジトリを開く"
+            title={tNav("openGithubRepo")}
           >
             t
           </a>
@@ -968,12 +979,12 @@ export function App() {
                 activeView === item.id ? "sidebar-nav-item--active" : ""
               }`}
               onClick={() => setActiveView(item.id)}
-              title={item.label}
+              title={tNav(item.id)}
             >
               <span className="sidebar-nav-icon">
                 {renderNavIcon(item, githubStatus)}
               </span>
-              <span className="sidebar-nav-label">{item.label}</span>
+              <span className="sidebar-nav-label">{tNav(item.id)}</span>
             </button>
           ))}
         </nav>
@@ -986,12 +997,12 @@ export function App() {
                 activeView === item.id ? "sidebar-nav-item--active" : ""
               }`}
               onClick={() => setActiveView(item.id)}
-              title={item.label}
+              title={tNav(item.id)}
             >
               <span className="sidebar-nav-icon">
                 {renderNavIcon(item, githubStatus)}
               </span>
-              <span className="sidebar-nav-label">{item.label}</span>
+              <span className="sidebar-nav-label">{tNav(item.id)}</span>
             </button>
           ))}
           {githubStatus?.authOk && githubStatus?.linked && (
@@ -1015,7 +1026,9 @@ export function App() {
         <div className="topbar-crumbs">
           <span className="topbar-crumb">todome</span>
           <span className="topbar-crumb-sep">›</span>
-          <span className="topbar-crumb-current">{VIEW_LABEL[activeView]}</span>
+          <span className="topbar-crumb-current">
+            {tNav(`view_${activeView}`)}
+          </span>
         </div>
         <div className="topbar-status">
           <span
@@ -1023,14 +1036,14 @@ export function App() {
               connected ? "topbar-status-dot--online" : "topbar-status-dot--offline"
             }`}
           />
-          {connected ? "connected" : "connecting…"}
+          {connected ? tNav("connected") : tNav("connecting")}
         </div>
         {!chatOpen && (
           <button
             className="topbar-toggle topbar-toggle--right"
             onClick={() => setChatOpen(true)}
-            title="AIアシスタントを開く"
-            aria-label="AIアシスタントを開く"
+            title={tNav("openAiAssistant")}
+            aria-label={tNav("openAiAssistant")}
           >
             &#10038;
           </button>
@@ -1102,6 +1115,8 @@ export function App() {
           <SettingsPanel
             theme={theme}
             setTheme={setThemeState}
+            language={language}
+            setLanguage={setLanguage}
             githubStatus={githubStatus}
             githubRepos={githubRepos}
             onRequestRepoList={handleRequestRepoList}
@@ -1161,7 +1176,9 @@ export function App() {
                 <span className="timer-popup-goal">{popupGoalName}</span>
               )}
               {!isPopupRunning && (
-                <span className="timer-popup-status-badge">一時停止中</span>
+                <span className="timer-popup-status-badge">
+                  {tNav("timerPaused")}
+                </span>
               )}
             </div>
           </div>
@@ -1178,30 +1195,30 @@ export function App() {
               <button
                 className="timer-popup-btn timer-popup-btn--pause"
                 onClick={() => handleTimerToggle(popupTask.id)}
-                title="一時停止"
+                title={tNav("timerPause")}
               >
-                &#10074;&#10074; 一時停止
+                &#10074;&#10074; {tNav("timerPause")}
               </button>
             ) : (
               <button
                 className="timer-popup-btn timer-popup-btn--resume"
                 onClick={() => handleTimerToggle(popupTask.id)}
-                title="再開"
+                title={tNav("timerResume")}
               >
-                &#9654; 再開
+                &#9654; {tNav("timerResume")}
               </button>
             )}
             <button
               className="timer-popup-btn timer-popup-btn--done"
               onClick={() => handleMoveColumn(popupTask.id, "done")}
-              title="完了"
+              title={tNav("timerDone")}
             >
-              &#10003; 完了
+              &#10003; {tNav("timerDone")}
             </button>
             <button
               className="timer-popup-close"
               onClick={() => setPopupTaskId(null)}
-              title="閉じる"
+              title={tNav("timerClose")}
             >
               &times;
             </button>

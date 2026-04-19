@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { AskUserRequest, ChatMessage } from "../types";
@@ -19,12 +20,6 @@ interface Props {
   onClose?: () => void;
   inputRef?: React.RefObject<HTMLInputElement | null>;
 }
-
-const SUGGESTIONS = [
-  "自己紹介するので、プロフィールに整理して登録して",
-  "達成したいことを話すので、目標とKPIに落とし込んで",
-  "プロフィールと目標を踏まえて、今日やるべきタスクを提案して",
-];
 
 function formatToolInput(input: unknown): string {
   if (input == null) return "";
@@ -50,6 +45,7 @@ export function ChatPanel({
   onClose,
   inputRef,
 }: Props) {
+  const { t } = useTranslation("chat");
   const [input, setInput] = useState("");
   const [toolDetail, setToolDetail] = useState<ChatMessage | null>(null);
   const flowRef = useRef<HTMLDivElement>(null);
@@ -57,6 +53,12 @@ export function ChatPanel({
   const toolOverlayMouseDownRef = useRef(false);
   const clearToolDetail = useCallback(() => setToolDetail(null), []);
   const { closing: toolDetailClosing, close: closeToolDetail } = useModalClose(clearToolDetail);
+
+  const suggestions = [
+    t("suggestionProfile"),
+    t("suggestionGoal"),
+    t("suggestionToday"),
+  ];
 
   const handleSend = () => {
     const text = input.trim();
@@ -85,22 +87,22 @@ export function ChatPanel({
     <div className="chat-panel">
       <div className="chat-panel-header">
         <span className="chat-panel-icon">&#10038;</span>
-        AI アシスタント
+        {t("title")}
         <button
           className="chat-panel-clear"
           onClick={onClearSession}
           disabled={!connected}
-          title="セッションをクリア (/clear)"
-          aria-label="セッションをクリア"
+          title={t("clearSessionTitle")}
+          aria-label={t("clearSession")}
         >
-          クリア
+          {t("clear")}
         </button>
         {onClose && (
           <button
             className="chat-panel-close"
             onClick={onClose}
-            title="AIアシスタントを閉じる"
-            aria-label="AIアシスタントを閉じる"
+            title={t("closeAssistant")}
+            aria-label={t("closeAssistant")}
           >
             &#10095;
           </button>
@@ -111,10 +113,10 @@ export function ChatPanel({
         {messages.length === 0 && !waiting && (
           <div className="chat-welcome">
             <p className="chat-welcome-text">
-              AIエージェントに相談しながら<br />タスクを管理しましょう
+              {t("welcomeLine1")}<br />{t("welcomeLine2")}
             </p>
             <div className="chat-suggestions">
-              {SUGGESTIONS.map((s) => (
+              {suggestions.map((s) => (
                 <button
                   key={s}
                   className="chat-suggestion"
@@ -134,7 +136,7 @@ export function ChatPanel({
                 <button
                   className="chat-tool-label chat-tool-label--button"
                   onClick={() => setToolDetail(m)}
-                  title="詳細を表示"
+                  title={t("showDetails")}
                 >
                   {m.text}
                   <span className="chat-tool-label-icon">&#9432;</span>
@@ -210,9 +212,9 @@ export function ChatPanel({
           placeholder={
             connected
               ? waiting
-                ? "AIが応答中..."
-                : "AIに相談..."
-              : "接続中..."
+                ? t("inputPlaceholderResponding")
+                : t("inputPlaceholderReady")
+              : t("inputPlaceholderConnecting")
           }
           value={input}
           disabled={!connected || waiting}
@@ -232,7 +234,7 @@ export function ChatPanel({
             onClick={onCancel}
             disabled={!connected}
           >
-            キャンセル
+            {t("cancel")}
           </button>
         ) : (
           <button
@@ -240,7 +242,7 @@ export function ChatPanel({
             disabled={!connected || !input.trim()}
             onClick={handleSend}
           >
-            送信
+            {t("send")}
           </button>
         )}
       </div>
@@ -269,7 +271,7 @@ export function ChatPanel({
               <button
                 className="modal-close"
                 onClick={closeToolDetail}
-                aria-label="閉じる"
+                aria-label={t("close")}
               >
                 &times;
               </button>

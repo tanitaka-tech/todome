@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { formatDate, formatDateTime } from "../i18n/format";
 import type {
   CommitDiffDetails,
   CommitDiffEntry,
@@ -19,27 +21,29 @@ interface Props {
   onRestoreCommit: (hash: string) => void;
 }
 
-function formatRelative(iso: string | null): string {
-  if (!iso) return "未同期";
+type TFn = (key: string, opts?: Record<string, unknown>) => string;
+
+function formatRelative(iso: string | null, t: TFn): string {
+  if (!iso) return t("notSynced");
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
+  if (Number.isNaN(d.getTime())) return t("dash");
   const diff = Date.now() - d.getTime();
   const sec = Math.floor(diff / 1000);
-  if (sec < 60) return "たった今";
+  if (sec < 60) return t("justNow");
   const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}分前`;
+  if (min < 60) return t("minutesAgo", { count: min });
   const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}時間前`;
+  if (hr < 24) return t("hoursAgo", { count: hr });
   const day = Math.floor(hr / 24);
-  if (day < 7) return `${day}日前`;
-  return d.toLocaleDateString();
+  if (day < 7) return t("daysAgo", { count: day });
+  return formatDate(d);
 }
 
-function formatFull(iso: string | null): string {
-  if (!iso) return "未同期";
+function formatFull(iso: string | null, t: TFn): string {
+  if (!iso) return t("notSynced");
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString();
+  return formatDateTime(d);
 }
 
 function hasAnyChangeInDetails(details: CommitDiffDetails): boolean {
@@ -52,10 +56,10 @@ function hasAnyChangeInDetails(details: CommitDiffDetails): boolean {
 
 type ChangeKind = "added" | "removed" | "modified";
 
-const KIND_LABEL: Record<ChangeKind, string> = {
-  added: "追加",
-  removed: "削除",
-  modified: "変更",
+const KIND_LABEL_KEY: Record<ChangeKind, string> = {
+  added: "kindAdded",
+  removed: "kindRemoved",
+  modified: "kindModified",
 };
 
 const KIND_CLASS: Record<ChangeKind, string> = {
@@ -67,6 +71,7 @@ const KIND_CLASS: Record<ChangeKind, string> = {
 function renderSection(
   title: string,
   section: { added: LabeledId[]; removed: LabeledId[]; modified: LabeledId[] },
+  t: TFn,
 ) {
   const kinds: ChangeKind[] = ["added", "removed", "modified"];
   const items: { kind: ChangeKind; entry: LabeledId }[] = [];
@@ -84,7 +89,7 @@ function renderSection(
           key={`${kind}-${entry.id}`}
           className="sidebar-github-commit-tip-item"
         >
-          <span className={KIND_CLASS[kind]}>{KIND_LABEL[kind]}</span>
+          <span className={KIND_CLASS[kind]}>{t(KIND_LABEL_KEY[kind])}</span>
           <span className="sidebar-github-commit-tip-item-label" title={entry.label}>
             {entry.label}
           </span>
@@ -105,6 +110,7 @@ export function GitHubSyncTab({
   onRequestCommitDiff,
   onRestoreCommit,
 }: Props) {
+  const { t } = useTranslation("github");
   void tick;
   const [open, setOpen] = useState(false);
   const [anchor, setAnchor] = useState<{ bottom: number; left: number } | null>(
@@ -115,10 +121,12 @@ export function GitHubSyncTab({
   const closeTimer = useRef<number | null>(null);
   const requestedDiffs = useRef<Set<string>>(new Set());
   const needsSync = status.pendingSync && !status.syncing;
-  const label = status.syncing ? "同期中" : formatRelative(status.lastSyncAt);
+  const label = status.syncing
+    ? t("syncing")
+    : formatRelative(status.lastSyncAt, t);
   const title = status.syncing
-    ? "同期中…"
-    : `最終同期: ${formatFull(status.lastSyncAt)}`;
+    ? t("syncingEllipsis")
+    : t("lastSync", { date: formatFull(status.lastSyncAt, t) });
 
   const cancelClose = () => {
     if (closeTimer.current !== null) {
@@ -164,9 +172,7 @@ export function GitHubSyncTab({
   };
 
   const handleCommitClick = (commit: GitCommit) => {
-    const ok = window.confirm(
-      `この時点 (${commit.shortHash}) の状態にデータを復元します。\n現在の状態は「restore」コミットとして上書きされます (履歴は GitHub 上に残ります)。\nよろしいですか?`,
-    );
+    const ok = window.confirm(t("restoreConfirm", { hash: commit.shortHash }));
     if (ok) {
       onRestoreCommit(commit.hash);
       setOpen(false);
@@ -190,7 +196,7 @@ export function GitHubSyncTab({
       >
         <span className="sidebar-github-icon">
           {status.syncing ? (
-            <span className="sidebar-github-spinner" aria-label="同期中">
+            <span className="sidebar-github-spinner" aria-label={t("ariaSyncing")}>
               <span />
               <span />
               <span />
@@ -206,7 +212,9 @@ export function GitHubSyncTab({
               <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z" />
             </svg>
           )}
-          {needsSync && <span className="sidebar-github-badge" aria-label="要同期" />}
+          {needsSync && (
+            <span className="sidebar-github-badge" aria-label={t("ariaNeedsSync")} />
+          )}
         </span>
         <span className="sidebar-github-label">{label}</span>
       </button>
@@ -222,11 +230,11 @@ export function GitHubSyncTab({
             {status.owner}/{status.repo}
           </div>
 
-          <div className="sidebar-github-history-title">履歴から復元</div>
+          <div className="sidebar-github-history-title">{t("historyTitle")}</div>
           <div className="sidebar-github-commits">
             {commits.length === 0 ? (
               <div className="sidebar-github-commits-empty">
-                {status.syncing ? "取得中…" : "履歴がありません"}
+                {status.syncing ? t("commitsLoading") : t("commitsEmpty")}
               </div>
             ) : (
               commits.map((commit) => (
@@ -244,7 +252,7 @@ export function GitHubSyncTab({
                     {commit.shortHash}
                   </span>
                   <span className="sidebar-github-commit-date">
-                    {formatRelative(commit.date)}
+                    {formatRelative(commit.date, t)}
                   </span>
                   <span className="sidebar-github-commit-msg">
                     {commit.message}
@@ -263,7 +271,7 @@ export function GitHubSyncTab({
             }}
             disabled={status.syncing}
           >
-            ⇅ 同期 (Push)
+            {t("syncPush")}
           </button>
           <button
             type="button"
@@ -274,13 +282,13 @@ export function GitHubSyncTab({
             }}
             disabled={status.syncing}
           >
-            ↓ Pull
+            {t("pull")}
           </button>
 
           <div className="sidebar-github-popup-foot">
             {status.syncing
-              ? "同期中…"
-              : `最終同期: ${formatFull(status.lastSyncAt)}`}
+              ? t("syncingEllipsis")
+              : t("lastSync", { date: formatFull(status.lastSyncAt, t) })}
           </div>
 
           {hoveredHash && (
@@ -290,7 +298,7 @@ export function GitHubSyncTab({
             >
               {!hoveredDiff ? (
                 <div className="sidebar-github-commit-tip-loading">
-                  差分を計算中…
+                  {t("diffLoading")}
                 </div>
               ) : hoveredDiff.error ? (
                 <div className="sidebar-github-commit-tip-error">
@@ -299,22 +307,22 @@ export function GitHubSyncTab({
               ) : hoveredDiff.details && hasAnyChangeInDetails(hoveredDiff.details) ? (
                 <>
                   <div className="sidebar-github-commit-tip-head">
-                    復元した場合の変更
+                    {t("restoreHead")}
                   </div>
-                  {renderSection("タスク", hoveredDiff.details.tasks)}
-                  {renderSection("ゴール", hoveredDiff.details.goals)}
-                  {renderSection("振り返り", hoveredDiff.details.retros)}
+                  {renderSection(t("sectionTasks"), hoveredDiff.details.tasks, t)}
+                  {renderSection(t("sectionGoals"), hoveredDiff.details.goals, t)}
+                  {renderSection(t("sectionRetros"), hoveredDiff.details.retros, t)}
                   {hoveredDiff.details.profileChanged && (
                     <div className="sidebar-github-commit-tip-section">
                       <div className="sidebar-github-commit-tip-section-title">
-                        プロフィール
+                        {t("sectionProfile")}
                       </div>
                       <div className="sidebar-github-commit-tip-item">
                         <span className="sidebar-github-commit-tip-modified">
-                          変更
+                          {t("kindModified")}
                         </span>
                         <span className="sidebar-github-commit-tip-item-label">
-                          プロフィールの記述
+                          {t("profileChangedLabel")}
                         </span>
                       </div>
                     </div>
@@ -322,7 +330,7 @@ export function GitHubSyncTab({
                 </>
               ) : (
                 <div className="sidebar-github-commit-tip-nochange">
-                  現在と同じ内容です
+                  {t("noChange")}
                 </div>
               )}
             </div>
