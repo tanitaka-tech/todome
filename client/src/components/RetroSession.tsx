@@ -23,6 +23,11 @@ interface Props {
     value: string,
   ) => void;
   onEditDayRating: (retroId: string, value: number) => void;
+  onEditSleep: (
+    retroId: string,
+    key: "wakeUpTime" | "bedtime",
+    value: string,
+  ) => void;
 }
 
 export function RetroSession({
@@ -36,6 +41,7 @@ export function RetroSession({
   onClose,
   onEditField,
   onEditDayRating,
+  onEditSleep,
 }: Props) {
   const [input, setInput] = useState("");
   const flowRef = useRef<HTMLDivElement>(null);
@@ -192,6 +198,7 @@ export function RetroSession({
             typeLabel={typeLabel}
             onEditField={(key, value) => onEditField(retro.id, key, value)}
             onEditDayRating={(v) => onEditDayRating(retro.id, v)}
+            onEditSleep={(key, value) => onEditSleep(retro.id, key, value)}
           />
         </div>
       </div>

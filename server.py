@@ -289,6 +289,9 @@ def _migrate_retro_document(doc: dict[str, Any]) -> dict[str, Any]:
             migrated["dayRating"] = 0
     migrated.pop("energy", None)
 
+    migrated.setdefault("wakeUpTime", "")
+    migrated.setdefault("bedtime", "")
+
     legacy_keys = ("findings", "improvements", "idealState", "actions")
     if any(k in doc for k in legacy_keys):
         findings = (doc.get("findings") or "").strip()
@@ -1369,6 +1372,18 @@ def _strip_retrodoc_block(text: str) -> tuple[str, dict[str, Any] | None]:
 
 
 RETRO_DOC_TEXT_KEYS = ("did", "learned", "next")
+RETRO_DOC_TIME_KEYS = ("wakeUpTime", "bedtime")
+
+
+def _is_valid_hhmm(value: str) -> bool:
+    """24時間 HH:MM 形式かを判定。空文字 (未設定) は False。"""
+    if not isinstance(value, str) or len(value) != 5 or value[2] != ":":
+        return False
+    hh, mm = value[:2], value[3:]
+    if not (hh.isdigit() and mm.isdigit()):
+        return False
+    h, m = int(hh), int(mm)
+    return 0 <= h <= 23 and 0 <= m <= 59
 
 
 def _merge_retro_document(
@@ -1385,6 +1400,15 @@ def _merge_retro_document(
         iv = int(day_rating)
         if 0 <= iv <= 10:
             merged["dayRating"] = iv
+    for key in RETRO_DOC_TIME_KEYS:
+        if key not in updates:
+            continue
+        val = updates.get(key)
+        if not isinstance(val, str):
+            continue
+        stripped = val.strip()
+        if stripped == "" or _is_valid_hhmm(stripped):
+            merged[key] = stripped
     return merged
 
 
@@ -1428,6 +1452,8 @@ def _build_retro_system_prompt(
     }
     if is_daily:
         doc_snapshot["dayRating"] = int(doc.get("dayRating") or 0)
+        doc_snapshot["wakeUpTime"] = doc.get("wakeUpTime", "") or ""
+        doc_snapshot["bedtime"] = doc.get("bedtime", "") or ""
     current_doc_json = json.dumps(doc_snapshot, ensure_ascii=False)
 
     rating_section = ""
@@ -1436,16 +1462,20 @@ def _build_retro_system_prompt(
         rating_section = (
             "4. 今日の評価 (dayRating): 今日を 1〜10 の整数で自己評価する "
             "(1=最悪, 10=最高)。未評価は 0。\n"
+            "5. 起床時間 (wakeUpTime) / 就寝時間 (bedtime): 今日の起床・就寝時刻を "
+            '"HH:MM" (24時間) で記録する。未設定は ""。\n'
         )
         rating_format_hint = (
             '- dayRating は整数値 (1〜10, 未評価なら 0) を数値で入れる\n'
+            '- wakeUpTime / bedtime は "HH:MM" の文字列。未設定は "" のまま返す\n'
         )
         retrodoc_example = (
-            '<retrodoc>{{"did":"...","learned":"...","next":"...","dayRating":0}}</retrodoc>'
+            '<retrodoc>{{"did":"...","learned":"...","next":"...",'
+            '"dayRating":0,"wakeUpTime":"","bedtime":""}}</retrodoc>'
         )
         opening_hint = (
             "- 冒頭メッセージでは簡単に挨拶し、まず今日やったこと・印象的だった出来事を尋ねる。"
-            "対話の中で自然に「今日を 1〜10 で評価すると？」も確認する"
+            "対話の中で自然に「今日を 1〜10 で評価すると？」「起きた時間と寝る予定の時間は？」も確認する"
         )
     else:
         retrodoc_example = (
@@ -1584,9 +1614,13 @@ async def run_retro_turn(
     # ドキュメントが空のままの場合は DB に保存せず、ドラフト化しない。
     # (did/learned/next のいずれかに内容、または dayRating が設定されたら永続化)
     doc_for_check = new_retro["document"]
-    has_content = any(
-        (doc_for_check.get(k) or "").strip() for k in RETRO_DOC_TEXT_KEYS
-    ) or bool(doc_for_check.get("dayRating"))
+    has_content = (
+        any((doc_for_check.get(k) or "").strip() for k in RETRO_DOC_TEXT_KEYS)
+        or bool(doc_for_check.get("dayRating"))
+        or any(
+            (doc_for_check.get(k) or "").strip() for k in RETRO_DOC_TIME_KEYS
+        )
+    )
     if has_content:
         save_retro(new_retro)
         schedule_autosync()
@@ -1622,6 +1656,8 @@ async def finalize_retro(
     }
     if retro["type"] == "daily":
         doc_snapshot["dayRating"] = int(doc.get("dayRating") or 0)
+        doc_snapshot["wakeUpTime"] = doc.get("wakeUpTime", "") or ""
+        doc_snapshot["bedtime"] = doc.get("bedtime", "") or ""
     doc_text = json.dumps(doc_snapshot, ensure_ascii=False, indent=2)
 
     system_prompt = (
@@ -2249,6 +2285,8 @@ async def websocket_endpoint(ws: WebSocket):
                             "learned": "",
                             "next": "",
                             "dayRating": 0,
+                            "wakeUpTime": "",
+                            "bedtime": "",
                             "completedTasks": completed_ids,
                         },
                         "messages": [
@@ -2400,6 +2438,15 @@ async def websocket_endpoint(ws: WebSocket):
                             iv = int(ev)
                             if 0 <= iv <= 10:
                                 updated["document"]["dayRating"] = iv
+                    for key in RETRO_DOC_TIME_KEYS:
+                        if key not in doc_update:
+                            continue
+                        tv = doc_update.get(key)
+                        if not isinstance(tv, str):
+                            continue
+                        ts = tv.strip()
+                        if ts == "" or _is_valid_hhmm(ts):
+                            updated["document"][key] = ts
 
                 ai_comment_update = data.get("aiComment")
                 if isinstance(ai_comment_update, str):
@@ -2416,6 +2463,10 @@ async def websocket_endpoint(ws: WebSocket):
                         for k in RETRO_DOC_TEXT_KEYS
                     )
                     or bool(doc_for_check.get("dayRating"))
+                    or any(
+                        (doc_for_check.get(k) or "").strip()
+                        for k in RETRO_DOC_TIME_KEYS
+                    )
                     or bool((updated.get("aiComment") or "").strip())
                 )
 

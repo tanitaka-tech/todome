@@ -5,6 +5,7 @@ import type { KanbanTask, RetroDocument as RetroDocumentT, RetroType } from "../
 
 type DocFieldKey = "did" | "learned" | "next";
 type EditableKey = DocFieldKey | "aiComment";
+type SleepKey = "wakeUpTime" | "bedtime";
 
 interface Props {
   document: RetroDocumentT;
@@ -16,6 +17,7 @@ interface Props {
   typeLabel: string;
   onEditField?: (key: EditableKey, value: string) => void;
   onEditDayRating?: (value: number) => void;
+  onEditSleep?: (key: SleepKey, value: string) => void;
 }
 
 const SECTIONS: {
@@ -135,6 +137,60 @@ function EditableMarkdownSection({
   );
 }
 
+function SleepTimeRow({
+  wakeUpTime,
+  bedtime,
+  onChange,
+}: {
+  wakeUpTime: string;
+  bedtime: string;
+  onChange?: (key: SleepKey, value: string) => void;
+}) {
+  const readonly = !onChange;
+  return (
+    <div className="retro-sleep">
+      <label className="retro-sleep-field">
+        <span className="retro-sleep-label">起床</span>
+        <input
+          type="time"
+          className="retro-sleep-input"
+          value={wakeUpTime}
+          disabled={readonly}
+          onChange={(e) => onChange?.("wakeUpTime", e.target.value)}
+        />
+        {wakeUpTime && !readonly && (
+          <button
+            type="button"
+            className="retro-sleep-clear"
+            onClick={() => onChange?.("wakeUpTime", "")}
+          >
+            クリア
+          </button>
+        )}
+      </label>
+      <label className="retro-sleep-field">
+        <span className="retro-sleep-label">就寝</span>
+        <input
+          type="time"
+          className="retro-sleep-input"
+          value={bedtime}
+          disabled={readonly}
+          onChange={(e) => onChange?.("bedtime", e.target.value)}
+        />
+        {bedtime && !readonly && (
+          <button
+            type="button"
+            className="retro-sleep-clear"
+            onClick={() => onChange?.("bedtime", "")}
+          >
+            クリア
+          </button>
+        )}
+      </label>
+    </div>
+  );
+}
+
 function DayRatingSlider({
   value,
   onChange,
@@ -192,6 +248,7 @@ export function RetroDocumentView({
   typeLabel,
   onEditField,
   onEditDayRating,
+  onEditSleep,
 }: Props) {
   const completedTasks = tasks.filter((t) =>
     document.completedTasks.includes(t.id),
@@ -214,6 +271,19 @@ export function RetroDocumentView({
             <DayRatingSlider
               value={document.dayRating || 0}
               onChange={onEditDayRating}
+            />
+          </div>
+        </section>
+      )}
+
+      {isDaily && (
+        <section className="retro-doc-section">
+          <h3 className="retro-doc-section-title">睡眠</h3>
+          <div className="retro-doc-section-body">
+            <SleepTimeRow
+              wakeUpTime={document.wakeUpTime || ""}
+              bedtime={document.bedtime || ""}
+              onChange={onEditSleep}
             />
           </div>
         </section>

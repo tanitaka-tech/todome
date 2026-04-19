@@ -25,6 +25,11 @@ interface Props {
     value: string,
   ) => void;
   onEditDayRating: (retroId: string, value: number) => void;
+  onEditSleep: (
+    retroId: string,
+    key: "wakeUpTime" | "bedtime",
+    value: string,
+  ) => void;
 }
 
 const RETRO_TABS: { id: RetroType; label: string }[] = [
@@ -117,6 +122,7 @@ export function RetroPanel({
   onDelete,
   onEditField,
   onEditDayRating,
+  onEditSleep,
 }: Props) {
   const [tab, setTab] = useState<RetroType>("weekly");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
@@ -182,6 +188,7 @@ export function RetroPanel({
         onClose={onCloseSession}
         onEditField={onEditField}
         onEditDayRating={onEditDayRating}
+        onEditSleep={onEditSleep}
       />
     );
   }
