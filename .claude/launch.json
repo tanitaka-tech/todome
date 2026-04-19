@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--prefix", "client"],
       "port": 5173
+    },
+    {
+      "name": "todome-dev",
+      "runtimeExecutable": "./start.sh",
+      "runtimeArgs": ["dev"],
+      "port": 5173
     }
   ]
 }

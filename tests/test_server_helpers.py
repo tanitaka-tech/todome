@@ -15,6 +15,7 @@ from server import (
     _ensure_task_fields,
     _find_time_kpi,
     _is_goal_all_kpis_achieved,
+    _is_valid_hhmm,
     _merge_retro_document,
     _migrate_retro_document,
     _normalize_ai_config,
@@ -321,6 +322,12 @@ class TestMigrateRetroDocument:
         for k in ("findings", "improvements", "idealState", "actions", "energy"):
             assert k not in result
 
+    def test_default_sleep_fields_are_empty(self):
+        # 旧データに wakeUpTime/bedtime が無くても "" で埋まる
+        result = _migrate_retro_document({"did": "x"})
+        assert result["wakeUpTime"] == ""
+        assert result["bedtime"] == ""
+
 
 class TestMergeRetroDocument:
     def test_updates_expected_keys(self):
@@ -334,6 +341,47 @@ class TestMergeRetroDocument:
         current = {"did": "x", "completedTasks": ["t1"]}
         merged = _merge_retro_document(current, {"did": "y"})
         assert merged["completedTasks"] == ["t1"]
+
+    def test_accepts_valid_sleep_times(self):
+        merged = _merge_retro_document(
+            {}, {"wakeUpTime": "06:30", "bedtime": "23:45"}
+        )
+        assert merged["wakeUpTime"] == "06:30"
+        assert merged["bedtime"] == "23:45"
+
+    def test_accepts_empty_sleep_times_as_clear(self):
+        # 空文字は明示的なクリア指示として受け入れる
+        merged = _merge_retro_document(
+            {"wakeUpTime": "07:00"}, {"wakeUpTime": ""}
+        )
+        assert merged["wakeUpTime"] == ""
+
+    def test_rejects_invalid_sleep_times(self):
+        merged = _merge_retro_document(
+            {"wakeUpTime": "06:30"},
+            {"wakeUpTime": "25:00", "bedtime": "abc"},
+        )
+        # 不正値は無視され、既存値が維持される
+        assert merged["wakeUpTime"] == "06:30"
+        assert "bedtime" not in merged
+
+
+class TestIsValidHhmm:
+    def test_valid_times(self):
+        assert _is_valid_hhmm("00:00")
+        assert _is_valid_hhmm("06:30")
+        assert _is_valid_hhmm("23:59")
+
+    def test_boundary_invalid_times(self):
+        assert not _is_valid_hhmm("24:00")  # 時の上限超過
+        assert not _is_valid_hhmm("12:60")  # 分の上限超過
+        assert not _is_valid_hhmm("")        # 空文字は未設定扱い (False)
+
+    def test_format_violations(self):
+        assert not _is_valid_hhmm("6:30")    # 桁不足
+        assert not _is_valid_hhmm("06-30")   # 区切り違い
+        assert not _is_valid_hhmm("aa:bb")   # 数字でない
+        assert not _is_valid_hhmm("06:30:00")  # 秒付き
 
 
 class TestEnsureTaskFields:

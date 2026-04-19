@@ -718,6 +718,33 @@ export function App() {
     [send],
   );
 
+  const handleRetroEditSleep = useCallback(
+    (
+      retroId: string,
+      key: "wakeUpTime" | "bedtime",
+      value: string,
+    ) => {
+      setRetros((prev) =>
+        prev.map((r) =>
+          r.id === retroId
+            ? { ...r, document: { ...r.document, [key]: value } }
+            : r,
+        ),
+      );
+      setActiveRetro((prev) =>
+        prev && prev.id === retroId
+          ? { ...prev, document: { ...prev.document, [key]: value } }
+          : prev,
+      );
+      send({
+        type: "retro_edit_document",
+        retroId,
+        document: { [key]: value },
+      });
+    },
+    [send],
+  );
+
   useEffect(() => {
     const isTypingTarget = (el: EventTarget | null): boolean => {
       if (!(el instanceof HTMLElement)) return false;
@@ -1001,6 +1028,7 @@ export function App() {
             onDelete={handleRetroDelete}
             onEditField={handleRetroEditField}
             onEditDayRating={handleRetroEditDayRating}
+            onEditSleep={handleRetroEditSleep}
           />
         ) : activeView === "stats" ? (
           <StatsPanel tasks={tasks} goals={goals} tick={tick} />

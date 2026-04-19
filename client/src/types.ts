@@ -227,6 +227,8 @@ export interface RetroDocument {
   learned: string;
   next: string;
   dayRating: number; // 1-10, 0 = 未評価 (主に daily で使用)
+  wakeUpTime: string; // "HH:MM" (24h), "" = 未設定 (daily のみ)
+  bedtime: string;    // "HH:MM" (24h), "" = 未設定 (daily のみ)
   completedTasks: string[];
 }
 
