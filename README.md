@@ -121,6 +121,10 @@ uv run uvicorn server:app --host 0.0.0.0 --port 3002
 ```
 </details>
 
+## 使用例
+
+- **スマホからアクセスする** — PC で起動した todome をスマホのブラウザから開く方法(同一LAN / Tailscale / cloudflared)。詳細は [docs/smartphone-access.md](docs/smartphone-access.md) を参照。
+
 ## 技術スタック
 
 | レイヤー | 技術 |
