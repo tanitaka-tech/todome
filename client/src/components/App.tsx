@@ -3,6 +3,8 @@ import type {
   AIToolConfig,
   AskUserRequest,
   ChatMessage,
+  CommitDiffEntry,
+  GitCommit,
   GitHubStatus,
   Goal,
   KanbanTask,
@@ -138,6 +140,10 @@ export function App() {
   const [chatOpen, setChatOpen] = useState(true);
   const [githubStatus, setGithubStatus] = useState<GitHubStatus | null>(null);
   const [githubRepos, setGithubRepos] = useState<RepoInfo[]>([]);
+  const [githubCommits, setGithubCommits] = useState<GitCommit[]>([]);
+  const [commitDiffs, setCommitDiffs] = useState<Record<string, CommitDiffEntry>>(
+    {},
+  );
   const [aiConfig, setAIConfig] = useState<AIToolConfig>({
     allowedTools: ["TodoWrite", "Bash"],
   });
@@ -243,6 +249,20 @@ export function App() {
         break;
       case "github_repo_list":
         setGithubRepos(msg.repos);
+        break;
+      case "github_commit_list":
+        setGithubCommits(msg.commits);
+        setCommitDiffs({});
+        break;
+      case "github_commit_diff_result":
+        setCommitDiffs((p) => ({
+          ...p,
+          [msg.hash]: {
+            summary: msg.summary,
+            details: msg.details,
+            error: msg.error,
+          },
+        }));
         break;
       case "ai_config_sync":
         setAIConfig(msg.config);
@@ -403,6 +423,24 @@ export function App() {
   const handleToggleAutoSync = useCallback(
     (value: boolean) => {
       send({ type: "github_set_auto_sync", value });
+    },
+    [send],
+  );
+
+  const handleListCommits = useCallback(() => {
+    send({ type: "github_list_commits" });
+  }, [send]);
+
+  const handleRequestCommitDiff = useCallback(
+    (hash: string) => {
+      send({ type: "github_commit_diff", hash });
+    },
+    [send],
+  );
+
+  const handleRestoreCommit = useCallback(
+    (hash: string) => {
+      send({ type: "github_restore_commit", hash });
     },
     [send],
   );
@@ -753,8 +791,13 @@ export function App() {
             <GitHubSyncTab
               status={githubStatus}
               tick={tick}
+              commits={githubCommits}
+              commitDiffs={commitDiffs}
               onSyncNow={handleSyncNow}
               onPullNow={handlePullNow}
+              onListCommits={handleListCommits}
+              onRequestCommitDiff={handleRequestCommitDiff}
+              onRestoreCommit={handleRestoreCommit}
             />
           )}
         </nav>

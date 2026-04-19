@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import datetime
 import json
 import os
 import shutil
@@ -262,3 +263,79 @@ def write_gitattributes(dest: Path) -> None:
     if path.exists() and path.read_text() == content:
         return
     path.write_text(content)
+
+
+# --- commit history / restore ---
+
+def git_log(dest: Path, limit: int = 30, path: str = "todome.db") -> list[dict[str, Any]]:
+    """対象ファイルを触ったコミット履歴を新しい順で返す。"""
+    sep = "\x1f"
+    fmt = sep.join(["%H", "%h", "%ct", "%an", "%s"])
+    proc = _run(
+        [
+            "git",
+            "-C",
+            str(dest),
+            "log",
+            f"-n{limit}",
+            f"--pretty=format:{fmt}",
+            "--",
+            path,
+        ],
+        env=_git_env(),
+    )
+    out: list[dict[str, Any]] = []
+    for line in proc.stdout.splitlines():
+        parts = line.split(sep, 4)
+        if len(parts) != 5:
+            continue
+        full, short, ts, author, message = parts
+        try:
+            iso = datetime.datetime.fromtimestamp(int(ts)).isoformat(timespec="seconds")
+        except ValueError:
+            iso = ""
+        out.append(
+            {
+                "hash": full,
+                "shortHash": short,
+                "date": iso,
+                "author": author,
+                "message": message,
+            }
+        )
+    return out
+
+
+def extract_db_at_commit(
+    dest: Path, commit_hash: str, out_path: Path, path: str = "todome.db"
+) -> None:
+    """`git show <hash>:<path>` の内容を out_path に書き出す。"""
+    try:
+        proc = subprocess.run(
+            ["git", "-C", str(dest), "show", f"{commit_hash}:{path}"],
+            check=True,
+            capture_output=True,
+        )
+    except subprocess.CalledProcessError as e:
+        msg = (e.stderr.decode(errors="replace") or str(e)).strip()
+        raise GitHubSyncError(f"git show 失敗: {msg}") from e
+    except FileNotFoundError as e:
+        raise GitHubSyncError("コマンドが見つかりません: git") from e
+    if not proc.stdout:
+        raise GitHubSyncError(f"{path} はコミット {commit_hash[:7]} に存在しません")
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_bytes(proc.stdout)
+
+
+def restore_db_to_commit(
+    dest: Path,
+    commit_hash: str,
+    message: str,
+    path: str = "todome.db",
+) -> bool:
+    """対象ファイルを commit_hash の内容に戻して commit+push する。変更なしなら False。"""
+    _run(
+        ["git", "-C", str(dest), "checkout", commit_hash, "--", path],
+        env=_git_env(),
+    )
+    return git_add_commit_push(dest, message, paths=[path])

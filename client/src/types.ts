@@ -167,6 +167,51 @@ export interface RepoInfo {
   url: string;
 }
 
+export interface GitCommit {
+  hash: string;
+  shortHash: string;
+  date: string;
+  author: string;
+  message: string;
+}
+
+export interface DiffCounts {
+  added: number;
+  removed: number;
+  modified: number;
+}
+
+export interface CommitDiffSummary {
+  tasks: DiffCounts;
+  goals: DiffCounts;
+  retros: DiffCounts;
+  profileChanged: boolean;
+}
+
+export interface LabeledId {
+  id: string;
+  label: string;
+}
+
+export interface DiffSection {
+  added: LabeledId[];
+  removed: LabeledId[];
+  modified: LabeledId[];
+}
+
+export interface CommitDiffDetails {
+  tasks: DiffSection;
+  goals: DiffSection;
+  retros: DiffSection;
+  profileChanged: boolean;
+}
+
+export interface CommitDiffEntry {
+  summary: CommitDiffSummary | null;
+  details: CommitDiffDetails | null;
+  error: string | null;
+}
+
 // --- AI tool config ---
 
 export interface AIToolConfig {
@@ -215,6 +260,14 @@ export type WSMessage =
   | { type: "profile_sync"; profile: UserProfile }
   | { type: "github_status"; status: GitHubStatus }
   | { type: "github_repo_list"; repos: RepoInfo[] }
+  | { type: "github_commit_list"; commits: GitCommit[] }
+  | {
+      type: "github_commit_diff_result";
+      hash: string;
+      summary: CommitDiffSummary | null;
+      details: CommitDiffDetails | null;
+      error: string | null;
+    }
   | { type: "ai_config_sync"; config: AIToolConfig }
   | { type: "result"; result: string; cost: number; turns: number; sessionId: string }
   | { type: "retro_list_sync"; retros: Retrospective[] }

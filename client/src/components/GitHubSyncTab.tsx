@@ -1,11 +1,21 @@
-import { useRef, useState } from "react";
-import type { GitHubStatus } from "../types";
+import { useEffect, useRef, useState } from "react";
+import type {
+  CommitDiffEntry,
+  CommitDiffSummary,
+  GitCommit,
+  GitHubStatus,
+} from "../types";
 
 interface Props {
   status: GitHubStatus;
   tick: number;
+  commits: GitCommit[];
+  commitDiffs: Record<string, CommitDiffEntry>;
   onSyncNow: () => void;
   onPullNow: () => void;
+  onListCommits: () => void;
+  onRequestCommitDiff: (hash: string) => void;
+  onRestoreCommit: (hash: string) => void;
 }
 
 function formatRelative(iso: string | null): string {
@@ -31,14 +41,57 @@ function formatFull(iso: string | null): string {
   return d.toLocaleString();
 }
 
-export function GitHubSyncTab({ status, tick, onSyncNow, onPullNow }: Props) {
+function hasAnyChange(summary: CommitDiffSummary): boolean {
+  const s = summary;
+  return (
+    s.tasks.added + s.tasks.removed + s.tasks.modified +
+      s.goals.added + s.goals.removed + s.goals.modified +
+      s.retros.added + s.retros.removed + s.retros.modified >
+      0 || s.profileChanged
+  );
+}
+
+function renderCounts(
+  label: string,
+  c: { added: number; removed: number; modified: number },
+) {
+  if (c.added + c.removed + c.modified === 0) return null;
+  return (
+    <div className="sidebar-github-commit-tip-row">
+      <span className="sidebar-github-commit-tip-label">{label}</span>
+      {c.added > 0 && (
+        <span className="sidebar-github-commit-tip-added">+{c.added}</span>
+      )}
+      {c.removed > 0 && (
+        <span className="sidebar-github-commit-tip-removed">-{c.removed}</span>
+      )}
+      {c.modified > 0 && (
+        <span className="sidebar-github-commit-tip-modified">~{c.modified}</span>
+      )}
+    </div>
+  );
+}
+
+export function GitHubSyncTab({
+  status,
+  tick,
+  commits,
+  commitDiffs,
+  onSyncNow,
+  onPullNow,
+  onListCommits,
+  onRequestCommitDiff,
+  onRestoreCommit,
+}: Props) {
   void tick;
   const [open, setOpen] = useState(false);
   const [anchor, setAnchor] = useState<{ bottom: number; left: number } | null>(
     null,
   );
+  const [hoveredHash, setHoveredHash] = useState<string | null>(null);
   const tabRef = useRef<HTMLButtonElement | null>(null);
   const closeTimer = useRef<number | null>(null);
+  const requestedDiffs = useRef<Set<string>>(new Set());
   const needsSync = status.pendingSync && !status.syncing;
   const label = status.syncing ? "同期中" : formatRelative(status.lastSyncAt);
   const title = status.syncing
@@ -56,6 +109,7 @@ export function GitHubSyncTab({ status, tick, onSyncNow, onPullNow }: Props) {
     cancelClose();
     closeTimer.current = window.setTimeout(() => {
       setOpen(false);
+      setHoveredHash(null);
       closeTimer.current = null;
     }, 150);
   };
@@ -71,6 +125,34 @@ export function GitHubSyncTab({ status, tick, onSyncNow, onPullNow }: Props) {
     }
     setOpen(true);
   };
+
+  useEffect(() => {
+    if (open) {
+      onListCommits();
+      requestedDiffs.current.clear();
+    }
+  }, [open, onListCommits]);
+
+  const handleCommitEnter = (hash: string) => {
+    setHoveredHash(hash);
+    if (!commitDiffs[hash] && !requestedDiffs.current.has(hash)) {
+      requestedDiffs.current.add(hash);
+      onRequestCommitDiff(hash);
+    }
+  };
+
+  const handleCommitClick = (commit: GitCommit) => {
+    const ok = window.confirm(
+      `この時点 (${commit.shortHash}) の状態にデータを復元します。\n現在の状態は「restore」コミットとして上書きされます (履歴は GitHub 上に残ります)。\nよろしいですか?`,
+    );
+    if (ok) {
+      onRestoreCommit(commit.hash);
+      setOpen(false);
+      setHoveredHash(null);
+    }
+  };
+
+  const hoveredDiff = hoveredHash ? commitDiffs[hoveredHash] : undefined;
 
   return (
     <div
@@ -139,11 +221,83 @@ export function GitHubSyncTab({ status, tick, onSyncNow, onPullNow }: Props) {
           >
             ↓ Pull
           </button>
+
+          <div className="sidebar-github-history-title">履歴から復元</div>
+          <div className="sidebar-github-commits">
+            {commits.length === 0 ? (
+              <div className="sidebar-github-commits-empty">
+                {status.syncing ? "取得中…" : "履歴がありません"}
+              </div>
+            ) : (
+              commits.map((commit) => (
+                <button
+                  key={commit.hash}
+                  type="button"
+                  className="sidebar-github-commit"
+                  onMouseEnter={() => handleCommitEnter(commit.hash)}
+                  onMouseLeave={() => setHoveredHash((p) => (p === commit.hash ? null : p))}
+                  onClick={() => handleCommitClick(commit)}
+                  disabled={status.syncing}
+                  title={commit.message}
+                >
+                  <span className="sidebar-github-commit-hash">
+                    {commit.shortHash}
+                  </span>
+                  <span className="sidebar-github-commit-date">
+                    {formatRelative(commit.date)}
+                  </span>
+                  <span className="sidebar-github-commit-msg">
+                    {commit.message}
+                  </span>
+                </button>
+              ))
+            )}
+          </div>
           <div className="sidebar-github-popup-foot">
             {status.syncing
               ? "同期中…"
               : `最終同期: ${formatFull(status.lastSyncAt)}`}
           </div>
+
+          {hoveredHash && (
+            <div
+              className="sidebar-github-commit-tip"
+              style={{ bottom: anchor.bottom, left: anchor.left + 320 }}
+            >
+              {!hoveredDiff ? (
+                <div className="sidebar-github-commit-tip-loading">
+                  差分を計算中…
+                </div>
+              ) : hoveredDiff.error ? (
+                <div className="sidebar-github-commit-tip-error">
+                  {hoveredDiff.error}
+                </div>
+              ) : hoveredDiff.summary && hasAnyChange(hoveredDiff.summary) ? (
+                <>
+                  <div className="sidebar-github-commit-tip-head">
+                    復元した場合の変更
+                  </div>
+                  {renderCounts("タスク", hoveredDiff.summary.tasks)}
+                  {renderCounts("ゴール", hoveredDiff.summary.goals)}
+                  {renderCounts("振り返り", hoveredDiff.summary.retros)}
+                  {hoveredDiff.summary.profileChanged && (
+                    <div className="sidebar-github-commit-tip-row">
+                      <span className="sidebar-github-commit-tip-label">
+                        プロフィール
+                      </span>
+                      <span className="sidebar-github-commit-tip-modified">
+                        変更あり
+                      </span>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="sidebar-github-commit-tip-nochange">
+                  現在と同じ内容です
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -9,6 +9,8 @@ from server import (
     _apply_kpi_time_delta,
     _compute_retro_period,
     _completed_task_ids_in_period,
+    _diff_entities_by_id,
+    _diff_profile,
     _ensure_kpi_ids,
     _ensure_task_fields,
     _find_time_kpi,
@@ -17,9 +19,11 @@ from server import (
     _migrate_retro_document,
     _normalize_ai_config,
     _normalize_goal_repository,
+    _pick_label,
     _rebalance_kpi_contribution,
     _short_id,
     _strip_retrodoc_block,
+    _summarize_diff,
     _sync_goal_achievement,
 )
 
@@ -529,3 +533,103 @@ class TestRebalanceKpiContribution:
         assert goals[0]["kpis"][0]["currentValue"] == 0
         assert goals[0]["kpis"][1]["currentValue"] == 600
         assert task["kpiContributed"] is True
+
+
+class TestPickLabel:
+    def test_returns_first_non_empty_string(self):
+        assert _pick_label({"title": "a", "name": "b"}, ("title", "name"), "x") == "a"
+
+    def test_skips_empty_values(self):
+        assert _pick_label({"title": "", "name": "b"}, ("title", "name"), "x") == "b"
+
+    def test_falls_back_when_all_missing(self):
+        assert _pick_label({}, ("title",), "fallback-id") == "fallback-id"
+
+
+class TestDiffEntitiesById:
+    def test_added_removed_modified_mixed(self):
+        current = [
+            {"id": "a", "title": "A"},
+            {"id": "b", "title": "B"},
+            {"id": "c", "title": "C"},
+        ]
+        target = [
+            {"id": "a", "title": "A"},          # 同じ
+            {"id": "b", "title": "B changed"},  # 変更
+            {"id": "d", "title": "D"},          # target のみ → added
+        ]
+        result = _diff_entities_by_id(current, target, "id", ("title",))
+        assert [e["id"] for e in result["added"]] == ["d"]
+        assert [e["id"] for e in result["removed"]] == ["c"]
+        assert [e["id"] for e in result["modified"]] == ["b"]
+        assert result["modified"][0]["label"] == "B changed"
+
+    def test_both_empty(self):
+        result = _diff_entities_by_id([], [], "id", ("title",))
+        assert result == {"added": [], "removed": [], "modified": []}
+
+    def test_one_side_empty(self):
+        current = [{"id": "a", "title": "A"}]
+        assert _diff_entities_by_id(current, [], "id", ("title",))["removed"][0]["id"] == "a"
+        assert _diff_entities_by_id([], current, "id", ("title",))["added"][0]["id"] == "a"
+
+    def test_same_id_same_content_is_not_modified(self):
+        a = [{"id": "x", "title": "same"}]
+        b = [{"id": "x", "title": "same"}]
+        assert _diff_entities_by_id(a, b, "id", ("title",))["modified"] == []
+
+    def test_label_fallback_to_id_when_all_keys_missing(self):
+        current = [{"id": "only-current"}]
+        result = _diff_entities_by_id(current, [], "id", ("title", "name"))
+        assert result["removed"][0]["label"] == "only-current"
+
+    def test_entities_without_id_key_are_ignored(self):
+        # id フィールドが空のエンティティは diff の対象外
+        current = [{"id": "", "title": "noid"}, {"id": "a", "title": "A"}]
+        target = [{"id": "a", "title": "A"}]
+        result = _diff_entities_by_id(current, target, "id", ("title",))
+        assert result == {"added": [], "removed": [], "modified": []}
+
+
+class TestDiffProfile:
+    def test_same_returns_false(self):
+        assert _diff_profile({"x": 1}, {"x": 1}) is False
+
+    def test_different_returns_true(self):
+        assert _diff_profile({"x": 1}, {"x": 2}) is True
+
+    def test_both_empty_returns_false(self):
+        assert _diff_profile({}, {}) is False
+
+
+class TestSummarizeDiff:
+    def test_counts_per_section(self):
+        details = {
+            "tasks": {
+                "added": [{"id": "a", "label": "A"}],
+                "removed": [],
+                "modified": [{"id": "b", "label": "B"}, {"id": "c", "label": "C"}],
+            },
+            "goals": {"added": [], "removed": [{"id": "g", "label": "G"}], "modified": []},
+            "retros": {"added": [], "removed": [], "modified": []},
+            "profileChanged": True,
+        }
+        summary = _summarize_diff(details)
+        assert summary["tasks"] == {"added": 1, "removed": 0, "modified": 2}
+        assert summary["goals"] == {"added": 0, "removed": 1, "modified": 0}
+        assert summary["retros"] == {"added": 0, "removed": 0, "modified": 0}
+        assert summary["profileChanged"] is True
+
+    def test_empty_sections_default_to_zero(self):
+        summary = _summarize_diff({})
+        assert summary == {
+            "tasks": {"added": 0, "removed": 0, "modified": 0},
+            "goals": {"added": 0, "removed": 0, "modified": 0},
+            "retros": {"added": 0, "removed": 0, "modified": 0},
+            "profileChanged": False,
+        }
+
+    def test_profile_changed_flag_preserved_as_bool(self):
+        # dict が無い / 値が truthy な非 bool でも bool 化される
+        assert _summarize_diff({"profileChanged": 1})["profileChanged"] is True
+        assert _summarize_diff({"profileChanged": 0})["profileChanged"] is False
