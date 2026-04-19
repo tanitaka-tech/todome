@@ -2,6 +2,10 @@
 
 TrelloライクなKanbanボードでタスクを管理しながら、AIエージェントに相談してタスクの更新や新たなタスクの提案を受けられるWebアプリです。
 
+| Kanban形式でのタスク管理 | タスク管理をAIにお任せ | AIと一緒に振り返り |
+|:---:|:---:|:---:|
+| ![Kanban形式でのタスク管理](docs/manual/assets/animations/celebration.webp) | ![タスク管理をAIにお任せ](docs/manual/assets/animations/chat-ai.webp) | ![AIと一緒に振り返り](docs/manual/assets/animations/retro-ai.webp) |
+
 ## 画面説明書
 
 ゲーム画面風の画面説明書を `docs/manual/` に配置しています。GitHub Pages で公開します。
