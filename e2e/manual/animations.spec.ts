@@ -7,7 +7,11 @@ const HARNESS_PATH = path.resolve(__dirname, "ws-harness.js");
 const FRAMES_ROOT = path.resolve(__dirname, "..", "animation-frames");
 
 type Clip = { x: number; y: number; width: number; height: number };
-type InjectEvent = { at: number; msg: unknown };
+type InjectEvent = {
+  at: number;
+  msg?: unknown;
+  action?: (page: Page) => Promise<void>;
+};
 
 async function injectWS(page: Page, msg: unknown): Promise<void> {
   await page.evaluate(
@@ -90,7 +94,9 @@ async function captureLoop(
     const elapsed = Date.now() - start;
     while (pending.length > 0 && pending[0].at <= elapsed) {
       const ev = pending.shift();
-      if (ev) await injectWS(page, ev.msg);
+      if (!ev) continue;
+      if (ev.msg !== undefined) await injectWS(page, ev.msg);
+      if (ev.action) await ev.action(page);
     }
     await page.screenshot({
       path: path.join(frameDir, `${String(i).padStart(3, "0")}.png`),
@@ -103,7 +109,10 @@ async function captureLoop(
   }
   // 残ったイベントも撮影後に投げておく (完了系メッセージが最後に落ちると次のテストの
   // 残留状態が気になるので念のため)
-  for (const ev of pending) await injectWS(page, ev.msg);
+  for (const ev of pending) {
+    if (ev.msg !== undefined) await injectWS(page, ev.msg);
+    if (ev.action) await ev.action(page);
+  }
 
   await fs.writeFile(
     path.join(frameDir, "frames.json"),
@@ -319,6 +328,46 @@ test.describe("画面説明書ハイライト用アニメーション", () => {
             sessionId: "demo",
           },
         },
+      ],
+    );
+  });
+
+  test("theme-switch — 設定画面でテーマを切り替えると全体の色味が変わる", async ({
+    page,
+  }) => {
+    await gotoStubbedApp(page);
+    await hydrateBaseline(page, { tasks: DEMO_BOARD });
+    await closeChatIfOpen(page);
+    await clickNav(page, "設定");
+    await expect(
+      page.getByRole("heading", { name: "設定", level: 1 }),
+    ).toBeVisible();
+    await expect(page.locator(".theme-switch")).toHaveCount(2);
+
+    const clickTheme = (label: string) => async (p: Page) => {
+      await p
+        .locator(".theme-option")
+        .filter({ hasText: new RegExp(`^${label}`) })
+        .first()
+        .click();
+    };
+
+    await captureLoop(
+      page,
+      "theme-switch",
+      8500,
+      10,
+      { x: 0, y: 0, width: 1440, height: 860 },
+      [
+        { at: 700, action: clickTheme("Midnight") },
+        { at: 1500, action: clickTheme("Forest") },
+        { at: 2300, action: clickTheme("Sunset") },
+        { at: 3100, action: clickTheme("Paper") },
+        { at: 3900, action: clickTheme("Mint") },
+        { at: 4700, action: clickTheme("Rose") },
+        { at: 5500, action: clickTheme("Sky") },
+        { at: 6300, action: clickTheme("Sand") },
+        { at: 7200, action: clickTheme("Dark") },
       ],
     );
   });
