@@ -1,0 +1,15 @@
+export const en_stats: Record<string, string> = {
+  pageTitle: "Statistics",
+  pageSubtitle: "Visualize time tracked and goal trends",
+  summaryTotal: "Total time",
+  summaryCompleted: "Completed tasks",
+  summaryAll: "All tasks",
+  sectionTimeByGoal: "Time by goal",
+  sectionTimeTrend: "Time trend",
+  periodDay: "Day",
+  periodMonth: "Month",
+  periodYear: "Year",
+  noData: "No data",
+  noGoalLabel: "No goal",
+  unknownGoalLabel: "Unknown",
+};

@@ -1,0 +1,114 @@
+export const en_retro: Record<string, string> = {
+  pageTitle: "Retrospective",
+  summaryCompleted: "{{count}} completed",
+  summaryDrafts: "{{count}} drafts",
+
+  tabDaily: "Day",
+  tabWeekly: "Week",
+  tabMonthly: "Month",
+  tabYearly: "Year",
+
+  typeDaily: "Daily retro",
+  typeWeekly: "Weekly retro",
+  typeMonthly: "Monthly retro",
+  typeYearly: "Yearly retro",
+
+  typeShortDaily: "Daily",
+  typeShortWeekly: "Weekly",
+  typeShortMonthly: "Monthly",
+  typeShortYearly: "Yearly",
+
+  targetDate: "Target date",
+  periodPast: "Past",
+  backToToday: "Back to today",
+
+  draftExistsTitle: "There is a draft for this period",
+  draftMetaUpdated: "Updated {{date}}",
+  resumeDraft: "Resume where you left off",
+  discardDraftAndCreate: "Discard draft and start new",
+
+  startTitle: "Let's begin your {{type}}",
+  startDescription: "Wrap up this period's retro through a conversation with AI.",
+  startButton: "Start retro",
+
+  historyTitle: "History",
+  viewList: "List",
+  viewCalendar: "Calendar",
+  historyEmpty: "No {{type}} history yet.",
+  badgeDraft: "Draft",
+  learnedTitle: "What I learned",
+  aiCommentTitle: "AI comment",
+  historyUpdated: "Updated {{date}}",
+  historyCompleted: "Completed {{date}}",
+
+  doneTasksTitle: "Completed tasks ({{count}})",
+  doneTasksEmpty: "No tasks were completed in this period.",
+
+  dailyMetaRating: "Rating {{value}}/10",
+  dailyMetaWakeUp: "Wake {{time}}",
+  dailyMetaBedtime: "Sleep {{time}}",
+
+  deleteLabel: "Delete",
+
+  modalDiscardTitle: "Discard draft",
+  modalDiscardConfirm: "Discard the in-progress draft ({{start}} - {{end}}) and start a new one?",
+  modalIrreversible: "This action cannot be undone.",
+  modalCancel: "Cancel",
+  modalDiscardAndCreate: "Discard and start new",
+
+  modalDeleteTitle: "Delete retro",
+  modalDeleteConfirm: "Delete {{type}} ({{start}} - {{end}})?",
+  modalDelete: "Delete",
+
+  sessionBack: "Back to list",
+  sessionReopenTitle: "Resume the conversation with AI",
+  sessionReopen: "Resume chat",
+  sessionCompleteTitle: "Complete",
+  sessionComplete: "Complete",
+  sessionInputPlaceholder: "Type your reply...",
+  sessionInputWaiting: "AI is responding...",
+  sessionSend: "Send",
+  sessionCompletedNote: "This retro is already completed.",
+
+  docSectionRating: "Day rating",
+  docSectionSleep: "Sleep",
+  docSectionDid: "What I did",
+  docSectionLearned: "What I learned",
+  docSectionNext: "Next actions",
+  docSectionDoneTasks: "Completed tasks ({{count}})",
+  docSectionAiComment: "AI comment",
+
+  placeholderDid: "What you actually did or what happened during the period.",
+  placeholderLearned: "Insights, learnings, and what went well or didn't.",
+  placeholderNext: "Actions to take (or stop) in the next period.",
+  placeholderDoneTasksEmpty: "No tasks were completed in this period.",
+  placeholderAiCommentEmpty: "No AI comment yet.",
+
+  editCancel: "Cancel",
+  editSave: "Save",
+  editClickHint: "Click to edit",
+
+  sleepWakeUp: "Wake-up",
+  sleepBedtime: "Bedtime",
+  sleepClear: "Clear",
+
+  ratingAriaLabel: "Day rating",
+  ratingValue: "{{value}} / 10",
+  ratingUnset: "Not rated",
+  ratingClear: "Clear",
+
+  calendarPrevMonth: "Previous month",
+  calendarNextMonth: "Next month",
+  calendarThisMonth: "This month",
+  calendarTitle: "{{month}} {{year}}",
+  calendarTypeLabel: "{{type}} retro",
+  calendarDraftMeta: "Draft - updated {{date}}",
+
+  weekday0: "Mon",
+  weekday1: "Tue",
+  weekday2: "Wed",
+  weekday3: "Thu",
+  weekday4: "Fri",
+  weekday5: "Sat",
+  weekday6: "Sun",
+};

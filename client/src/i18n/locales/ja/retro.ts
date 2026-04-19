@@ -1,0 +1,114 @@
+export const ja_retro: Record<string, string> = {
+  pageTitle: "振り返り",
+  summaryCompleted: "{{count}} completed",
+  summaryDrafts: "{{count}} drafts",
+
+  tabDaily: "日",
+  tabWeekly: "週",
+  tabMonthly: "月",
+  tabYearly: "年",
+
+  typeDaily: "日次振り返り",
+  typeWeekly: "週次振り返り",
+  typeMonthly: "月次振り返り",
+  typeYearly: "年次振り返り",
+
+  typeShortDaily: "日次",
+  typeShortWeekly: "週次",
+  typeShortMonthly: "月次",
+  typeShortYearly: "年次",
+
+  targetDate: "対象日",
+  periodPast: "過去",
+  backToToday: "今日に戻す",
+
+  draftExistsTitle: "この期間のドラフトがあります",
+  draftMetaUpdated: "最終更新 {{date}}",
+  resumeDraft: "前回の続きから再開",
+  discardDraftAndCreate: "ドラフトを破棄して新規作成",
+
+  startTitle: "{{type}}をはじめましょう",
+  startDescription: "AI との対話で、この期間の振り返りをまとめます。",
+  startButton: "振り返りを始める",
+
+  historyTitle: "履歴",
+  viewList: "リスト",
+  viewCalendar: "カレンダー",
+  historyEmpty: "まだ{{type}}の履歴はありません。",
+  badgeDraft: "ドラフト",
+  learnedTitle: "わかったこと",
+  aiCommentTitle: "AI コメント",
+  historyUpdated: "最終更新 {{date}}",
+  historyCompleted: "完了 {{date}}",
+
+  doneTasksTitle: "達成タスク ({{count}}件)",
+  doneTasksEmpty: "この期間に完了したタスクはありません。",
+
+  dailyMetaRating: "評価 {{value}}/10",
+  dailyMetaWakeUp: "起床 {{time}}",
+  dailyMetaBedtime: "就寝 {{time}}",
+
+  deleteLabel: "削除",
+
+  modalDiscardTitle: "ドラフトを破棄",
+  modalDiscardConfirm: "進行中のドラフト ({{start}} 〜 {{end}}) を破棄して新規作成しますか？",
+  modalIrreversible: "この操作は元に戻せません。",
+  modalCancel: "キャンセル",
+  modalDiscardAndCreate: "破棄して新規作成",
+
+  modalDeleteTitle: "振り返りを削除",
+  modalDeleteConfirm: "{{type}} ({{start}} 〜 {{end}}) を削除しますか？",
+  modalDelete: "削除",
+
+  sessionBack: "一覧に戻る",
+  sessionReopenTitle: "AIとの会話を再開する",
+  sessionReopen: "会話を再開",
+  sessionCompleteTitle: "完了",
+  sessionComplete: "完了",
+  sessionInputPlaceholder: "回答を入力...",
+  sessionInputWaiting: "AIが応答中...",
+  sessionSend: "送信",
+  sessionCompletedNote: "この振り返りは完了済みです。",
+
+  docSectionRating: "今日の評価",
+  docSectionSleep: "睡眠",
+  docSectionDid: "やったこと",
+  docSectionLearned: "わかったこと",
+  docSectionNext: "次やること",
+  docSectionDoneTasks: "達成タスク ({{count}}件)",
+  docSectionAiComment: "AI からのコメント",
+
+  placeholderDid: "期間内に実際にやったこと・起きた出来事。",
+  placeholderLearned: "気づき・学び・うまくいった / いかなかった原因。",
+  placeholderNext: "次の期間で取り組むアクション (やる / 辞める)。",
+  placeholderDoneTasksEmpty: "この期間に完了したタスクはありません。",
+  placeholderAiCommentEmpty: "AI からのコメントはまだありません。",
+
+  editCancel: "キャンセル",
+  editSave: "保存",
+  editClickHint: "クリックして編集",
+
+  sleepWakeUp: "起床",
+  sleepBedtime: "就寝",
+  sleepClear: "クリア",
+
+  ratingAriaLabel: "今日の評価",
+  ratingValue: "{{value}} / 10",
+  ratingUnset: "未評価",
+  ratingClear: "クリア",
+
+  calendarPrevMonth: "前の月",
+  calendarNextMonth: "次の月",
+  calendarThisMonth: "今月",
+  calendarTitle: "{{year}}年 {{month}}月",
+  calendarTypeLabel: "{{type}}の振り返り",
+  calendarDraftMeta: "ドラフト · 最終更新 {{date}}",
+
+  weekday0: "月",
+  weekday1: "火",
+  weekday2: "水",
+  weekday3: "木",
+  weekday4: "金",
+  weekday5: "土",
+  weekday6: "日",
+};

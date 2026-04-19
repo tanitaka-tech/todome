@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { AskQuestion } from "../types";
 
 interface Props {
@@ -8,6 +9,7 @@ interface Props {
 }
 
 export function AskUserCard({ requestId, questions, onSubmit }: Props) {
+  const { t } = useTranslation("chat");
   const [selections, setSelections] = useState<Record<string, string[]>>({});
   const [freeInputs, setFreeInputs] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
@@ -51,7 +53,7 @@ export function AskUserCard({ requestId, questions, onSubmit }: Props) {
   return (
     <div className={`ask-card ${submitted ? "ask-card--submitted" : ""}`}>
       <div className="ask-card-header">
-        {submitted ? "回答済み" : "いくつか質問があります"}
+        {submitted ? t("answered") : t("askHeader")}
       </div>
 
       {questions.map((q) => (
@@ -83,7 +85,7 @@ export function AskUserCard({ requestId, questions, onSubmit }: Props) {
           {!q.options && (
             <input
               className="ask-free-input"
-              placeholder="回答を入力..."
+              placeholder={t("freeInputPlaceholder")}
               disabled={submitted}
               value={freeInputs[q.question] || ""}
               onChange={(e) =>
@@ -103,7 +105,7 @@ export function AskUserCard({ requestId, questions, onSubmit }: Props) {
           disabled={submitted}
           onClick={handleSubmit}
         >
-          {submitted ? "送信済み" : "回答を送信"}
+          {submitted ? t("submitted") : t("submitAnswers")}
         </button>
       </div>
     </div>

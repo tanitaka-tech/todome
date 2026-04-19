@@ -1,0 +1,15 @@
+export const ja_stats: Record<string, string> = {
+  pageTitle: "統計",
+  pageSubtitle: "作業時間と目標の推移を可視化",
+  summaryTotal: "合計作業時間",
+  summaryCompleted: "完了タスク",
+  summaryAll: "全タスク",
+  sectionTimeByGoal: "目標別 作業時間",
+  sectionTimeTrend: "作業時間の推移",
+  periodDay: "日",
+  periodMonth: "月",
+  periodYear: "年",
+  noData: "データがありません",
+  noGoalLabel: "目標なし",
+  unknownGoalLabel: "不明",
+};

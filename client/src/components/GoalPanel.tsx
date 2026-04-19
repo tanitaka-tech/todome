@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import EmojiPicker, { EmojiStyle, Theme } from "emoji-picker-react";
+import { useTranslation } from "react-i18next";
 import {
   areAllKpisAchieved,
   formatKpiTimeValue,
@@ -72,6 +73,7 @@ export function GoalPanel({
   onRequestRepoList,
   githubAuthOk,
 }: Props) {
+  const { t } = useTranslation("goal");
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [tab, setTab] = useState<"active" | "achieved">("active");
@@ -177,27 +179,27 @@ export function GoalPanel({
   const handleSave = () => {
     if (!editingGoal) return;
     if (!editingGoal.name.trim()) {
-      setFormError("目標名を入力してください");
+      setFormError(t("errorNameRequired"));
       return;
     }
     if (editingGoal.kpis.length === 0) {
-      setFormError("KPIを最低1つ設定してください");
+      setFormError(t("errorKpiMin"));
       return;
     }
     for (const kpi of editingGoal.kpis) {
       if (!kpi.name.trim()) {
-        setFormError("KPI名を入力してください");
+        setFormError(t("errorKpiNameRequired"));
         return;
       }
       if (!(kpi.targetValue > 0)) {
-        setFormError("KPIの目標値は0より大きい数値を入力してください");
+        setFormError(t("errorKpiTargetPositive"));
         return;
       }
     }
 
     const repoTrimmed = (editingGoal.repository || "").trim();
     if (repoTrimmed && !REPO_PATTERN.test(repoTrimmed)) {
-      setFormError("リポジトリは owner/name 形式で入力してください");
+      setFormError(t("errorRepoFormat"));
       return;
     }
 
@@ -306,14 +308,17 @@ export function GoalPanel({
     <div className="goal-panel">
       <div className="page-head">
         <div className="page-head-title-wrap">
-          <h1 className="page-title">目標管理</h1>
+          <h1 className="page-title">{t("pageTitle")}</h1>
           <div className="page-subtitle">
-            {activeGoals.length} active · {achievedGoals.length} achieved
+            {t("pageSubtitle", {
+              active: activeGoals.length,
+              achieved: achievedGoals.length,
+            })}
           </div>
         </div>
         <div className="page-actions">
           <button className="btn btn--primary" onClick={openNew}>
-            + 新しい目標
+            {t("newGoal")}
           </button>
         </div>
       </div>
@@ -323,13 +328,13 @@ export function GoalPanel({
           className={`goal-tab ${tab === "active" ? "goal-tab--active" : ""}`}
           onClick={() => setTab("active")}
         >
-          進行中 ({activeGoals.length})
+          {t("tabActive", { count: activeGoals.length })}
         </button>
         <button
           className={`goal-tab ${tab === "achieved" ? "goal-tab--active" : ""}`}
           onClick={() => setTab("achieved")}
         >
-          達成済み ({achievedGoals.length})
+          {t("tabAchieved", { count: achievedGoals.length })}
         </button>
       </div>
 
@@ -337,9 +342,7 @@ export function GoalPanel({
         <div className="goal-list">
           {visibleGoals.length === 0 && !showForm && (
             <div className="goal-empty">
-              {tab === "active"
-                ? "目標がまだありません。「+ 新しい目標」から追加できます。"
-                : "達成済みの目標はまだありません。"}
+              {tab === "active" ? t("emptyActive") : t("emptyAchieved")}
             </div>
           )}
           {visibleGoals.map((goal) => {
@@ -364,25 +367,27 @@ export function GoalPanel({
                     <button
                       className="goal-card-action"
                       onClick={() => openEdit(goal)}
-                      title="編集"
+                      title={t("edit")}
                     >
                       &#9998;
                     </button>
                     <button
                       className="goal-card-action goal-card-action--delete"
                       onClick={() => requestDelete(goal)}
-                      title="削除"
+                      title={t("delete")}
                     >
                       &times;
                     </button>
                   </div>
                 </div>
                 {goal.deadline && (
-                  <div className="goal-card-meta">期日: {goal.deadline}</div>
+                  <div className="goal-card-meta">
+                    {t("metaDeadline", { date: goal.deadline })}
+                  </div>
                 )}
                 {goal.achieved && goal.achievedAt && (
                   <div className="goal-card-meta">
-                    達成: {goal.achievedAt.slice(0, 10)}
+                    {t("metaAchieved", { date: goal.achievedAt.slice(0, 10) })}
                   </div>
                 )}
                 {goal.repository && (
@@ -404,7 +409,7 @@ export function GoalPanel({
                 {goal.kpis.length > 0 && (
                   <div className="goal-card-overall">
                     <div className="goal-card-overall-head">
-                      <span>全体進捗</span>
+                      <span>{t("overallProgress")}</span>
                       <span>{Math.round(overall)}%</span>
                     </div>
                     <div className="goal-progress-bar">
@@ -498,7 +503,7 @@ export function GoalPanel({
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2 className="modal-title">
-                {editingGoal.id ? "目標を編集" : "新しい目標"}
+                {editingGoal.id ? t("modalTitleEdit") : t("modalTitleNew")}
               </h2>
               <button className="modal-close" onClick={closeForm}>
                 &times;
@@ -506,7 +511,7 @@ export function GoalPanel({
             </div>
 
             <div className="modal-body">
-              <label className="modal-label">目標名</label>
+              <label className="modal-label">{t("labelName")}</label>
               <div className="goal-name-row">
                 <div className="goal-icon-wrap" ref={iconWrapRef}>
                   <button
@@ -514,8 +519,8 @@ export function GoalPanel({
                     className={`goal-icon-btn ${iconPickerOpen ? "is-active" : ""}`}
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => setIconPickerOpen((v) => !v)}
-                    title="アイコンを選択"
-                    aria-label="アイコンを選択"
+                    title={t("iconSelect")}
+                    aria-label={t("iconSelect")}
                   >
                     {editingGoal.icon || (
                       <span className="goal-icon-placeholder">🎯</span>
@@ -549,7 +554,7 @@ export function GoalPanel({
                               setIconPickerOpen(false);
                             }}
                           >
-                            アイコンなし
+                            {t("iconNone")}
                           </button>
                         </div>
                         <EmojiPicker
@@ -561,7 +566,7 @@ export function GoalPanel({
                           }}
                           theme={getEmojiPickerTheme()}
                           emojiStyle={EmojiStyle.NATIVE}
-                          searchPlaceHolder="検索"
+                          searchPlaceHolder={t("iconSearchPlaceholder")}
                           lazyLoadEmojis
                           width="100%"
                           height={380}
@@ -574,7 +579,7 @@ export function GoalPanel({
                 </div>
                 <input
                   className="modal-input"
-                  placeholder="例: Q3 売上目標"
+                  placeholder={t("namePlaceholder")}
                   value={editingGoal.name}
                   onChange={(e) =>
                     setEditingGoal({ ...editingGoal, name: e.target.value })
@@ -582,18 +587,18 @@ export function GoalPanel({
                 />
               </div>
 
-              <label className="modal-label">メモ</label>
+              <label className="modal-label">{t("labelMemo")}</label>
               <textarea
                 className="modal-textarea"
                 rows={3}
-                placeholder="目標に関するメモ..."
+                placeholder={t("memoPlaceholder")}
                 value={editingGoal.memo}
                 onChange={(e) =>
                   setEditingGoal({ ...editingGoal, memo: e.target.value })
                 }
               />
 
-              <label className="modal-label">期日</label>
+              <label className="modal-label">{t("labelDeadline")}</label>
               <input
                 className="modal-input"
                 type="date"
@@ -604,14 +609,14 @@ export function GoalPanel({
               />
 
               <label className="modal-label">
-                リポジトリ{" "}
+                {t("labelRepository")}{" "}
                 <span className="modal-label-hint">
-                  (任意 / owner/name 形式)
+                  {t("labelRepositoryHint")}
                 </span>
               </label>
               <input
                 className="modal-input"
-                placeholder="例: tanitaka_tech/todome"
+                placeholder={t("repositoryPlaceholder")}
                 list="goal-repo-suggest"
                 value={editingGoal.repository ?? ""}
                 onChange={(e) =>
@@ -631,10 +636,11 @@ export function GoalPanel({
 
               <div className="modal-label-row">
                 <label className="modal-label" style={{ marginBottom: 0 }}>
-                  KPI <span className="modal-label-hint">(最低1つ必須)</span>
+                  {t("labelKpi")}{" "}
+                  <span className="modal-label-hint">{t("labelKpiHint")}</span>
                 </label>
                 <button className="kpi-add-btn" onClick={addKpi}>
-                  + 追加
+                  {t("addKpi")}
                 </button>
               </div>
               <div className="kpi-list">
@@ -643,7 +649,7 @@ export function GoalPanel({
                     <div className="kpi-edit-row-top">
                       <input
                         className="kpi-input kpi-input-name"
-                        placeholder="KPI名 (例: 月間売上)"
+                        placeholder={t("kpiNamePlaceholder")}
                         value={kpi.name}
                         onChange={(e) =>
                           updateKpi(kpi.id, "name", e.target.value)
@@ -652,7 +658,7 @@ export function GoalPanel({
                       <button
                         className="kpi-remove-btn"
                         onClick={() => removeKpi(kpi.id)}
-                        title="削除"
+                        title={t("kpiRemove")}
                       >
                         &times;
                       </button>
@@ -660,7 +666,7 @@ export function GoalPanel({
                     <div className="kpi-edit-row-bottom">
                       {kpi.unit === "time" ? (
                         <label className="kpi-field">
-                          <span className="kpi-field-label">目標時間</span>
+                          <span className="kpi-field-label">{t("kpiTargetTime")}</span>
                           <div className="kpi-time-input">
                             <input
                               className="kpi-input kpi-input-num"
@@ -703,7 +709,7 @@ export function GoalPanel({
                         </label>
                       ) : (
                         <label className="kpi-field">
-                          <span className="kpi-field-label">目標値</span>
+                          <span className="kpi-field-label">{t("kpiTargetValue")}</span>
                           <input
                             className="kpi-input kpi-input-num"
                             type="number"
@@ -723,7 +729,7 @@ export function GoalPanel({
                         </label>
                       )}
                       <label className="kpi-field">
-                        <span className="kpi-field-label">単位</span>
+                        <span className="kpi-field-label">{t("kpiUnit")}</span>
                         <select
                           className="kpi-input kpi-input-unit"
                           value={kpi.unit}
@@ -735,15 +741,15 @@ export function GoalPanel({
                             )
                           }
                         >
-                          <option value="number">数値</option>
-                          <option value="percent">パーセンテージ</option>
-                          <option value="time">時間</option>
+                          <option value="number">{t("unitNumber")}</option>
+                          <option value="percent">{t("unitPercent")}</option>
+                          <option value="time">{t("unitTime")}</option>
                         </select>
                       </label>
                     </div>
                     <div className="kpi-edit-slider-row">
                       <div className="kpi-edit-slider-head">
-                        <span className="kpi-field-label">現在値</span>
+                        <span className="kpi-field-label">{t("kpiCurrent")}</span>
                         <span className="kpi-edit-slider-value">
                           {formatKpiValue(kpi.currentValue, kpi.unit)} /{" "}
                           {formatKpiValue(kpi.targetValue, kpi.unit)}
@@ -792,7 +798,7 @@ export function GoalPanel({
                   </div>
                 ))}
                 {editingGoal.kpis.length === 0 && (
-                  <div className="kpi-empty">KPIが設定されていません</div>
+                  <div className="kpi-empty">{t("kpiEmpty")}</div>
                 )}
               </div>
 
@@ -801,10 +807,10 @@ export function GoalPanel({
 
             <div className="modal-footer">
               <button className="modal-btn-secondary" onClick={closeForm}>
-                キャンセル
+                {t("cancel")}
               </button>
               <button className="modal-btn-primary" onClick={handleSave}>
-                保存
+                {t("save")}
               </button>
             </div>
           </div>
@@ -828,7 +834,7 @@ export function GoalPanel({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="modal-header">
-              <h2 className="modal-title">目標を削除</h2>
+              <h2 className="modal-title">{t("deleteModalTitle")}</h2>
               <button
                 className="modal-close"
                 onClick={closeDelete}
@@ -838,22 +844,22 @@ export function GoalPanel({
             </div>
             <div className="modal-body">
               <p className="modal-confirm-text">
-                「<strong>{deleteTarget.name}</strong>」を削除しますか？
+                {t("deleteConfirmText", { name: deleteTarget.name })}
               </p>
-              <p className="modal-confirm-sub">この操作は元に戻せません。</p>
+              <p className="modal-confirm-sub">{t("deleteConfirmSub")}</p>
             </div>
             <div className="modal-footer">
               <button
                 className="modal-btn-secondary"
                 onClick={closeDelete}
               >
-                キャンセル
+                {t("cancel")}
               </button>
               <button
                 className="modal-btn-primary modal-btn-danger"
                 onClick={confirmDelete}
               >
-                削除
+                {t("deleteConfirm")}
               </button>
             </div>
           </div>

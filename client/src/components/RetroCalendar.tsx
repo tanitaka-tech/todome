@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type {
   KanbanTask,
   RetroDocument,
@@ -14,8 +15,6 @@ interface Props {
   onOpenRetro: (retro: Retrospective) => void;
 }
 
-const WEEKDAY_LABELS = ["月", "火", "水", "木", "金", "土", "日"];
-
 function fmtDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
@@ -24,11 +23,11 @@ function isoInRange(iso: string, start: string, end: string): boolean {
   return iso >= start && iso <= end;
 }
 
-const TYPE_LABEL: Record<RetroType, string> = {
-  daily: "日次",
-  weekly: "週次",
-  monthly: "月次",
-  yearly: "年次",
+const TYPE_LABEL_KEYS: Record<RetroType, string> = {
+  daily: "typeShortDaily",
+  weekly: "typeShortWeekly",
+  monthly: "typeShortMonthly",
+  yearly: "typeShortYearly",
 };
 
 function formatDateTime(iso: string): string {
@@ -36,15 +35,8 @@ function formatDateTime(iso: string): string {
   return iso.replace("T", " ").slice(0, 16);
 }
 
-function formatDailyMeta(doc: RetroDocument): string {
-  const parts: string[] = [];
-  if (doc.dayRating > 0) parts.push(`評価 ${doc.dayRating}/10`);
-  if (doc.wakeUpTime) parts.push(`起床 ${doc.wakeUpTime}`);
-  if (doc.bedtime) parts.push(`就寝 ${doc.bedtime}`);
-  return parts.join(" · ");
-}
-
 export function RetroCalendar({ retros, tasks, type, onOpenRetro }: Props) {
+  const { t, i18n } = useTranslation("retro");
   const [cursor, setCursor] = useState<Date>(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -52,6 +44,21 @@ export function RetroCalendar({ retros, tasks, type, onOpenRetro }: Props) {
 
   const year = cursor.getFullYear();
   const month = cursor.getMonth();
+
+  const weekdayLabels = useMemo(
+    () => [0, 1, 2, 3, 4, 5, 6].map((i) => t(`weekday${i}`)),
+    [t],
+  );
+
+  const formatDailyMeta = (doc: RetroDocument): string => {
+    const parts: string[] = [];
+    if (doc.dayRating > 0)
+      parts.push(t("dailyMetaRating", { value: doc.dayRating }));
+    if (doc.wakeUpTime)
+      parts.push(t("dailyMetaWakeUp", { time: doc.wakeUpTime }));
+    if (doc.bedtime) parts.push(t("dailyMetaBedtime", { time: doc.bedtime }));
+    return parts.join(" · ");
+  };
 
   const days = useMemo(() => {
     const firstOfMonth = new Date(year, month, 1);
@@ -84,7 +91,11 @@ export function RetroCalendar({ retros, tasks, type, onOpenRetro }: Props) {
   }, [year, month, retros]);
 
   const today = fmtDate(new Date());
-  const titleLabel = `${year}年 ${month + 1}月`;
+  const locale = i18n.language === "en" ? "en-US" : "ja-JP";
+  const monthLabel = new Intl.DateTimeFormat(locale, { month: "long" }).format(
+    new Date(year, month, 1),
+  );
+  const titleLabel = t("calendarTitle", { year, month: monthLabel });
 
   const goPrev = () => setCursor(new Date(year, month - 1, 1));
   const goNext = () => setCursor(new Date(year, month + 1, 1));
@@ -99,7 +110,7 @@ export function RetroCalendar({ retros, tasks, type, onOpenRetro }: Props) {
         <button
           className="retro-calendar-nav"
           onClick={goPrev}
-          aria-label="前の月"
+          aria-label={t("calendarPrevMonth")}
         >
           ‹
         </button>
@@ -107,20 +118,20 @@ export function RetroCalendar({ retros, tasks, type, onOpenRetro }: Props) {
         <button
           className="retro-calendar-nav"
           onClick={goNext}
-          aria-label="次の月"
+          aria-label={t("calendarNextMonth")}
         >
           ›
         </button>
         <button className="retro-calendar-today-btn" onClick={goThis}>
-          今月
+          {t("calendarThisMonth")}
         </button>
         <div className="retro-calendar-type-label">
-          {TYPE_LABEL[type]}の振り返り
+          {t("calendarTypeLabel", { type: t(TYPE_LABEL_KEYS[type]) })}
         </div>
       </div>
       <div className="retro-calendar-grid">
-        {WEEKDAY_LABELS.map((w) => (
-          <div key={w} className="retro-calendar-weekday">
+        {weekdayLabels.map((w, i) => (
+          <div key={i} className="retro-calendar-weekday">
             {w}
           </div>
         ))}
@@ -150,7 +161,7 @@ export function RetroCalendar({ retros, tasks, type, onOpenRetro }: Props) {
                 <div className="retro-calendar-popup" role="tooltip">
                   <div className="retro-calendar-popup-head">
                     <span className="retro-calendar-popup-badge">
-                      {TYPE_LABEL[d.retro!.type]}
+                      {t(TYPE_LABEL_KEYS[d.retro!.type])}
                     </span>
                     <span className="retro-calendar-popup-period">
                       {d.retro!.periodStart === d.retro!.periodEnd
@@ -167,7 +178,7 @@ export function RetroCalendar({ retros, tasks, type, onOpenRetro }: Props) {
                   {d.retro!.document.learned && (
                     <div className="retro-calendar-popup-learned">
                       <div className="retro-calendar-popup-learned-title">
-                        わかったこと
+                        {t("learnedTitle")}
                       </div>
                       <div className="retro-calendar-popup-learned-body">
                         {d.retro!.document.learned}
@@ -185,11 +196,11 @@ export function RetroCalendar({ retros, tasks, type, onOpenRetro }: Props) {
                     return (
                       <div className="retro-calendar-popup-tasks">
                         <div className="retro-calendar-popup-tasks-title">
-                          ✅ 達成タスク ({doneTasks.length}件)
+                          ✅ {t("doneTasksTitle", { count: doneTasks.length })}
                         </div>
                         {doneTasks.length === 0 ? (
                           <div className="retro-calendar-popup-tasks-empty">
-                            この期間に完了したタスクはありません。
+                            {t("doneTasksEmpty")}
                           </div>
                         ) : (
                           <ul className="retro-calendar-popup-tasks-list">
@@ -209,7 +220,7 @@ export function RetroCalendar({ retros, tasks, type, onOpenRetro }: Props) {
                   {d.retro!.aiComment && (
                     <div className="retro-calendar-popup-ai">
                       <div className="retro-calendar-popup-ai-title">
-                        AI コメント
+                        {t("aiCommentTitle")}
                       </div>
                       <div className="retro-calendar-popup-ai-body">
                         {d.retro!.aiComment}
@@ -218,8 +229,12 @@ export function RetroCalendar({ retros, tasks, type, onOpenRetro }: Props) {
                   )}
                   <div className="retro-calendar-popup-meta">
                     {d.retro!.completedAt
-                      ? `完了 ${formatDateTime(d.retro!.completedAt)}`
-                      : `ドラフト · 最終更新 ${formatDateTime(d.retro!.updatedAt)}`}
+                      ? t("historyCompleted", {
+                          date: formatDateTime(d.retro!.completedAt),
+                        })
+                      : t("calendarDraftMeta", {
+                          date: formatDateTime(d.retro!.updatedAt),
+                        })}
                   </div>
                 </div>
               )}

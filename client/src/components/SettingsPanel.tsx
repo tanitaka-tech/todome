@@ -1,10 +1,15 @@
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { ThemeName } from "../theme";
+import type { Language } from "../i18n/language";
+import { formatDateTime } from "../i18n/format";
 import type { AIToolConfig, GitHubStatus, RepoInfo } from "../types";
 
 interface Props {
   theme: ThemeName;
   setTheme: (t: ThemeName) => void;
+  language: Language;
+  setLanguage: (lang: Language) => void;
   githubStatus: GitHubStatus | null;
   githubRepos: RepoInfo[];
   onRequestRepoList: () => void;
@@ -25,47 +30,23 @@ interface Props {
 interface AIToolDef {
   id: string;
   label: string;
-  desc: string;
-  warning?: string;
+  descKey: string;
+  warningKey?: string;
 }
 
 const AI_TOOL_CATALOG: AIToolDef[] = [
   {
     id: "TodoWrite",
     label: "TodoWrite",
-    desc: "タスクの追加/更新、目標の追加/更新 (GOAL_ADD / GOAL_UPDATE)。",
-    warning: "これをオフにするとAIからタスクや目標を操作できなくなります。",
+    descKey: "toolTodoWriteDesc",
+    warningKey: "toolTodoWriteWarning",
   },
-  {
-    id: "Bash",
-    label: "Bash",
-    desc: "シェルコマンド実行。許可リスト(gh issue/pr/repo の読み取り系, git status/log/diff)のみ通る。",
-  },
-  {
-    id: "Read",
-    label: "Read",
-    desc: "ローカルファイル読み取り。プロジェクトコードを参照して回答するときに使用。",
-  },
-  {
-    id: "Glob",
-    label: "Glob",
-    desc: "ファイル名パターンによる検索。",
-  },
-  {
-    id: "Grep",
-    label: "Grep",
-    desc: "ファイル内容のパターン検索。",
-  },
-  {
-    id: "WebFetch",
-    label: "WebFetch",
-    desc: "指定URLの内容を取得。ドキュメント参照などに使用。",
-  },
-  {
-    id: "WebSearch",
-    label: "WebSearch",
-    desc: "Web検索。最新情報を調べたいときに使用。",
-  },
+  { id: "Bash", label: "Bash", descKey: "toolBashDesc" },
+  { id: "Read", label: "Read", descKey: "toolReadDesc" },
+  { id: "Glob", label: "Glob", descKey: "toolGlobDesc" },
+  { id: "Grep", label: "Grep", descKey: "toolGrepDesc" },
+  { id: "WebFetch", label: "WebFetch", descKey: "toolWebFetchDesc" },
+  { id: "WebSearch", label: "WebSearch", descKey: "toolWebSearchDesc" },
 ];
 
 type ThemeDef = {
@@ -267,7 +248,7 @@ function formatDate(iso: string | null | undefined): string {
   try {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return iso;
-    return d.toLocaleString();
+    return formatDateTime(d);
   } catch {
     return iso;
   }
@@ -276,6 +257,8 @@ function formatDate(iso: string | null | undefined): string {
 export function SettingsPanel({
   theme,
   setTheme,
+  language,
+  setLanguage,
   githubStatus,
   githubRepos,
   onRequestRepoList,
@@ -287,6 +270,7 @@ export function SettingsPanel({
   aiConfig,
   onUpdateAIConfig,
 }: Props) {
+  const { t } = useTranslation("settings");
   const toggleTool = (toolId: string, enabled: boolean) => {
     const current = new Set(aiConfig.allowedTools);
     if (enabled) current.add(toolId);
@@ -305,46 +289,72 @@ export function SettingsPanel({
     <div className="settings-panel">
       <div className="page-head">
         <div className="page-head-title-wrap">
-          <h1 className="page-title">設定</h1>
-          <div className="page-subtitle">アプリの外観と挙動を設定します</div>
+          <h1 className="page-title">{t("pageTitle")}</h1>
+          <div className="page-subtitle">{t("pageSubtitle")}</div>
         </div>
       </div>
 
       <div className="page-body">
         <div className="widget" style={{ maxWidth: 720 }}>
           <div className="widget-head">
-            <span className="widget-title">Appearance</span>
+            <span className="widget-title">{t("appearance")}</span>
           </div>
           <div className="widget-body">
             <div className="settings-row">
               <div>
-                <div className="settings-row-label">テーマ</div>
-                <div className="settings-row-desc">
-                  全体の配色を切り替えます。設定はこのブラウザに保存されます。
-                </div>
+                <div className="settings-row-label">{t("language")}</div>
+                <div className="settings-row-desc">{t("languageDesc")}</div>
+              </div>
+              <div className="theme-switch">
+                <button
+                  type="button"
+                  className={`theme-option ${
+                    language === "ja" ? "theme-option--active" : ""
+                  }`}
+                  onClick={() => setLanguage("ja")}
+                >
+                  <div className="theme-option-name">{t("langJa")}</div>
+                  <div className="theme-option-sub">JA</div>
+                </button>
+                <button
+                  type="button"
+                  className={`theme-option ${
+                    language === "en" ? "theme-option--active" : ""
+                  }`}
+                  onClick={() => setLanguage("en")}
+                >
+                  <div className="theme-option-name">{t("langEn")}</div>
+                  <div className="theme-option-sub">EN</div>
+                </button>
+              </div>
+            </div>
+            <div className="settings-row">
+              <div>
+                <div className="settings-row-label">{t("theme")}</div>
+                <div className="settings-row-desc">{t("themeDesc")}</div>
               </div>
               <div className="theme-groups">
                 <div className="theme-group">
-                  <div className="theme-group-label">ダーク</div>
+                  <div className="theme-group-label">{t("dark")}</div>
                   <div className="theme-switch">
-                    {DARK_THEMES_LIST.map((t) => (
+                    {DARK_THEMES_LIST.map((themeDef) => (
                       <ThemeOption
-                        key={t.id}
-                        t={t}
-                        active={theme === t.id}
+                        key={themeDef.id}
+                        t={themeDef}
+                        active={theme === themeDef.id}
                         onSelect={setTheme}
                       />
                     ))}
                   </div>
                 </div>
                 <div className="theme-group">
-                  <div className="theme-group-label">ライト</div>
+                  <div className="theme-group-label">{t("light")}</div>
                   <div className="theme-switch">
-                    {LIGHT_THEMES_LIST.map((t) => (
+                    {LIGHT_THEMES_LIST.map((themeDef) => (
                       <ThemeOption
-                        key={t.id}
-                        t={t}
-                        active={theme === t.id}
+                        key={themeDef.id}
+                        t={themeDef}
+                        active={theme === themeDef.id}
                         onSelect={setTheme}
                       />
                     ))}
@@ -357,7 +367,7 @@ export function SettingsPanel({
 
         <div className="widget" style={{ maxWidth: 720 }}>
           <div className="widget-head">
-            <span className="widget-title">GitHub連携</span>
+            <span className="widget-title">{t("github")}</span>
           </div>
           <div className="widget-body">
             <GitHubSection
@@ -375,11 +385,11 @@ export function SettingsPanel({
 
         <div className="widget" style={{ maxWidth: 720 }}>
           <div className="widget-head">
-            <span className="widget-title">AIエージェント</span>
+            <span className="widget-title">{t("aiAgent")}</span>
           </div>
           <div className="widget-body">
             <div className="settings-row-desc" style={{ marginBottom: 12 }}>
-              AIアシスタントが使えるツールを選びます。変更は次のチャット送信から反映されます。
+              {t("aiAgentDesc")}
             </div>
             <div className="ai-tool-list">
               {AI_TOOL_CATALOG.map((tool) => {
@@ -393,10 +403,10 @@ export function SettingsPanel({
                     />
                     <div className="ai-tool-text">
                       <div className="ai-tool-name">{tool.label}</div>
-                      <div className="ai-tool-desc">{tool.desc}</div>
-                      {tool.warning && (
+                      <div className="ai-tool-desc">{t(tool.descKey)}</div>
+                      {tool.warningKey && (
                         <div className="ai-tool-warning">
-                          ⚠ {tool.warning}
+                          ⚠ {t(tool.warningKey)}
                         </div>
                       )}
                       {tool.id === "Bash" && (
@@ -414,14 +424,13 @@ export function SettingsPanel({
                           />
                           <div>
                             <div className="ai-tool-name">
-                              gh api を許可
+                              {t("ghApiName")}
                             </div>
                             <div className="ai-tool-desc">
-                              GitHub REST API への直接アクセス (gh api ...) を
-                              追加で許可します。
+                              {t("ghApiDesc")}
                             </div>
                             <div className="ai-tool-warning">
-                              ⚠ POST/PATCH/DELETE を含む任意の API 呼び出しが可能になります。
+                              {t("ghApiWarning")}
                             </div>
                           </div>
                         </label>
@@ -459,18 +468,21 @@ function GitHubSection({
   onPullNow,
   onToggleAutoSync,
 }: GitHubSectionProps) {
+  const { t } = useTranslation("settings");
   const [pickerOpen, setPickerOpen] = useState(false);
 
   if (!status) {
-    return <div className="settings-row-desc">読み込み中…</div>;
+    return <div className="settings-row-desc">{t("loading")}</div>;
   }
 
   if (!status.authOk) {
     return (
       <div className="gh-section">
-        <div className="settings-row-label">GitHub CLI 未認証</div>
+        <div className="settings-row-label">{t("ghNotAuth")}</div>
         <div className="settings-row-desc">
-          ターミナルで <code>gh auth login</code> を実行し、サーバを再起動してください。
+          {t("ghAuthInstructionPre")}
+          <code>gh auth login</code>
+          {t("ghAuthInstructionPost")}
         </div>
         {status.authError && (
           <div className="gh-error">{status.authError}</div>
@@ -484,10 +496,13 @@ function GitHubSection({
       <div className="gh-section">
         <div className="settings-row">
           <div>
-            <div className="settings-row-label">GitHub 未連携</div>
+            <div className="settings-row-label">{t("ghNotLinked")}</div>
             <div className="settings-row-desc">
-              ログイン中: <strong>{status.authUser}</strong> — 任意のリポジトリに
-              <code>todome.db</code> を保存します。
+              {t("ghLoginHintPrefix")}
+              <strong>{status.authUser}</strong>
+              {t("ghLoginHintSuffix")}
+              <code>todome.db</code>
+              {t("ghLoginHintTail")}
             </div>
           </div>
           <button
@@ -498,7 +513,7 @@ function GitHubSection({
               setPickerOpen(true);
             }}
           >
-            連携する
+            {t("ghLinkBtn")}
           </button>
         </div>
         {status.lastError && <div className="gh-error">{status.lastError}</div>}
@@ -526,7 +541,7 @@ function GitHubSection({
       <div className="settings-row">
         <div>
           <div className="settings-row-label">
-            連携済:{" "}
+            {t("ghLinkedLabel")}
             <a
               href={`https://github.com/${status.owner}/${status.repo}`}
               target="_blank"
@@ -537,8 +552,8 @@ function GitHubSection({
           </div>
           <div className="settings-row-desc">
             {status.syncing
-              ? "同期中…"
-              : `最終同期: ${formatDate(status.lastSyncAt)}`}
+              ? t("ghSyncing")
+              : t("ghLastSync", { date: formatDate(status.lastSyncAt) })}
           </div>
         </div>
         <div className="gh-actions">
@@ -548,7 +563,7 @@ function GitHubSection({
             onClick={onSyncNow}
             disabled={status.syncing}
           >
-            Sync now
+            {t("syncNow")}
           </button>
           <button
             className="gh-btn"
@@ -556,7 +571,7 @@ function GitHubSection({
             onClick={onPullNow}
             disabled={status.syncing}
           >
-            Pull
+            {t("pull")}
           </button>
           <button
             className="gh-btn gh-btn--danger"
@@ -564,7 +579,7 @@ function GitHubSection({
             onClick={onUnlink}
             disabled={status.syncing}
           >
-            解除
+            {t("unlink")}
           </button>
         </div>
       </div>
@@ -575,7 +590,7 @@ function GitHubSection({
             checked={status.autoSync}
             onChange={(e) => onToggleAutoSync(e.target.checked)}
           />
-          <span>自動同期 (変更から20秒後に commit & push)</span>
+          <span>{t("autoSync")}</span>
         </label>
       </div>
       {status.lastError && <div className="gh-error">{status.lastError}</div>}
@@ -598,6 +613,7 @@ function RepoPicker({
   onSelect,
   onCreate,
 }: RepoPickerProps) {
+  const { t } = useTranslation("settings");
   const [search, setSearch] = useState(defaultName);
   const [newName, setNewName] = useState(defaultName);
   const [newPrivate, setNewPrivate] = useState(true);
@@ -614,18 +630,18 @@ function RepoPicker({
     <div className="gh-picker-overlay" onClick={onCancel}>
       <div className="gh-picker" onClick={(e) => e.stopPropagation()}>
         <div className="gh-picker-head">
-          <h3>リポジトリを選択</h3>
+          <h3>{t("repoPickerTitle")}</h3>
           <button className="gh-picker-close" type="button" onClick={onCancel}>
             ×
           </button>
         </div>
 
         <div className="gh-picker-section">
-          <label className="gh-picker-label">既存のリポジトリから選ぶ</label>
+          <label className="gh-picker-label">{t("pickExisting")}</label>
           <input
             className="gh-picker-search"
             type="text"
-            placeholder="リポジトリ名で絞り込み"
+            placeholder={t("pickSearchPlaceholder")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -633,8 +649,8 @@ function RepoPicker({
             {filtered.length === 0 ? (
               <div className="gh-repo-empty">
                 {repos.length === 0
-                  ? "リストを読み込み中…"
-                  : "該当するリポジトリが見つかりません"}
+                  ? t("repoListLoading")
+                  : t("repoListEmpty")}
               </div>
             ) : (
               filtered.map((r) => (
@@ -646,7 +662,7 @@ function RepoPicker({
                 >
                   <span className="gh-repo-name">{r.nameWithOwner}</span>
                   {r.isPrivate && (
-                    <span className="gh-repo-badge">Private</span>
+                    <span className="gh-repo-badge">{t("privateLabel")}</span>
                   )}
                 </button>
               ))
@@ -655,12 +671,12 @@ function RepoPicker({
         </div>
 
         <div className="gh-picker-section">
-          <label className="gh-picker-label">新規リポジトリを作成</label>
+          <label className="gh-picker-label">{t("createNew")}</label>
           <div className="gh-picker-row">
             <input
               className="gh-picker-search"
               type="text"
-              placeholder="リポジトリ名"
+              placeholder={t("repoNamePlaceholder")}
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
             />
@@ -670,7 +686,7 @@ function RepoPicker({
                 checked={newPrivate}
                 onChange={(e) => setNewPrivate(e.target.checked)}
               />
-              <span>Private</span>
+              <span>{t("privateLabel")}</span>
             </label>
             <button
               className="gh-btn gh-btn--primary"
@@ -678,7 +694,7 @@ function RepoPicker({
               disabled={!newName.trim()}
               onClick={() => onCreate(newName.trim(), newPrivate)}
             >
-              作成して連携
+              {t("createAndLink")}
             </button>
           </div>
         </div>

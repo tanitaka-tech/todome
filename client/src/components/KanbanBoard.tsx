@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { ColumnId, Goal, KanbanTask } from "../types";
 import { formatDuration, totalSeconds } from "../types";
+import { formatDateTime } from "../i18n/format";
 
 interface Props {
   tasks: KanbanTask[];
@@ -19,25 +21,25 @@ interface Props {
 
 export const KANBAN_GOAL_FILTER_NONE = "__none__";
 
-const COLUMNS: { id: ColumnId; label: string; color: string }[] = [
-  { id: "todo", label: "TODO", color: "#6b7280" },
-  { id: "in_progress", label: "進行中", color: "#d4a24e" },
-  { id: "done", label: "完了", color: "#9a5b2f" },
+const COLUMNS: { id: ColumnId; labelKey: string; color: string }[] = [
+  { id: "todo", labelKey: "columnTodo", color: "#6b7280" },
+  { id: "in_progress", labelKey: "columnInProgress", color: "#d4a24e" },
+  { id: "done", labelKey: "columnDone", color: "#9a5b2f" },
 ];
 
-const PRIORITY_LABELS: Record<string, { label: string; className: string }> = {
-  high: { label: "高", className: "priority-high" },
-  medium: { label: "中", className: "priority-medium" },
-  low: { label: "低", className: "priority-low" },
+const PRIORITY_LABELS: Record<string, { labelKey: string; className: string }> = {
+  high: { labelKey: "priorityHigh", className: "priority-high" },
+  medium: { labelKey: "priorityMedium", className: "priority-medium" },
+  low: { labelKey: "priorityLow", className: "priority-low" },
 };
 
 const GOAL_FILTER_NONE = KANBAN_GOAL_FILTER_NONE;
-const RECENT_DAYS_OPTIONS: { value: number; label: string }[] = [
-  { value: 0, label: "全期間" },
-  { value: 1, label: "1日" },
-  { value: 3, label: "3日" },
-  { value: 7, label: "7日" },
-  { value: 30, label: "30日" },
+const RECENT_DAYS_OPTIONS: { value: number; labelKey: string }[] = [
+  { value: 0, labelKey: "filterAllPeriod" },
+  { value: 1, labelKey: "filterDay1" },
+  { value: 3, labelKey: "filterDay3" },
+  { value: 7, labelKey: "filterDay7" },
+  { value: 30, labelKey: "filterDay30" },
 ];
 
 type InsertPos = "above" | "below";
@@ -56,6 +58,7 @@ export function KanbanBoard({
   recentDays,
   setRecentDays,
 }: Props) {
+  const { t } = useTranslation("kanban");
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<ColumnId | null>(null);
   const [dragOverCardId, setDragOverCardId] = useState<string | null>(null);
@@ -476,14 +479,14 @@ export function KanbanBoard({
     <div className="kanban-wrap">
       <div className="kanban-filter-bar">
         <div className="kanban-filter-group">
-          <span className="kanban-filter-label">目標</span>
+          <span className="kanban-filter-label">{t("filterGoal")}</span>
           <select
             className="kanban-filter-select"
             value={goalFilter}
             onChange={(e) => setGoalFilter(e.target.value)}
           >
-            <option value="">すべて</option>
-            <option value={GOAL_FILTER_NONE}>目標なし</option>
+            <option value="">{t("filterAll")}</option>
+            <option value={GOAL_FILTER_NONE}>{t("filterNoGoal")}</option>
             {goals.map((g) => (
               <option key={g.id} value={g.id}>
                 {g.name}
@@ -492,7 +495,7 @@ export function KanbanBoard({
           </select>
         </div>
         <div className="kanban-filter-group">
-          <span className="kanban-filter-label">完了</span>
+          <span className="kanban-filter-label">{t("filterDone")}</span>
           <div className="kanban-filter-tabs">
             {RECENT_DAYS_OPTIONS.map((opt) => (
               <button
@@ -500,7 +503,7 @@ export function KanbanBoard({
                 className={`kanban-filter-tab ${recentDays === opt.value ? "kanban-filter-tab--active" : ""}`}
                 onClick={() => setRecentDays(opt.value)}
               >
-                {opt.label}
+                {t(opt.labelKey)}
               </button>
             ))}
           </div>
@@ -512,9 +515,9 @@ export function KanbanBoard({
               setGoalFilter("");
               setRecentDays(0);
             }}
-            title="フィルターをクリア"
+            title={t("filterClear")}
           >
-            {hiddenCount}件を非表示 &times;
+            {t("hiddenCount", { count: hiddenCount })} &times;
           </button>
         )}
       </div>
@@ -531,12 +534,12 @@ export function KanbanBoard({
           >
             <div className="kanban-column-header">
               <span className="kanban-column-dot" style={{ background: col.color }} />
-              <span className="kanban-column-title">{col.label}</span>
+              <span className="kanban-column-title">{t(col.labelKey)}</span>
               <span className="kanban-column-count">{colTasks.length}</span>
               <button
                 className="kanban-add-btn"
                 onClick={() => handleAdd(col.id)}
-                title="タスクを追加"
+                title={t("addTask")}
               >
                 +
               </button>
@@ -576,15 +579,15 @@ export function KanbanBoard({
                       <button
                         className={`kanban-priority-badge ${PRIORITY_LABELS[task.priority].className}`}
                         onClick={(e) => cyclePriority(e, task)}
-                        title="優先度を変更"
+                        title={t("changePriority")}
                       >
-                        {PRIORITY_LABELS[task.priority].label}
+                        {t(PRIORITY_LABELS[task.priority].labelKey)}
                       </button>
                       <div className="kanban-card-actions">
                         <button
                           className="kanban-card-action kanban-card-delete"
                           onClick={(e) => handleDelete(e, task.id)}
-                          title="削除"
+                          title={t("delete")}
                         >
                           &times;
                         </button>
@@ -611,7 +614,7 @@ export function KanbanBoard({
                             e.stopPropagation();
                             onTimerToggle(task.id);
                           }}
-                          title={running ? "停止" : "開始"}
+                          title={running ? t("timerStop") : t("timerStart")}
                         >
                           {running ? "\u25A0" : "\u25B6"}
                         </button>
@@ -625,13 +628,14 @@ export function KanbanBoard({
                     </div>
                     {task.completedAt && (
                       <div className="kanban-card-completed-at">
-                        {new Date(task.completedAt).toLocaleString("ja-JP", {
+                        {formatDateTime(task.completedAt, {
                           month: "short",
                           day: "numeric",
                           hour: "2-digit",
                           minute: "2-digit",
                         })}
-                        {" 完了"}
+                        {" "}
+                        {t("completedSuffix")}
                       </div>
                     )}
                   </div>
@@ -643,7 +647,7 @@ export function KanbanBoard({
                   <input
                     ref={addInputRef}
                     className="kanban-add-input"
-                    placeholder="タスク名を入力..."
+                    placeholder={t("taskNamePlaceholder")}
                     value={newTitle}
                     onChange={(e) => setNewTitle(e.target.value)}
                     onKeyDown={(e) => {
@@ -660,13 +664,13 @@ export function KanbanBoard({
                         setNewPriority(e.target.value as "low" | "medium" | "high")
                       }
                     >
-                      <option value="low">低</option>
-                      <option value="medium">中</option>
-                      <option value="high">高</option>
+                      <option value="low">{t("priorityLow")}</option>
+                      <option value="medium">{t("priorityMedium")}</option>
+                      <option value="high">{t("priorityHigh")}</option>
                     </select>
-                    <button className="kanban-add-submit" onClick={submitAdd}>追加</button>
+                    <button className="kanban-add-submit" onClick={submitAdd}>{t("add")}</button>
                     <button className="kanban-add-cancel" onClick={() => setAddingTo(null)}>
-                      キャンセル
+                      {t("cancel")}
                     </button>
                   </div>
                 </div>

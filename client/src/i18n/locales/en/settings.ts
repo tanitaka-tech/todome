@@ -1,0 +1,61 @@
+export const en_settings: Record<string, string> = {
+  pageTitle: "Settings",
+  pageSubtitle: "Configure appearance and behavior of the app",
+  appearance: "Appearance",
+  theme: "Theme",
+  themeDesc:
+    "Switch the overall color scheme. Your selection is saved in this browser.",
+  dark: "Dark",
+  light: "Light",
+  language: "Language",
+  languageDesc:
+    "Switch the UI language. Your selection is saved in this browser.",
+  langJa: "日本語",
+  langEn: "English",
+  github: "GitHub",
+  aiAgent: "AI Agent",
+  aiAgentDesc:
+    "Choose which tools the AI assistant can use. Changes take effect on the next chat message.",
+  ghApiName: "Allow gh api",
+  ghApiDesc:
+    "Additionally allow direct access to the GitHub REST API (gh api ...).",
+  ghApiWarning:
+    "⚠ Enables arbitrary API calls including POST / PATCH / DELETE.",
+  loading: "Loading…",
+  ghNotAuth: "GitHub CLI not authenticated",
+  ghAuthInstructionPre: "Run ",
+  ghAuthInstructionPost: " in your terminal and restart the server.",
+  ghNotLinked: "GitHub not linked",
+  ghLoginHintPrefix: "Logged in as: ",
+  ghLoginHintSuffix: " — save ",
+  ghLoginHintTail: " to any repository.",
+  ghLinkBtn: "Link",
+  ghLinkedLabel: "Linked: ",
+  ghSyncing: "Syncing…",
+  ghLastSync: "Last sync: {{date}}",
+  syncNow: "Sync now",
+  pull: "Pull",
+  unlink: "Unlink",
+  autoSync: "Auto-sync (commit & push 20 s after changes)",
+  repoPickerTitle: "Select a repository",
+  pickExisting: "Pick from existing repositories",
+  pickSearchPlaceholder: "Filter by repository name",
+  repoListLoading: "Loading list…",
+  repoListEmpty: "No matching repository",
+  createNew: "Create a new repository",
+  repoNamePlaceholder: "Repository name",
+  privateLabel: "Private",
+  createAndLink: "Create and link",
+  toolTodoWriteDesc:
+    "Add / update tasks and goals (GOAL_ADD / GOAL_UPDATE).",
+  toolTodoWriteWarning:
+    "Turning this off prevents the AI from managing tasks or goals.",
+  toolBashDesc:
+    "Run shell commands. Only an allow-list (gh issue/pr/repo read, git status/log/diff) is permitted.",
+  toolReadDesc:
+    "Read local files. Used when the AI needs to reference project code.",
+  toolGlobDesc: "Search by filename pattern.",
+  toolGrepDesc: "Search file contents by pattern.",
+  toolWebFetchDesc: "Fetch the contents of a URL. Useful for doc lookups.",
+  toolWebSearchDesc: "Web search. Useful for up-to-date information.",
+};

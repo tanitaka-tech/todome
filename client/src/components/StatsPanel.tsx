@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { Goal, KanbanTask, TimeLog } from "../types";
 import { formatDuration } from "../types";
 
@@ -88,6 +89,8 @@ function aggregateByGoalAndPeriod(
   tasks: KanbanTask[],
   goals: Goal[],
   period: Period,
+  noGoalLabel: string,
+  unknownGoalLabel: string,
 ) {
   const periods = generatePeriods(period);
   const goalMap = new Map(goals.map((g) => [g.id, g.name]));
@@ -117,16 +120,22 @@ function aggregateByGoalAndPeriod(
 
   const goalList = Array.from(goalIds).map((id) => ({
     id,
-    name: id === "__none__" ? "目標なし" : (goalMap.get(id) || "不明"),
+    name: id === "__none__" ? noGoalLabel : (goalMap.get(id) || unknownGoalLabel),
   }));
 
   return { periods, data, goalList };
 }
 
-function PieChart({ slices }: { slices: { label: string; value: number; color: string }[] }) {
+function PieChart({
+  slices,
+  emptyLabel,
+}: {
+  slices: { label: string; value: number; color: string }[];
+  emptyLabel: string;
+}) {
   const total = slices.reduce((s, d) => s + d.value, 0);
   if (total === 0) {
-    return <div className="stats-empty">データがありません</div>;
+    return <div className="stats-empty">{emptyLabel}</div>;
   }
 
   const filtered = slices.filter((s) => s.value > 0);
@@ -176,10 +185,12 @@ function BarChart({
   periods,
   data,
   goalList,
+  emptyLabel,
 }: {
   periods: { key: string; label: string }[];
   data: Record<string, Record<string, number>>;
   goalList: { id: string; name: string }[];
+  emptyLabel: string;
 }) {
   let maxVal = 0;
   for (const p of periods) {
@@ -191,7 +202,7 @@ function BarChart({
   }
 
   if (maxVal === 0) {
-    return <div className="stats-empty">データがありません</div>;
+    return <div className="stats-empty">{emptyLabel}</div>;
   }
 
   const barW = Math.max(16, Math.min(40, 600 / periods.length - 8));
@@ -255,7 +266,10 @@ function BarChart({
 }
 
 export function StatsPanel({ tasks, goals, tick: _tick }: Props) {
+  const { t } = useTranslation("stats");
   const [period, setPeriod] = useState<Period>("day");
+  const noGoalLabel = t("noGoalLabel");
+  const unknownGoalLabel = t("unknownGoalLabel");
 
   const goalTimeMap: Record<string, number> = {};
   for (const task of tasks) {
@@ -274,7 +288,7 @@ export function StatsPanel({ tasks, goals, tick: _tick }: Props) {
   const pieSlices = Object.entries(goalTimeMap)
     .filter(([, v]) => v > 0)
     .map(([gId, v], i) => ({
-      label: gId === "__none__" ? "目標なし" : (goalNameMap.get(gId) || "不明"),
+      label: gId === "__none__" ? noGoalLabel : (goalNameMap.get(gId) || unknownGoalLabel),
       value: v,
       color: getColor(i),
     }));
@@ -283,17 +297,25 @@ export function StatsPanel({ tasks, goals, tick: _tick }: Props) {
     tasks,
     goals,
     period,
+    noGoalLabel,
+    unknownGoalLabel,
   );
 
   const totalTime = Object.values(goalTimeMap).reduce((s, v) => s + v, 0);
   const completedCount = tasks.filter((t) => t.completedAt).length;
 
+  const periodLabels: Record<Period, string> = {
+    day: t("periodDay"),
+    month: t("periodMonth"),
+    year: t("periodYear"),
+  };
+
   return (
     <div className="stats-panel">
       <div className="page-head">
         <div className="page-head-title-wrap">
-          <h1 className="page-title">統計</h1>
-          <div className="page-subtitle">作業時間と目標の推移を可視化</div>
+          <h1 className="page-title">{t("pageTitle")}</h1>
+          <div className="page-subtitle">{t("pageSubtitle")}</div>
         </div>
       </div>
 
@@ -301,7 +323,7 @@ export function StatsPanel({ tasks, goals, tick: _tick }: Props) {
         <div className="stats-summary">
           <div className="widget">
             <div className="kpi-tile">
-              <div className="kpi-label">合計作業時間</div>
+              <div className="kpi-label">{t("summaryTotal")}</div>
               <div className="kpi-value kpi-value--accent">
                 {formatDuration(totalTime)}
               </div>
@@ -309,13 +331,13 @@ export function StatsPanel({ tasks, goals, tick: _tick }: Props) {
           </div>
           <div className="widget">
             <div className="kpi-tile">
-              <div className="kpi-label">完了タスク</div>
+              <div className="kpi-label">{t("summaryCompleted")}</div>
               <div className="kpi-value">{completedCount}</div>
             </div>
           </div>
           <div className="widget">
             <div className="kpi-tile">
-              <div className="kpi-label">全タスク</div>
+              <div className="kpi-label">{t("summaryAll")}</div>
               <div className="kpi-value">{tasks.length}</div>
             </div>
           </div>
@@ -324,16 +346,16 @@ export function StatsPanel({ tasks, goals, tick: _tick }: Props) {
         <div className="overview-grid">
           <div className="widget col-6">
             <div className="widget-head">
-              <span className="widget-title">目標別 作業時間</span>
+              <span className="widget-title">{t("sectionTimeByGoal")}</span>
             </div>
             <div className="widget-body">
-              <PieChart slices={pieSlices} />
+              <PieChart slices={pieSlices} emptyLabel={t("noData")} />
             </div>
           </div>
 
           <div className="widget col-6">
             <div className="widget-head">
-              <span className="widget-title">作業時間の推移</span>
+              <span className="widget-title">{t("sectionTimeTrend")}</span>
               <div className="stats-period-tabs">
                 {(["day", "month", "year"] as const).map((p) => (
                   <button
@@ -341,13 +363,18 @@ export function StatsPanel({ tasks, goals, tick: _tick }: Props) {
                     className={`stats-period-tab ${period === p ? "stats-period-tab--active" : ""}`}
                     onClick={() => setPeriod(p)}
                   >
-                    {p === "day" ? "日" : p === "month" ? "月" : "年"}
+                    {periodLabels[p]}
                   </button>
                 ))}
               </div>
             </div>
             <div className="widget-body">
-              <BarChart periods={periods} data={data} goalList={goalList} />
+              <BarChart
+                periods={periods}
+                data={data}
+                goalList={goalList}
+                emptyLabel={t("noData")}
+              />
             </div>
           </div>
         </div>

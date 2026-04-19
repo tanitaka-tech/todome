@@ -1,4 +1,5 @@
 import { useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { useModalClose } from "../hooks/useModalClose";
 
 interface Props {
@@ -6,8 +7,8 @@ interface Props {
 }
 
 interface ShortcutGroup {
-  title: string;
-  items: { keys: string[]; desc: string; chord?: boolean }[];
+  titleKey: string;
+  items: { keys: string[]; descKey: string; chord?: boolean }[];
 }
 
 const IS_MAC =
@@ -16,51 +17,52 @@ const MOD = IS_MAC ? "⌘" : "Ctrl";
 
 const GROUPS: ShortcutGroup[] = [
   {
-    title: "グローバル",
+    titleKey: "groupGlobal",
     items: [
-      { keys: ["?"], desc: "このヘルプを開く" },
-      { keys: ["/"], desc: "AIアシスタントにフォーカス" },
-      { keys: [MOD, "B"], desc: "AIアシスタントの開閉" },
-      { keys: ["Esc"], desc: "モーダル / フォーカスを閉じる" },
-      { keys: ["G", "O"], desc: "Overview へ移動", chord: true },
-      { keys: ["G", "B"], desc: "ボードへ移動", chord: true },
-      { keys: ["G", "G"], desc: "目標へ移動", chord: true },
-      { keys: ["G", "R"], desc: "振り返りへ移動", chord: true },
-      { keys: ["G", "S"], desc: "統計へ移動", chord: true },
-      { keys: ["G", "P"], desc: "プロフィールへ移動", chord: true },
-      { keys: ["G", ","], desc: "設定へ移動", chord: true },
+      { keys: ["?"], descKey: "openHelp" },
+      { keys: ["/"], descKey: "focusChat" },
+      { keys: [MOD, "B"], descKey: "toggleChat" },
+      { keys: ["Esc"], descKey: "closeModal" },
+      { keys: ["G", "O"], descKey: "goOverview", chord: true },
+      { keys: ["G", "B"], descKey: "goBoard", chord: true },
+      { keys: ["G", "G"], descKey: "goGoals", chord: true },
+      { keys: ["G", "R"], descKey: "goRetro", chord: true },
+      { keys: ["G", "S"], descKey: "goStats", chord: true },
+      { keys: ["G", "P"], descKey: "goProfile", chord: true },
+      { keys: ["G", ","], descKey: "goSettings", chord: true },
     ],
   },
   {
-    title: "ボード",
+    titleKey: "groupBoard",
     items: [
-      { keys: ["N"], desc: "新しいタスクを追加" },
-      { keys: ["↑", "↓"], desc: "カード選択を上下に移動" },
-      { keys: ["←", "→"], desc: "カードを前後のカラムへ移動" },
-      { keys: ["Enter"], desc: "選択中のカードを開く" },
-      { keys: ["Space"], desc: "選択中のタスクのタイマーを開始/停止" },
-      { keys: ["D"], desc: "選択中のタスクを完了にする" },
-      { keys: ["Delete"], desc: "選択中のタスクを削除" },
+      { keys: ["N"], descKey: "addTask" },
+      { keys: ["↑", "↓"], descKey: "moveSelection" },
+      { keys: ["←", "→"], descKey: "moveCardColumn" },
+      { keys: ["Enter"], descKey: "openCard" },
+      { keys: ["Space"], descKey: "toggleTimer" },
+      { keys: ["D"], descKey: "completeTask" },
+      { keys: ["Delete"], descKey: "deleteTask" },
     ],
   },
   {
-    title: "AIチャット",
+    titleKey: "groupChat",
     items: [
-      { keys: ["Enter"], desc: "送信" },
-      { keys: ["Shift", "Enter"], desc: "改行" },
-      { keys: [MOD, "K"], desc: "セッションをクリア" },
-      { keys: [MOD, "."], desc: "生成をキャンセル" },
+      { keys: ["Enter"], descKey: "chatSend" },
+      { keys: ["Shift", "Enter"], descKey: "chatNewline" },
+      { keys: [MOD, "K"], descKey: "chatClearSession" },
+      { keys: [MOD, "."], descKey: "chatCancel" },
     ],
   },
   {
-    title: "振り返り",
+    titleKey: "groupRetro",
     items: [
-      { keys: [MOD, "Enter"], desc: "振り返りを完了" },
+      { keys: [MOD, "Enter"], descKey: "retroComplete" },
     ],
   },
 ];
 
 export function ShortcutsHelpModal({ onClose }: Props) {
+  const { t } = useTranslation("shortcuts");
   const { closing, close } = useModalClose(onClose);
   const overlayDownRef = useRef(false);
 
@@ -81,15 +83,15 @@ export function ShortcutsHelpModal({ onClose }: Props) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-header">
-          <h2 className="modal-title">キーボードショートカット</h2>
-          <button className="modal-close" onClick={close} aria-label="閉じる">
+          <h2 className="modal-title">{t("title")}</h2>
+          <button className="modal-close" onClick={close} aria-label={t("close")}>
             &times;
           </button>
         </div>
         <div className="modal-body shortcuts-modal-body">
           {GROUPS.map((group) => (
-            <div key={group.title} className="shortcuts-group">
-              <div className="shortcuts-group-title">{group.title}</div>
+            <div key={group.titleKey} className="shortcuts-group">
+              <div className="shortcuts-group-title">{t(group.titleKey)}</div>
               <div className="shortcuts-list">
                 {group.items.map((item, idx) => (
                   <div key={idx} className="shortcuts-row">
@@ -105,7 +107,7 @@ export function ShortcutsHelpModal({ onClose }: Props) {
                         </span>
                       ))}
                     </div>
-                    <div className="shortcuts-desc">{item.desc}</div>
+                    <div className="shortcuts-desc">{t(item.descKey)}</div>
                   </div>
                 ))}
               </div>
