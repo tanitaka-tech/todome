@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { KanbanTask, RetroDocument as RetroDocumentT, RetroType } from "../types";
+import { isTaskCompletedInPeriod } from "../types";
+
 
 type DocFieldKey = "did" | "learned" | "next";
 type EditableKey = DocFieldKey | "aiComment";
@@ -238,17 +240,6 @@ function DayRatingSlider({
   );
 }
 
-function isCompletedInPeriod(
-  task: KanbanTask,
-  periodStart: string,
-  periodEnd: string,
-): boolean {
-  if (task.column !== "done") return false;
-  const ca = (task.completedAt || "").replace("Z", "").slice(0, 19);
-  if (!ca) return false;
-  return ca >= `${periodStart}T00:00:00` && ca <= `${periodEnd}T23:59:59`;
-}
-
 export function RetroDocumentView({
   document,
   retroType,
@@ -262,7 +253,7 @@ export function RetroDocumentView({
   onEditSleep,
 }: Props) {
   const completedTasks = tasks.filter((t) =>
-    isCompletedInPeriod(t, periodStart, periodEnd),
+    isTaskCompletedInPeriod(t, periodStart, periodEnd),
   );
   const isDaily = retroType === "daily";
 

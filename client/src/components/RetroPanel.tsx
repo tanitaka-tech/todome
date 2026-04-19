@@ -1,5 +1,11 @@
 import { useMemo, useRef, useState } from "react";
-import type { KanbanTask, RetroType, Retrospective } from "../types";
+import type {
+  KanbanTask,
+  RetroDocument,
+  RetroType,
+  Retrospective,
+} from "../types";
+import { isTaskCompletedInPeriod } from "../types";
 import { RetroSession } from "./RetroSession";
 import { RetroCalendar } from "./RetroCalendar";
 import { useModalClose } from "../hooks/useModalClose";
@@ -51,21 +57,46 @@ const TYPE_LABEL: Record<RetroType, string> = {
   yearly: "年次振り返り",
 };
 
-function summaryFromRetro(r: Retrospective): string {
-  if (r.aiComment) {
-    const s = r.aiComment.trim().replace(/\s+/g, " ");
-    return s.length > 90 ? s.slice(0, 88) + "…" : s;
-  }
-  const firstText =
-    (r.document.did && r.document.did.trim()) ||
-    (r.document.learned && r.document.learned.trim()) ||
-    (r.document.next && r.document.next.trim()) ||
-    "";
-  if (firstText) {
-    const s = firstText.replace(/\s+/g, " ");
-    return s.length > 90 ? s.slice(0, 88) + "…" : s;
-  }
-  return "(まだ内容がありません)";
+function formatDailyMeta(doc: RetroDocument): string {
+  const parts: string[] = [];
+  if (doc.dayRating > 0) parts.push(`評価 ${doc.dayRating}/10`);
+  if (doc.wakeUpTime) parts.push(`起床 ${doc.wakeUpTime}`);
+  if (doc.bedtime) parts.push(`就寝 ${doc.bedtime}`);
+  return parts.join(" · ");
+}
+
+function RetroHistoryDoneTasks({
+  tasks,
+  periodStart,
+  periodEnd,
+}: {
+  tasks: KanbanTask[];
+  periodStart: string;
+  periodEnd: string;
+}) {
+  const doneTasks = tasks.filter((t) =>
+    isTaskCompletedInPeriod(t, periodStart, periodEnd),
+  );
+  return (
+    <div className="retro-history-tasks">
+      <div className="retro-history-tasks-title">
+        ✅ 達成タスク ({doneTasks.length}件)
+      </div>
+      {doneTasks.length === 0 ? (
+        <div className="retro-history-tasks-empty">
+          この期間に完了したタスクはありません。
+        </div>
+      ) : (
+        <ul className="retro-history-tasks-list">
+          {doneTasks.map((t) => (
+            <li key={t.id} className="retro-history-tasks-item">
+              {t.title}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 function formatDateTime(iso: string): string {
@@ -318,6 +349,7 @@ export function RetroPanel({
         {viewMode === "calendar" ? (
           <RetroCalendar
             retros={currentList}
+            tasks={tasks}
             type={tab}
             onOpenRetro={onOpenRetro}
           />
@@ -337,9 +369,32 @@ export function RetroPanel({
                     {d.periodStart} 〜 {d.periodEnd}
                   </span>
                 </div>
-                <div className="retro-history-summary">
-                  {summaryFromRetro(d)}
-                </div>
+                {d.type === "daily" && formatDailyMeta(d.document) && (
+                  <div className="retro-history-daily">
+                    {formatDailyMeta(d.document)}
+                  </div>
+                )}
+                {d.document.learned && (
+                  <div className="retro-history-learned">
+                    <div className="retro-history-learned-title">
+                      わかったこと
+                    </div>
+                    <div className="retro-history-learned-body">
+                      {d.document.learned}
+                    </div>
+                  </div>
+                )}
+                <RetroHistoryDoneTasks
+                  tasks={tasks}
+                  periodStart={d.periodStart}
+                  periodEnd={d.periodEnd}
+                />
+                {d.aiComment && (
+                  <div className="retro-history-ai">
+                    <div className="retro-history-ai-title">AI コメント</div>
+                    <div className="retro-history-ai-body">{d.aiComment}</div>
+                  </div>
+                )}
                 <div className="retro-history-meta">
                   最終更新 {formatDateTime(d.updatedAt)}
                 </div>
@@ -376,9 +431,32 @@ export function RetroPanel({
                     {r.periodStart} 〜 {r.periodEnd}
                   </span>
                 </div>
-                <div className="retro-history-summary">
-                  {summaryFromRetro(r)}
-                </div>
+                {r.type === "daily" && formatDailyMeta(r.document) && (
+                  <div className="retro-history-daily">
+                    {formatDailyMeta(r.document)}
+                  </div>
+                )}
+                {r.document.learned && (
+                  <div className="retro-history-learned">
+                    <div className="retro-history-learned-title">
+                      わかったこと
+                    </div>
+                    <div className="retro-history-learned-body">
+                      {r.document.learned}
+                    </div>
+                  </div>
+                )}
+                <RetroHistoryDoneTasks
+                  tasks={tasks}
+                  periodStart={r.periodStart}
+                  periodEnd={r.periodEnd}
+                />
+                {r.aiComment && (
+                  <div className="retro-history-ai">
+                    <div className="retro-history-ai-title">AI コメント</div>
+                    <div className="retro-history-ai-body">{r.aiComment}</div>
+                  </div>
+                )}
                 <div className="retro-history-meta">
                   完了 {formatDateTime(r.completedAt)}
                 </div>

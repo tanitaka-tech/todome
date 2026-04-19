@@ -161,6 +161,7 @@ export function App() {
   );
   const [aiConfig, setAIConfig] = useState<AIToolConfig>({
     allowedTools: ["TodoWrite", "Bash"],
+    allowGhApi: false,
   });
   const [retros, setRetros] = useState<Retrospective[]>([]);
   const [activeRetro, setActiveRetro] = useState<Retrospective | null>(null);

@@ -39,8 +39,7 @@ const AI_TOOL_CATALOG: AIToolDef[] = [
   {
     id: "Bash",
     label: "Bash",
-    desc: "シェルコマンド実行。gh / git で GitHub リポジトリの状況確認に使用。",
-    warning: "任意のコマンドをAIが実行できる権限です。",
+    desc: "シェルコマンド実行。許可リスト(gh issue/pr/repo の読み取り系, git status/log/diff)のみ通る。",
   },
   {
     id: "Read",
@@ -296,8 +295,12 @@ export function SettingsPanel({
     const next = AI_TOOL_CATALOG.filter((t) => current.has(t.id)).map(
       (t) => t.id,
     );
-    onUpdateAIConfig({ allowedTools: next });
+    onUpdateAIConfig({ ...aiConfig, allowedTools: next });
   };
+  const toggleGhApi = (enabled: boolean) => {
+    onUpdateAIConfig({ ...aiConfig, allowGhApi: enabled });
+  };
+  const bashEnabled = aiConfig.allowedTools.includes("Bash");
   return (
     <div className="settings-panel">
       <div className="page-head">
@@ -395,6 +398,33 @@ export function SettingsPanel({
                         <div className="ai-tool-warning">
                           ⚠ {tool.warning}
                         </div>
+                      )}
+                      {tool.id === "Bash" && (
+                        <label
+                          className="ai-tool-suboption"
+                          style={{
+                            opacity: bashEnabled ? 1 : 0.5,
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={aiConfig.allowGhApi}
+                            disabled={!bashEnabled}
+                            onChange={(e) => toggleGhApi(e.target.checked)}
+                          />
+                          <div>
+                            <div className="ai-tool-name">
+                              gh api を許可
+                            </div>
+                            <div className="ai-tool-desc">
+                              GitHub REST API への直接アクセス (gh api ...) を
+                              追加で許可します。
+                            </div>
+                            <div className="ai-tool-warning">
+                              ⚠ POST/PATCH/DELETE を含む任意の API 呼び出しが可能になります。
+                            </div>
+                          </div>
+                        </label>
                       )}
                     </div>
                   </label>

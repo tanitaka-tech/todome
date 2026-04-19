@@ -183,6 +183,10 @@ Browser (React)                         Server (FastAPI)
 └──────────────────┘                   └──────────────────┘
 ```
 
+## Special Thanks
+
+See [docs/special-thanks.md](docs/special-thanks.md) for references that helped shape todome.
+
 ## License
 
 MIT

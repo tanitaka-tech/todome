@@ -14,6 +14,7 @@ from server import (
     _ensure_kpi_ids,
     _ensure_task_fields,
     _find_time_kpi,
+    _is_bash_command_allowed,
     _is_goal_all_kpis_achieved,
     _is_valid_hhmm,
     _merge_retro_document,
@@ -181,7 +182,8 @@ class TestNormalizeAIConfig:
     def test_keeps_valid_tools(self):
         cfg = {"allowedTools": ["TodoWrite", "Bash", "Read"]}
         assert _normalize_ai_config(cfg) == {
-            "allowedTools": ["TodoWrite", "Bash", "Read"]
+            "allowedTools": ["TodoWrite", "Bash", "Read"],
+            "allowGhApi": False,
         }
 
     def test_drops_unknown_tools(self):
@@ -194,7 +196,10 @@ class TestNormalizeAIConfig:
 
     def test_empty_list_is_empty(self):
         # 空リストは「全部オフ」を許容する
-        assert _normalize_ai_config({"allowedTools": []}) == {"allowedTools": []}
+        assert _normalize_ai_config({"allowedTools": []}) == {
+            "allowedTools": [],
+            "allowGhApi": False,
+        }
 
     def test_missing_key_uses_defaults(self):
         assert _normalize_ai_config({})["allowedTools"] == list(
@@ -212,6 +217,85 @@ class TestNormalizeAIConfig:
     def test_non_string_entries_ignored(self):
         cfg = {"allowedTools": [1, None, "TodoWrite"]}
         assert _normalize_ai_config(cfg)["allowedTools"] == ["TodoWrite"]
+
+    def test_allow_gh_api_defaults_false(self):
+        assert _normalize_ai_config({"allowedTools": ["Bash"]})["allowGhApi"] is False
+
+    def test_allow_gh_api_true_preserved(self):
+        result = _normalize_ai_config(
+            {"allowedTools": ["Bash"], "allowGhApi": True}
+        )
+        assert result["allowGhApi"] is True
+
+    def test_allow_gh_api_coerced_to_bool(self):
+        # 文字列など truthy な値は True に丸める
+        result = _normalize_ai_config(
+            {"allowedTools": ["Bash"], "allowGhApi": "yes"}
+        )
+        assert result["allowGhApi"] is True
+
+
+class TestIsBashCommandAllowed:
+    def test_allows_gh_issue_list(self):
+        assert _is_bash_command_allowed(
+            "gh issue list -R owner/repo --state open", allow_gh_api=False
+        )
+
+    def test_allows_git_log_with_args(self):
+        assert _is_bash_command_allowed(
+            "git log --oneline -n 5", allow_gh_api=False
+        )
+
+    def test_rejects_rm(self):
+        assert not _is_bash_command_allowed("rm -rf /", allow_gh_api=False)
+
+    def test_rejects_gh_api_by_default(self):
+        assert not _is_bash_command_allowed(
+            "gh api /repos/owner/repo", allow_gh_api=False
+        )
+
+    def test_allows_gh_api_when_toggle_on(self):
+        assert _is_bash_command_allowed(
+            "gh api /repos/owner/repo", allow_gh_api=True
+        )
+
+    def test_rejects_shell_metacharacters(self):
+        assert not _is_bash_command_allowed(
+            "gh issue list; rm -rf /", allow_gh_api=False
+        )
+
+    def test_rejects_command_substitution(self):
+        assert not _is_bash_command_allowed(
+            "git log $(whoami)", allow_gh_api=False
+        )
+
+    def test_rejects_pipe(self):
+        assert not _is_bash_command_allowed(
+            "gh issue list | head", allow_gh_api=False
+        )
+
+    def test_rejects_redirect(self):
+        assert not _is_bash_command_allowed(
+            "git log > /tmp/out", allow_gh_api=False
+        )
+
+    def test_rejects_empty(self):
+        assert not _is_bash_command_allowed("", allow_gh_api=False)
+        assert not _is_bash_command_allowed("   ", allow_gh_api=False)
+
+    def test_rejects_non_string(self):
+        assert not _is_bash_command_allowed(None, allow_gh_api=False)
+        assert not _is_bash_command_allowed(123, allow_gh_api=False)
+
+    def test_rejects_partial_match(self):
+        # "gh issue" だけでは許可されない（list/view のどちらも必要）
+        assert not _is_bash_command_allowed("gh issue", allow_gh_api=False)
+
+    def test_rejects_unbalanced_quotes(self):
+        # shlex が失敗するケース
+        assert not _is_bash_command_allowed(
+            'gh issue list "unclosed', allow_gh_api=False
+        )
 
 
 class TestComputeRetroPeriod:
