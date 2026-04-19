@@ -204,13 +204,53 @@ def save_profile(profile: ProfileData) -> None:
 RetrospectiveData = dict[str, Any]
 
 
+def _migrate_retro_document(doc: dict[str, Any]) -> dict[str, Any]:
+    """旧スキーマを新スキーマ (did/learned/next/dayRating) にマップして返す。
+
+    - 旧テキストキー (findings/improvements/idealState/actions) → did/learned/next に合流
+      - findings → learned
+      - improvements + idealState + actions → next
+    - 旧数値キー energy → dayRating
+    既に新スキーマを持つドキュメントはそのまま。
+    """
+    migrated = dict(doc)
+    migrated.setdefault("did", "")
+    migrated.setdefault("learned", "")
+    migrated.setdefault("next", "")
+    migrated.setdefault("completedTasks", doc.get("completedTasks", []))
+
+    if "dayRating" not in migrated:
+        legacy_energy = doc.get("energy")
+        if isinstance(legacy_energy, (int, float)):
+            migrated["dayRating"] = int(legacy_energy)
+        else:
+            migrated["dayRating"] = 0
+    migrated.pop("energy", None)
+
+    legacy_keys = ("findings", "improvements", "idealState", "actions")
+    if any(k in doc for k in legacy_keys):
+        findings = (doc.get("findings") or "").strip()
+        improvements = (doc.get("improvements") or "").strip()
+        ideal_state = (doc.get("idealState") or "").strip()
+        actions = (doc.get("actions") or "").strip()
+        if not migrated["learned"] and findings:
+            migrated["learned"] = findings
+        next_parts = [p for p in (improvements, ideal_state, actions) if p]
+        if not migrated["next"] and next_parts:
+            migrated["next"] = "\n\n".join(next_parts)
+        for k in legacy_keys:
+            migrated.pop(k, None)
+    return migrated
+
+
 def _retro_row_to_dict(row: sqlite3.Row) -> RetrospectiveData:
+    doc = json.loads(row["document"])
     return {
         "id": row["id"],
         "type": row["type"],
         "periodStart": row["period_start"],
         "periodEnd": row["period_end"],
-        "document": json.loads(row["document"]),
+        "document": _migrate_retro_document(doc),
         "messages": json.loads(row["messages"]),
         "aiComment": row["ai_comment"] or "",
         "completedAt": row["completed_at"] or "",
@@ -941,15 +981,23 @@ def _strip_retrodoc_block(text: str) -> tuple[str, dict[str, Any] | None]:
     return cleaned, parsed
 
 
+RETRO_DOC_TEXT_KEYS = ("did", "learned", "next")
+
+
 def _merge_retro_document(
     current: dict[str, Any], updates: dict[str, Any]
 ) -> dict[str, Any]:
     """AIからの更新を現在のドキュメントにマージ。想定フィールドのみ受け付ける。"""
     merged = dict(current)
-    for key in ("findings", "improvements", "idealState", "actions"):
+    for key in RETRO_DOC_TEXT_KEYS:
         val = updates.get(key)
         if isinstance(val, str):
             merged[key] = val.strip()
+    day_rating = updates.get("dayRating")
+    if isinstance(day_rating, (int, float)):
+        iv = int(day_rating)
+        if 0 <= iv <= 10:
+            merged["dayRating"] = iv
     return merged
 
 
@@ -985,38 +1033,63 @@ def _build_retro_system_prompt(
     )
     doc = retro["document"]
     type_label = RETRO_TYPE_LABEL.get(retro["type"], "振り返り")
-    current_doc_json = json.dumps(
-        {
-            "findings": doc.get("findings", ""),
-            "improvements": doc.get("improvements", ""),
-            "idealState": doc.get("idealState", ""),
-            "actions": doc.get("actions", ""),
-        },
-        ensure_ascii=False,
-    )
+    is_daily = retro["type"] == "daily"
+    doc_snapshot: dict[str, Any] = {
+        "did": doc.get("did", ""),
+        "learned": doc.get("learned", ""),
+        "next": doc.get("next", ""),
+    }
+    if is_daily:
+        doc_snapshot["dayRating"] = int(doc.get("dayRating") or 0)
+    current_doc_json = json.dumps(doc_snapshot, ensure_ascii=False)
+
+    rating_section = ""
+    rating_format_hint = ""
+    if is_daily:
+        rating_section = (
+            "4. 今日の評価 (dayRating): 今日を 1〜10 の整数で自己評価する "
+            "(1=最悪, 10=最高)。未評価は 0。\n"
+        )
+        rating_format_hint = (
+            '- dayRating は整数値 (1〜10, 未評価なら 0) を数値で入れる\n'
+        )
+        retrodoc_example = (
+            '<retrodoc>{{"did":"...","learned":"...","next":"...","dayRating":0}}</retrodoc>'
+        )
+        opening_hint = (
+            "- 冒頭メッセージでは簡単に挨拶し、まず今日やったこと・印象的だった出来事を尋ねる。"
+            "対話の中で自然に「今日を 1〜10 で評価すると？」も確認する"
+        )
+    else:
+        retrodoc_example = (
+            '<retrodoc>{{"did":"...","learned":"...","next":"..."}}</retrodoc>'
+        )
+        opening_hint = (
+            "- 冒頭メッセージでは簡単に挨拶し、まずこの期間にやったこと・印象的だった出来事を尋ねる"
+        )
+
     return f"""\
 あなたはユーザーの{type_label}を伴走するコーチAIです。
 対象期間: {retro['periodStart']} 〜 {retro['periodEnd']}
 
 ## 役割
-ユーザーに温かく寄り添い、下記4観点を順番に深掘りしながら振り返りを構造化してください。
-1. 気づいたこと (findings): 期間内に起きた出来事・感じたこと
-2. 改善点 (improvements): 気づきから派生する具体的な改善アクション
-3. 次のどうなっていたら最高か？ (idealState): 理想の状態・ゴールイメージ
-4. そのためにやること・辞めること (actions): 具体アクション (やる / 辞める)
-
+ユーザーに温かく寄り添い、下記の観点を順番に深掘りしながら振り返りを構造化してください (YWT形式)。
+1. やったこと (did): 期間内に実際にやったこと・起きた出来事・達成したこと
+2. わかったこと (learned): そこから得られた気づき・学び・うまくいった/いかなかった原因
+3. 次やること (next): 次の期間で取り組むアクション (やる / 辞める の両方を含めて良い)
+{rating_section}
 ## 対話の進め方
 - 一度に1〜2個の質問だけに絞る
 - ユーザーの回答を受け、該当セクションのドキュメントを更新する
 - 全観点がある程度埋まったら、「いつでも完了ボタンを押して終了できます」とユーザーに伝える
-- 冒頭メッセージでは簡単に挨拶し、まずは気づいたこと・印象的だった出来事を尋ねる
+{opening_hint}
 
 ## 応答フォーマット (厳守)
 毎回の応答の最後に、必ず以下のタグでドキュメントの最新状態を返すこと:
-<retrodoc>{{"findings":"...","improvements":"...","idealState":"...","actions":"..."}}</retrodoc>
+{retrodoc_example}
 
 - 値は Markdown 箇条書き (- ...) 推奨。空欄の場合は "" のまま返す
-- 既存の内容を削らず、必要に応じて追記・整理する
+{rating_format_hint}- 既存の内容を削らず、必要に応じて追記・整理する
 - ユーザーの発言を勝手に広げすぎず、事実ベースで要約する
 
 ## 現時点のドキュメント
@@ -1033,7 +1106,7 @@ def _retro_welcome_text(retro_type: str, period_start: str, period_end: str) -> 
     label = RETRO_TYPE_LABEL.get(retro_type, "振り返り")
     return (
         f"{label}をはじめましょう ({period_start} 〜 {period_end})。\n\n"
-        "まずは、この期間で印象に残った出来事や気づいたことを教えてください。"
+        "まずは、この期間で実際にやったことや印象に残った出来事を教えてください。"
     )
 
 
@@ -1122,12 +1195,11 @@ async def run_retro_turn(
         new_retro["document"] = merged
 
     # ドキュメントが空のままの場合は DB に保存せず、ドラフト化しない。
-    # (findings/improvements/idealState/actions のいずれかに内容が入ったら永続化)
+    # (did/learned/next のいずれかに内容、または dayRating が設定されたら永続化)
     doc_for_check = new_retro["document"]
     has_content = any(
-        (doc_for_check.get(k) or "").strip()
-        for k in ("findings", "improvements", "idealState", "actions")
-    )
+        (doc_for_check.get(k) or "").strip() for k in RETRO_DOC_TEXT_KEYS
+    ) or bool(doc_for_check.get("dayRating"))
     if has_content:
         save_retro(new_retro)
         schedule_autosync()
@@ -1156,16 +1228,14 @@ async def finalize_retro(
         doc.get("completedTasks", []), tasks, goals
     )
     type_label = RETRO_TYPE_LABEL.get(retro["type"], "振り返り")
-    doc_text = json.dumps(
-        {
-            "findings": doc.get("findings", ""),
-            "improvements": doc.get("improvements", ""),
-            "idealState": doc.get("idealState", ""),
-            "actions": doc.get("actions", ""),
-        },
-        ensure_ascii=False,
-        indent=2,
-    )
+    doc_snapshot: dict[str, Any] = {
+        "did": doc.get("did", ""),
+        "learned": doc.get("learned", ""),
+        "next": doc.get("next", ""),
+    }
+    if retro["type"] == "daily":
+        doc_snapshot["dayRating"] = int(doc.get("dayRating") or 0)
+    doc_text = json.dumps(doc_snapshot, ensure_ascii=False, indent=2)
 
     system_prompt = (
         f"あなたはユーザーの{type_label}に対して、総評コメントを書くコーチAIです。\n"
@@ -1618,10 +1688,10 @@ async def websocket_endpoint(ws: WebSocket):
                         "periodStart": period_start,
                         "periodEnd": period_end,
                         "document": {
-                            "findings": "",
-                            "improvements": "",
-                            "idealState": "",
-                            "actions": "",
+                            "did": "",
+                            "learned": "",
+                            "next": "",
+                            "dayRating": 0,
                             "completedTasks": completed_ids,
                         },
                         "messages": [
@@ -1762,16 +1832,17 @@ async def websocket_endpoint(ws: WebSocket):
 
                 doc_update = data.get("document")
                 if isinstance(doc_update, dict):
-                    for key in (
-                        "findings",
-                        "improvements",
-                        "idealState",
-                        "actions",
-                    ):
+                    for key in RETRO_DOC_TEXT_KEYS:
                         if key in doc_update and isinstance(
                             doc_update[key], str
                         ):
                             updated["document"][key] = doc_update[key]
+                    if "dayRating" in doc_update:
+                        ev = doc_update.get("dayRating")
+                        if isinstance(ev, (int, float)):
+                            iv = int(ev)
+                            if 0 <= iv <= 10:
+                                updated["document"]["dayRating"] = iv
 
                 ai_comment_update = data.get("aiComment")
                 if isinstance(ai_comment_update, str):
@@ -1782,15 +1853,14 @@ async def websocket_endpoint(ws: WebSocket):
                 )
 
                 doc_for_check = updated["document"]
-                has_content = any(
-                    (doc_for_check.get(k) or "").strip()
-                    for k in (
-                        "findings",
-                        "improvements",
-                        "idealState",
-                        "actions",
+                has_content = (
+                    any(
+                        (doc_for_check.get(k) or "").strip()
+                        for k in RETRO_DOC_TEXT_KEYS
                     )
-                ) or bool((updated.get("aiComment") or "").strip())
+                    or bool(doc_for_check.get("dayRating"))
+                    or bool((updated.get("aiComment") or "").strip())
+                )
 
                 was_persisted = get_retro(rid) is not None
 

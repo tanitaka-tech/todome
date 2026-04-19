@@ -18,9 +18,10 @@ interface Props {
   onDelete: (retroId: string) => void;
   onEditField: (
     retroId: string,
-    key: "findings" | "improvements" | "idealState" | "actions" | "aiComment",
+    key: "did" | "learned" | "next" | "aiComment",
     value: string,
   ) => void;
+  onEditDayRating: (retroId: string, value: number) => void;
 }
 
 const RETRO_TABS: { id: RetroType; label: string }[] = [
@@ -42,8 +43,13 @@ function summaryFromRetro(r: Retrospective): string {
     const s = r.aiComment.trim().replace(/\s+/g, " ");
     return s.length > 90 ? s.slice(0, 88) + "…" : s;
   }
-  if (r.document.findings) {
-    const s = r.document.findings.trim().replace(/\s+/g, " ");
+  const firstText =
+    (r.document.did && r.document.did.trim()) ||
+    (r.document.learned && r.document.learned.trim()) ||
+    (r.document.next && r.document.next.trim()) ||
+    "";
+  if (firstText) {
+    const s = firstText.replace(/\s+/g, " ");
     return s.length > 90 ? s.slice(0, 88) + "…" : s;
   }
   return "(まだ内容がありません)";
@@ -68,6 +74,7 @@ export function RetroPanel({
   onDiscardDraft,
   onDelete,
   onEditField,
+  onEditDayRating,
 }: Props) {
   const [tab, setTab] = useState<RetroType>("weekly");
   const [discardTarget, setDiscardTarget] = useState<Retrospective | null>(
@@ -115,6 +122,7 @@ export function RetroPanel({
         onComplete={onComplete}
         onClose={onCloseSession}
         onEditField={onEditField}
+        onEditDayRating={onEditDayRating}
       />
     );
   }

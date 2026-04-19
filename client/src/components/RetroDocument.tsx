@@ -1,19 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { KanbanTask, RetroDocument as RetroDocumentT } from "../types";
+import type { KanbanTask, RetroDocument as RetroDocumentT, RetroType } from "../types";
 
-type DocFieldKey = "findings" | "improvements" | "idealState" | "actions";
+type DocFieldKey = "did" | "learned" | "next";
 type EditableKey = DocFieldKey | "aiComment";
 
 interface Props {
   document: RetroDocumentT;
+  retroType: RetroType;
   tasks: KanbanTask[];
   aiComment?: string;
   periodStart: string;
   periodEnd: string;
   typeLabel: string;
   onEditField?: (key: EditableKey, value: string) => void;
+  onEditDayRating?: (value: number) => void;
 }
 
 const SECTIONS: {
@@ -22,24 +24,19 @@ const SECTIONS: {
   placeholder: string;
 }[] = [
   {
-    key: "findings",
-    label: "気づいたこと",
-    placeholder: "AI との対話を通じて、期間内の出来事や感じたことが整理されます。",
+    key: "did",
+    label: "やったこと",
+    placeholder: "期間内に実際にやったこと・起きた出来事。",
   },
   {
-    key: "improvements",
-    label: "改善点",
-    placeholder: "気づきから派生する具体的な改善アクション。",
+    key: "learned",
+    label: "わかったこと",
+    placeholder: "気づき・学び・うまくいった / いかなかった原因。",
   },
   {
-    key: "idealState",
-    label: "次のどうなっていたら最高か？",
-    placeholder: "理想の状態・ゴールイメージ。",
-  },
-  {
-    key: "actions",
-    label: "そのためにやること・辞めること",
-    placeholder: "やること / 辞めること。",
+    key: "next",
+    label: "次やること",
+    placeholder: "次の期間で取り組むアクション (やる / 辞める)。",
   },
 ];
 
@@ -136,18 +133,68 @@ function EditableMarkdownSection({
   );
 }
 
+function DayRatingSlider({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange?: (v: number) => void;
+}) {
+  const readonly = !onChange;
+  const rated = value > 0;
+  const sliderValue = rated ? value : 5;
+  return (
+    <div className="retro-rating">
+      <div className="retro-rating-row">
+        <span className="retro-rating-end">1</span>
+        <input
+          type="range"
+          className="retro-rating-slider"
+          min={1}
+          max={10}
+          step={1}
+          value={sliderValue}
+          disabled={readonly}
+          onChange={(e) => onChange?.(Number(e.target.value))}
+          aria-label="今日の評価"
+        />
+        <span className="retro-rating-end">10</span>
+      </div>
+      <div className="retro-rating-meta">
+        <span
+          className={`retro-rating-value${rated ? "" : " retro-rating-value--unset"}`}
+        >
+          {rated ? `${value} / 10` : "未評価"}
+        </span>
+        {rated && !readonly && (
+          <button
+            type="button"
+            className="retro-rating-clear"
+            onClick={() => onChange?.(0)}
+          >
+            クリア
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function RetroDocumentView({
   document,
+  retroType,
   tasks,
   aiComment,
   periodStart,
   periodEnd,
   typeLabel,
   onEditField,
+  onEditDayRating,
 }: Props) {
   const completedTasks = tasks.filter((t) =>
     document.completedTasks.includes(t.id),
   );
+  const isDaily = retroType === "daily";
 
   return (
     <div className="retro-doc">
@@ -157,6 +204,18 @@ export function RetroDocumentView({
           {periodStart} 〜 {periodEnd}
         </div>
       </div>
+
+      {isDaily && (
+        <section className="retro-doc-section">
+          <h3 className="retro-doc-section-title">今日の評価</h3>
+          <div className="retro-doc-section-body">
+            <DayRatingSlider
+              value={document.dayRating || 0}
+              onChange={onEditDayRating}
+            />
+          </div>
+        </section>
+      )}
 
       {SECTIONS.map((s) => (
         <section key={s.key} className="retro-doc-section">

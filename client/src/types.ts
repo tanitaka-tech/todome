@@ -150,10 +150,10 @@ export interface RepoInfo {
 export type RetroType = "daily" | "weekly" | "monthly" | "yearly";
 
 export interface RetroDocument {
-  findings: string;
-  improvements: string;
-  idealState: string;
-  actions: string;
+  did: string;
+  learned: string;
+  next: string;
+  dayRating: number; // 1-10, 0 = 未評価 (主に daily で使用)
   completedTasks: string[];
 }
 

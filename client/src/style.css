@@ -4468,3 +4468,58 @@ body {
   justify-content: flex-end;
   gap: 8px;
 }
+
+.retro-rating {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.retro-rating-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.retro-rating-end {
+  font-size: 11px;
+  color: var(--fg-muted);
+  min-width: 12px;
+  text-align: center;
+}
+.retro-rating-slider {
+  flex: 1;
+  accent-color: var(--accent, #4c8cf5);
+  cursor: pointer;
+}
+.retro-rating-slider:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.retro-rating-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+}
+.retro-rating-value {
+  font-weight: 600;
+  color: var(--fg);
+}
+.retro-rating-value--unset {
+  color: var(--fg-muted);
+  font-weight: 400;
+  font-style: italic;
+}
+.retro-rating-clear {
+  font-size: 11px;
+  color: var(--fg-muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.retro-rating-clear:hover {
+  background: var(--surface-hover, rgba(127, 127, 127, 0.08));
+  color: var(--fg);
+}

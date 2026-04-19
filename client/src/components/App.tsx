@@ -274,10 +274,10 @@ export function App() {
           }
           const doc = msg.retro.document;
           const hasContent = !!(
-            doc.findings.trim() ||
-            doc.improvements.trim() ||
-            doc.idealState.trim() ||
-            doc.actions.trim() ||
+            doc.did.trim() ||
+            doc.learned.trim() ||
+            doc.next.trim() ||
+            doc.dayRating ||
             msg.retro.aiComment.trim()
           );
           return hasContent ? [msg.retro, ...prev] : prev;
@@ -592,7 +592,7 @@ export function App() {
   const handleRetroEditField = useCallback(
     (
       retroId: string,
-      key: "findings" | "improvements" | "idealState" | "actions" | "aiComment",
+      key: "did" | "learned" | "next" | "aiComment",
       value: string,
     ) => {
       setRetros((prev) =>
@@ -616,6 +616,30 @@ export function App() {
           document: { [key]: value },
         });
       }
+    },
+    [send],
+  );
+
+  const handleRetroEditDayRating = useCallback(
+    (retroId: string, value: number) => {
+      const clamped = Math.max(0, Math.min(10, Math.round(value)));
+      setRetros((prev) =>
+        prev.map((r) =>
+          r.id === retroId
+            ? { ...r, document: { ...r.document, dayRating: clamped } }
+            : r,
+        ),
+      );
+      setActiveRetro((prev) =>
+        prev && prev.id === retroId
+          ? { ...prev, document: { ...prev.document, dayRating: clamped } }
+          : prev,
+      );
+      send({
+        type: "retro_edit_document",
+        retroId,
+        document: { dayRating: clamped },
+      });
     },
     [send],
   );
@@ -761,6 +785,7 @@ export function App() {
             onDiscardDraft={handleRetroDiscardDraft}
             onDelete={handleRetroDelete}
             onEditField={handleRetroEditField}
+            onEditDayRating={handleRetroEditDayRating}
           />
         ) : activeView === "stats" ? (
           <StatsPanel tasks={tasks} goals={goals} tick={tick} />

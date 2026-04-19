@@ -19,9 +19,10 @@ interface Props {
   onClose: () => void;
   onEditField: (
     retroId: string,
-    key: "findings" | "improvements" | "idealState" | "actions" | "aiComment",
+    key: "did" | "learned" | "next" | "aiComment",
     value: string,
   ) => void;
+  onEditDayRating: (retroId: string, value: number) => void;
 }
 
 export function RetroSession({
@@ -34,6 +35,7 @@ export function RetroSession({
   onComplete,
   onClose,
   onEditField,
+  onEditDayRating,
 }: Props) {
   const [input, setInput] = useState("");
   const flowRef = useRef<HTMLDivElement>(null);
@@ -173,12 +175,14 @@ export function RetroSession({
         <div className="retro-doc-pane">
           <RetroDocumentView
             document={retro.document}
+            retroType={retro.type}
             tasks={tasks}
             aiComment={retro.aiComment}
             periodStart={retro.periodStart}
             periodEnd={retro.periodEnd}
             typeLabel={typeLabel}
             onEditField={(key, value) => onEditField(retro.id, key, value)}
+            onEditDayRating={(v) => onEditDayRating(retro.id, v)}
           />
         </div>
       </div>
