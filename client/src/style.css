@@ -556,6 +556,13 @@ body {
   font-size: 14px;
   letter-spacing: -0.02em;
   flex-shrink: 0;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 0.12s ease, filter 0.12s ease;
+}
+.sidebar-brand-mark:hover {
+  transform: scale(1.06);
+  filter: brightness(1.1);
 }
 
 .sidebar-nav {
