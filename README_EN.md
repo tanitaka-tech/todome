@@ -10,9 +10,11 @@
 - **Profile definition** — Reflects your current state, balance wheel, principles, and wishes into the AI context
 - **GitHub sync** — Share data across devices & link repositories to goals to feed the AI context ([Terms of Service notes](docs/github-sync-compliance.md))
 
-| Task management with Kanban | Leave task management to AI | Retrospective with AI | Switch themes to change mood |
-|:---:|:---:|:---:|:---:|
-| ![Task management with Kanban](docs/manual/assets/animations/celebration.webp) | ![Leave task management to AI](docs/manual/assets/animations/chat-ai.webp) | ![Retrospective with AI](docs/manual/assets/animations/retro-ai.webp) | ![Switch themes to change mood](docs/manual/assets/animations/theme-switch.webp) |
+| Task management with Kanban | Leave task management to AI | Plan goals and tasks with AI |
+|:---:|:---:|:---:|
+| ![Task management with Kanban](docs/manual/assets/animations/celebration.webp) | ![Leave task management to AI](docs/manual/assets/animations/chat-ai.webp) | ![Plan goals and tasks with AI](docs/manual/assets/animations/goal-ai.webp) |
+| **Retrospective with AI** | **Switch themes to change mood** | **Git-backed history** |
+| ![Retrospective with AI](docs/manual/assets/animations/retro-ai.webp) | ![Switch themes to change mood](docs/manual/assets/animations/theme-switch.webp) | ![Git-backed history](docs/manual/assets/animations/git-history.webp) |
 
 ## Concept
 

@@ -332,6 +332,250 @@ test.describe("画面説明書ハイライト用アニメーション", () => {
     );
   });
 
+  test("goal-ai — 目標タブで AI が目標と当日のタスクを作る", async ({ page }) => {
+    await gotoStubbedApp(page);
+    await hydrateBaseline(page, { tasks: [], goals: [] });
+    await clickNav(page, "目標");
+    await expect(
+      page.getByRole("heading", { name: "目標", level: 1 }),
+    ).toBeVisible();
+    await expect(page.locator(".chat-panel")).toBeVisible();
+
+    const demoGoal = {
+      id: "g-demo-weight",
+      name: "3ヶ月で10kg減量",
+      memo: "健康的に、無理のないペースで",
+      kpis: [
+        {
+          id: "k-exercise",
+          name: "週あたり運動日数",
+          unit: "number",
+          targetValue: 4,
+          currentValue: 0,
+        },
+        {
+          id: "k-log",
+          name: "食事記録継続日数",
+          unit: "number",
+          targetValue: 90,
+          currentValue: 0,
+        },
+      ],
+      deadline: "2026-07-20",
+      achieved: false,
+      achievedAt: "",
+      icon: "💪",
+    };
+
+    const demoTasks = [
+      {
+        id: "t-walk",
+        title: "朝のウォーキング30分",
+        description: "",
+        column: "todo",
+        priority: "high",
+        memo: "",
+        goalId: "g-demo-weight",
+        estimatedMinutes: 30,
+        timeSpent: 0,
+        timerStartedAt: "",
+        completedAt: "",
+        timeLogs: [],
+      },
+      {
+        id: "t-meal",
+        title: "今日の食事を記録する",
+        description: "",
+        column: "todo",
+        priority: "medium",
+        memo: "",
+        goalId: "g-demo-weight",
+        estimatedMinutes: 10,
+        timeSpent: 0,
+        timerStartedAt: "",
+        completedAt: "",
+        timeLogs: [],
+      },
+      {
+        id: "t-weigh",
+        title: "体重計に乗る(朝)",
+        description: "",
+        column: "todo",
+        priority: "medium",
+        memo: "",
+        goalId: "g-demo-weight",
+        estimatedMinutes: 2,
+        timeSpent: 0,
+        timerStartedAt: "",
+        completedAt: "",
+        timeLogs: [],
+      },
+    ];
+
+    const goalAddContent =
+      'GOAL_ADD:{"name":"3ヶ月で10kg減量","memo":"健康的に、無理のないペースで","kpis":[{"name":"週あたり運動日数","unit":"number","targetValue":4,"currentValue":0},{"name":"食事記録継続日数","unit":"number","targetValue":90,"currentValue":0}],"deadline":"2026-07-20"}';
+
+    const sendFirst = async (p: Page) => {
+      const input = p.locator(".chat-input");
+      await input.click();
+      await input.fill("3ヶ月後までに10kg痩せたいから目標とKPIを作って");
+    };
+    const clickSend = async (p: Page) => {
+      await p.locator(".chat-send").click();
+    };
+    const sendSecond = async (p: Page) => {
+      const input = p.locator(".chat-input");
+      await input.click();
+      await input.fill("この目標に向けて今日から始められるタスクを作成して");
+    };
+    const gotoBoard = async (p: Page) => {
+      await clickNav(p, "ボード");
+    };
+
+    await captureLoop(
+      page,
+      "goal-ai",
+      13000,
+      10,
+      { x: 0, y: 0, width: 1440, height: 860 },
+      [
+        { at: 300, action: sendFirst },
+        { at: 1100, action: clickSend },
+        {
+          at: 1400,
+          msg: {
+            type: "thinking_delta",
+            text: "3ヶ月で10kg減量なら、運動と食事記録のKPIが妥当そう。",
+          },
+        },
+        {
+          at: 1900,
+          msg: {
+            type: "stream_delta",
+            text: "「3ヶ月で10kg減量」を、",
+          },
+        },
+        {
+          at: 2300,
+          msg: {
+            type: "stream_delta",
+            text: "週あたり運動日数と食事記録継続日数のKPIで追加します。",
+          },
+        },
+        {
+          at: 2800,
+          msg: {
+            type: "tool_use",
+            name: "TodoWrite",
+            input: {
+              todos: [
+                {
+                  content: goalAddContent,
+                  status: "completed",
+                  activeForm: "目標を追加",
+                },
+              ],
+            },
+          },
+        },
+        {
+          at: 3300,
+          msg: { type: "goal_sync", goals: [demoGoal] },
+        },
+        {
+          at: 3800,
+          msg: {
+            type: "assistant",
+            text: "「3ヶ月で10kg減量」を追加しました。",
+            toolCalls: [],
+          },
+        },
+        {
+          at: 4200,
+          msg: {
+            type: "result",
+            result: "ok",
+            cost: 0.004,
+            turns: 1,
+            sessionId: "demo-goal",
+          },
+        },
+        { at: 4900, action: sendSecond },
+        { at: 5800, action: clickSend },
+        {
+          at: 6100,
+          msg: {
+            type: "thinking_delta",
+            text: "今日から無理なく始められる3つに絞る。",
+          },
+        },
+        {
+          at: 6600,
+          msg: {
+            type: "stream_delta",
+            text: "今日から始められるタスクを ",
+          },
+        },
+        {
+          at: 7000,
+          msg: {
+            type: "stream_delta",
+            text: "3 件追加します。",
+          },
+        },
+        {
+          at: 7500,
+          msg: {
+            type: "tool_use",
+            name: "TodoWrite",
+            input: {
+              todos: [
+                {
+                  content: "[HIGH] 朝のウォーキング30分",
+                  status: "pending",
+                  activeForm: "朝のウォーキング30分",
+                },
+                {
+                  content: "[MEDIUM] 今日の食事を記録する",
+                  status: "pending",
+                  activeForm: "今日の食事を記録する",
+                },
+                {
+                  content: "[MEDIUM] 体重計に乗る(朝)",
+                  status: "pending",
+                  activeForm: "体重計に乗る(朝)",
+                },
+              ],
+            },
+          },
+        },
+        {
+          at: 8000,
+          msg: { type: "kanban_sync", tasks: demoTasks },
+        },
+        {
+          at: 8500,
+          msg: {
+            type: "assistant",
+            text: "タスクを 3 件追加しました。",
+            toolCalls: [],
+          },
+        },
+        {
+          at: 8900,
+          msg: {
+            type: "result",
+            result: "ok",
+            cost: 0.003,
+            turns: 1,
+            sessionId: "demo-goal-tasks",
+          },
+        },
+        { at: 10200, action: gotoBoard },
+      ],
+    );
+  });
+
   test("theme-switch — 設定画面でテーマを切り替えると全体の色味が変わる", async ({
     page,
   }) => {
