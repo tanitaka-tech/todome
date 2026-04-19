@@ -205,7 +205,11 @@ def load_tasks() -> list[KanbanTask]:
         rows = conn.execute(
             "SELECT data FROM kanban_tasks ORDER BY sort_order"
         ).fetchall()
-    return [json.loads(r["data"]) for r in rows]
+    tasks = [json.loads(r["data"]) for r in rows]
+    for t in tasks:
+        t.setdefault("kpiId", "")
+        t["kpiContributed"] = bool(t.get("kpiContributed", False))
+    return tasks
 
 
 def save_tasks(tasks: list[KanbanTask]) -> None:
@@ -673,7 +677,7 @@ def _ensure_kpi_ids(kpis: list[dict]) -> list[dict]:
         if not kpi.get("id"):
             kpi["id"] = _short_id()
         unit = kpi.get("unit")
-        if unit not in ("number", "percent"):
+        if unit not in ("number", "percent", "time"):
             kpi["unit"] = "number"
         try:
             kpi["targetValue"] = max(0, int(round(float(kpi.get("targetValue", 0) or 0))))
@@ -687,6 +691,13 @@ def _ensure_kpi_ids(kpis: list[dict]) -> list[dict]:
             kpi["currentValue"] = 0
         kpi.pop("value", None)
     return kpis
+
+
+def _ensure_task_fields(task: dict) -> dict:
+    """既存タスクに kpiId / kpiContributed を補完する(マイグレーション用)。"""
+    task.setdefault("kpiId", "")
+    task["kpiContributed"] = bool(task.get("kpiContributed", False))
+    return task
 
 
 _REPO_NAME_WITH_OWNER_RE = re.compile(r"^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$")
@@ -732,6 +743,69 @@ def _sync_goal_achievement(goal: dict) -> dict:
         goal["achieved"] = False
         goal["achievedAt"] = ""
     return goal
+
+
+def _find_time_kpi(goals: list[dict], goal_id: str, kpi_id: str) -> dict | None:
+    """goal_id + kpi_id で unit=time の KPI を探す。見つからなければ None。"""
+    if not goal_id or not kpi_id:
+        return None
+    for g in goals:
+        if g.get("id") != goal_id:
+            continue
+        for k in g.get("kpis", []):
+            if k.get("id") == kpi_id and k.get("unit") == "time":
+                return k
+        return None
+    return None
+
+
+def _apply_kpi_time_delta(
+    goals: list[dict], goal_id: str, kpi_id: str, delta_seconds: int
+) -> bool:
+    """対象 KPI の currentValue に delta_seconds を加算し、0 未満にはクリップ。
+
+    加算が実施されたら goals を書き換え、目標の達成状態を再同期する。
+    戻り値: 実際に加算した場合 True。
+    """
+    kpi = _find_time_kpi(goals, goal_id, kpi_id)
+    if kpi is None or delta_seconds == 0:
+        return False
+    kpi["currentValue"] = max(0, int(kpi.get("currentValue", 0) or 0) + int(delta_seconds))
+    for g in goals:
+        if g.get("id") == goal_id:
+            _sync_goal_achievement(g)
+            break
+    return True
+
+
+def _rebalance_kpi_contribution(
+    task: dict, before: dict, goals: list[dict]
+) -> None:
+    """task の done 列 + time KPI 紐付けに応じて KPI 加算/減算を差分同期する。
+
+    before には変更前の {goalId, kpiId, timeSpent, kpiContributed} を渡す。
+    """
+    if before.get("kpiContributed"):
+        _apply_kpi_time_delta(
+            goals,
+            before.get("goalId", ""),
+            before.get("kpiId", ""),
+            -int(before.get("timeSpent", 0) or 0),
+        )
+        task["kpiContributed"] = False
+    if (
+        task.get("column") == "done"
+        and task.get("kpiId")
+        and task.get("goalId")
+    ):
+        added = _apply_kpi_time_delta(
+            goals,
+            task.get("goalId", ""),
+            task.get("kpiId", ""),
+            int(task.get("timeSpent", 0) or 0),
+        )
+        if added:
+            task["kpiContributed"] = True
 
 
 def process_todos(
@@ -848,6 +922,8 @@ def process_todos(
                 "priority": priority,
                 "memo": "",
                 "goalId": goal_id or "",
+                "kpiId": "",
+                "kpiContributed": False,
                 "estimatedMinutes": 0,
                 "timeSpent": 0,
                 "timerStartedAt": "",
@@ -1521,6 +1597,14 @@ async def websocket_endpoint(ws: WebSocket):
             if data["type"] == "kanban_move":
                 for t in kanban_tasks:
                     if t["id"] == data["taskId"]:
+                        before = {
+                            "goalId": t.get("goalId", ""),
+                            "kpiId": t.get("kpiId", ""),
+                            "timeSpent": int(t.get("timeSpent", 0) or 0),
+                            "kpiContributed": bool(
+                                t.get("kpiContributed", False)
+                            ),
+                        }
                         t["column"] = data["column"]
                         for key in (
                             "timeSpent",
@@ -1530,9 +1614,15 @@ async def websocket_endpoint(ws: WebSocket):
                         ):
                             if key in data:
                                 t[key] = data[key]
+                        _rebalance_kpi_contribution(t, before, goals)
                         break
                 save_tasks(kanban_tasks)
+                save_goals(goals)
                 schedule_autosync()
+                await ws.send_json(
+                    {"type": "kanban_sync", "tasks": kanban_tasks}
+                )
+                await ws.send_json({"type": "goal_sync", "goals": goals})
                 continue
 
             if data["type"] == "kanban_add":
@@ -1544,6 +1634,8 @@ async def websocket_endpoint(ws: WebSocket):
                     "priority": data.get("priority", "medium"),
                     "memo": data.get("memo", ""),
                     "goalId": data.get("goalId", ""),
+                    "kpiId": data.get("kpiId", ""),
+                    "kpiContributed": False,
                     "estimatedMinutes": data.get("estimatedMinutes", 0),
                     "timeSpent": 0,
                     "timerStartedAt": "",
@@ -1559,14 +1651,27 @@ async def websocket_endpoint(ws: WebSocket):
                 continue
 
             if data["type"] == "kanban_delete":
+                target = next(
+                    (t for t in kanban_tasks if t["id"] == data["taskId"]),
+                    None,
+                )
+                if target and target.get("kpiContributed"):
+                    _apply_kpi_time_delta(
+                        goals,
+                        target.get("goalId", ""),
+                        target.get("kpiId", ""),
+                        -int(target.get("timeSpent", 0) or 0),
+                    )
                 kanban_tasks = [
                     t for t in kanban_tasks if t["id"] != data["taskId"]
                 ]
                 save_tasks(kanban_tasks)
+                save_goals(goals)
                 schedule_autosync()
                 await ws.send_json(
                     {"type": "kanban_sync", "tasks": kanban_tasks}
                 )
+                await ws.send_json({"type": "goal_sync", "goals": goals})
                 continue
 
             if data["type"] == "kanban_reorder":
@@ -1590,12 +1695,21 @@ async def websocket_endpoint(ws: WebSocket):
                 task_id = data["taskId"]
                 for t in kanban_tasks:
                     if t["id"] == task_id:
+                        before = {
+                            "goalId": t.get("goalId", ""),
+                            "kpiId": t.get("kpiId", ""),
+                            "timeSpent": int(t.get("timeSpent", 0) or 0),
+                            "kpiContributed": bool(
+                                t.get("kpiContributed", False)
+                            ),
+                        }
                         for key in (
                             "title",
                             "description",
                             "priority",
                             "memo",
                             "goalId",
+                            "kpiId",
                             "estimatedMinutes",
                             "timeSpent",
                             "timerStartedAt",
@@ -1604,12 +1718,18 @@ async def websocket_endpoint(ws: WebSocket):
                         ):
                             if key in data:
                                 t[key] = data[key]
+                        # goalId が消えたら kpiId も連動で外す。
+                        if not t.get("goalId"):
+                            t["kpiId"] = ""
+                        _rebalance_kpi_contribution(t, before, goals)
                         break
                 save_tasks(kanban_tasks)
+                save_goals(goals)
                 schedule_autosync()
                 await ws.send_json(
                     {"type": "kanban_sync", "tasks": kanban_tasks}
                 )
+                await ws.send_json({"type": "goal_sync", "goals": goals})
                 continue
 
             # --- 目標操作 (クライアント直接) ---
@@ -1635,13 +1755,32 @@ async def websocket_endpoint(ws: WebSocket):
                 )
                 _normalize_goal_repository(incoming)
                 _sync_goal_achievement(incoming)
+                goal_id = incoming.get("id")
+                # KPI が削除された or unit が time 以外に変わった場合、
+                # 参照しているタスクの紐付けをクリアする。
+                valid_time_kpi_ids = {
+                    k["id"]
+                    for k in incoming.get("kpis", [])
+                    if k.get("unit") == "time"
+                }
+                for t in kanban_tasks:
+                    if (
+                        t.get("goalId") == goal_id
+                        and t.get("kpiId")
+                        and t["kpiId"] not in valid_time_kpi_ids
+                    ):
+                        t["kpiId"] = ""
+                        t["kpiContributed"] = False
                 goals = [
-                    incoming if g["id"] == incoming.get("id") else g
-                    for g in goals
+                    incoming if g["id"] == goal_id else g for g in goals
                 ]
                 save_goals(goals)
+                save_tasks(kanban_tasks)
                 schedule_autosync()
                 await ws.send_json({"type": "goal_sync", "goals": goals})
+                await ws.send_json(
+                    {"type": "kanban_sync", "tasks": kanban_tasks}
+                )
                 continue
 
             if data["type"] == "goal_delete":
@@ -1650,6 +1789,8 @@ async def websocket_endpoint(ws: WebSocket):
                 for t in kanban_tasks:
                     if t.get("goalId") == goal_id:
                         t["goalId"] = ""
+                        t["kpiId"] = ""
+                        t["kpiContributed"] = False
                 save_goals(goals)
                 save_tasks(kanban_tasks)
                 schedule_autosync()

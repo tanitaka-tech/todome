@@ -6,14 +6,18 @@ import pytest
 
 from server import (
     AI_DEFAULT_ALLOWED_TOOLS,
+    _apply_kpi_time_delta,
     _compute_retro_period,
     _completed_task_ids_in_period,
     _ensure_kpi_ids,
+    _ensure_task_fields,
+    _find_time_kpi,
     _is_goal_all_kpis_achieved,
     _merge_retro_document,
     _migrate_retro_document,
     _normalize_ai_config,
     _normalize_goal_repository,
+    _rebalance_kpi_contribution,
     _short_id,
     _strip_retrodoc_block,
     _sync_goal_achievement,
@@ -47,6 +51,10 @@ class TestEnsureKpiIds:
     def test_preserves_percent_unit(self):
         kpis = [{"name": "a", "unit": "percent", "targetValue": 100}]
         assert _ensure_kpi_ids(kpis)[0]["unit"] == "percent"
+
+    def test_preserves_time_unit(self):
+        kpis = [{"name": "a", "unit": "time", "targetValue": 3600}]
+        assert _ensure_kpi_ids(kpis)[0]["unit"] == "time"
 
     def test_percent_unit_forces_target_to_100(self):
         # percent は常に 100% 固定 (フォームと一貫)
@@ -320,3 +328,204 @@ class TestMergeRetroDocument:
         current = {"did": "x", "completedTasks": ["t1"]}
         merged = _merge_retro_document(current, {"did": "y"})
         assert merged["completedTasks"] == ["t1"]
+
+
+class TestEnsureTaskFields:
+    def test_defaults_kpi_fields_when_missing(self):
+        task = {"id": "t1"}
+        result = _ensure_task_fields(task)
+        assert result["kpiId"] == ""
+        assert result["kpiContributed"] is False
+
+    def test_preserves_existing_fields(self):
+        task = {"id": "t1", "kpiId": "k1", "kpiContributed": True}
+        result = _ensure_task_fields(task)
+        assert result["kpiId"] == "k1"
+        assert result["kpiContributed"] is True
+
+    def test_coerces_truthy_contributed_to_bool(self):
+        task = {"id": "t1", "kpiContributed": 1}
+        assert _ensure_task_fields(task)["kpiContributed"] is True
+
+
+class TestFindTimeKpi:
+    def _goals(self):
+        return [
+            {
+                "id": "g1",
+                "kpis": [
+                    {"id": "kA", "unit": "time", "targetValue": 3600, "currentValue": 0},
+                    {"id": "kB", "unit": "number", "targetValue": 5, "currentValue": 0},
+                ],
+            }
+        ]
+
+    def test_finds_time_kpi(self):
+        k = _find_time_kpi(self._goals(), "g1", "kA")
+        assert k is not None
+        assert k["id"] == "kA"
+
+    def test_returns_none_for_non_time_kpi(self):
+        assert _find_time_kpi(self._goals(), "g1", "kB") is None
+
+    def test_returns_none_for_missing_goal(self):
+        assert _find_time_kpi(self._goals(), "bogus", "kA") is None
+
+    def test_returns_none_for_empty_ids(self):
+        assert _find_time_kpi(self._goals(), "", "kA") is None
+        assert _find_time_kpi(self._goals(), "g1", "") is None
+
+
+class TestApplyKpiTimeDelta:
+    def _goals(self, current=0):
+        return [
+            {
+                "id": "g1",
+                "kpis": [
+                    {
+                        "id": "kA",
+                        "unit": "time",
+                        "targetValue": 3600,
+                        "currentValue": current,
+                    }
+                ],
+                "achieved": False,
+                "achievedAt": "",
+            }
+        ]
+
+    def test_adds_delta_to_current_value(self):
+        goals = self._goals(current=100)
+        ok = _apply_kpi_time_delta(goals, "g1", "kA", 900)
+        assert ok is True
+        assert goals[0]["kpis"][0]["currentValue"] == 1000
+
+    def test_clamps_to_zero_on_negative(self):
+        goals = self._goals(current=100)
+        _apply_kpi_time_delta(goals, "g1", "kA", -500)
+        assert goals[0]["kpis"][0]["currentValue"] == 0
+
+    def test_returns_false_when_kpi_missing(self):
+        goals = self._goals(current=100)
+        assert _apply_kpi_time_delta(goals, "g1", "bogus", 100) is False
+        assert goals[0]["kpis"][0]["currentValue"] == 100
+
+    def test_zero_delta_is_noop(self):
+        goals = self._goals(current=100)
+        assert _apply_kpi_time_delta(goals, "g1", "kA", 0) is False
+        assert goals[0]["kpis"][0]["currentValue"] == 100
+
+    def test_syncs_achievement_on_target_reached(self):
+        goals = self._goals(current=3000)
+        _apply_kpi_time_delta(goals, "g1", "kA", 600)
+        assert goals[0]["achieved"] is True
+        assert goals[0]["achievedAt"]
+
+
+class TestRebalanceKpiContribution:
+    def _make_goals(self, current=0):
+        return [
+            {
+                "id": "g1",
+                "kpis": [
+                    {
+                        "id": "kA",
+                        "unit": "time",
+                        "targetValue": 3600,
+                        "currentValue": current,
+                    }
+                ],
+                "achieved": False,
+                "achievedAt": "",
+            }
+        ]
+
+    def test_contributes_on_move_to_done(self):
+        # todo -> done: 未 contributed で done 列にあり KPI が紐付いていれば加算される
+        goals = self._make_goals()
+        task = {
+            "column": "done",
+            "goalId": "g1",
+            "kpiId": "kA",
+            "timeSpent": 1800,
+            "kpiContributed": False,
+        }
+        before = {
+            "goalId": "g1",
+            "kpiId": "kA",
+            "timeSpent": 1800,
+            "kpiContributed": False,
+        }
+        _rebalance_kpi_contribution(task, before, goals)
+        assert task["kpiContributed"] is True
+        assert goals[0]["kpis"][0]["currentValue"] == 1800
+
+    def test_uncontributes_on_move_away_from_done(self):
+        # done -> todo: 以前 contributed なら減算し、non-done なので再加算しない
+        goals = self._make_goals(current=1800)
+        task = {
+            "column": "todo",
+            "goalId": "g1",
+            "kpiId": "kA",
+            "timeSpent": 1800,
+            "kpiContributed": True,
+        }
+        before = {
+            "goalId": "g1",
+            "kpiId": "kA",
+            "timeSpent": 1800,
+            "kpiContributed": True,
+        }
+        _rebalance_kpi_contribution(task, before, goals)
+        assert task["kpiContributed"] is False
+        assert goals[0]["kpis"][0]["currentValue"] == 0
+
+    def test_noop_when_no_kpi_linked(self):
+        goals = self._make_goals()
+        task = {
+            "column": "done",
+            "goalId": "",
+            "kpiId": "",
+            "timeSpent": 600,
+            "kpiContributed": False,
+        }
+        before = {
+            "goalId": "",
+            "kpiId": "",
+            "timeSpent": 600,
+            "kpiContributed": False,
+        }
+        _rebalance_kpi_contribution(task, before, goals)
+        assert task["kpiContributed"] is False
+        assert goals[0]["kpis"][0]["currentValue"] == 0
+
+    def test_retargets_to_new_kpi_when_link_changes_in_done(self):
+        goals = [
+            {
+                "id": "g1",
+                "kpis": [
+                    {"id": "kA", "unit": "time", "targetValue": 3600, "currentValue": 600},
+                    {"id": "kB", "unit": "time", "targetValue": 7200, "currentValue": 0},
+                ],
+                "achieved": False,
+                "achievedAt": "",
+            }
+        ]
+        task = {
+            "column": "done",
+            "goalId": "g1",
+            "kpiId": "kB",
+            "timeSpent": 600,
+            "kpiContributed": True,
+        }
+        before = {
+            "goalId": "g1",
+            "kpiId": "kA",
+            "timeSpent": 600,
+            "kpiContributed": True,
+        }
+        _rebalance_kpi_contribution(task, before, goals)
+        # 旧 kA からは 600 減算、新 kB に 600 加算
+        assert goals[0]["kpis"][0]["currentValue"] == 0
+        assert goals[0]["kpis"][1]["currentValue"] == 600
+        assert task["kpiContributed"] is True

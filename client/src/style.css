@@ -2797,6 +2797,17 @@ body {
 }
 .kpi-input-num { width: 100%; }
 .kpi-input-unit { width: 100%; }
+.kpi-time-input {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.kpi-time-input .kpi-input-num { width: 64px; }
+.kpi-time-unit {
+  font-size: 11px;
+  color: var(--fg-muted);
+  padding-right: 4px;
+}
 .kpi-edit-progress-pct {
   margin-left: 6px;
   color: var(--fg-muted);

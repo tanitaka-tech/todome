@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Goal, KanbanTask } from "../types";
-import { formatDuration } from "../types";
+import { formatDuration, formatKpiTimeValue } from "../types";
 import { useModalClose } from "../hooks/useModalClose";
 
 interface Props {
@@ -25,14 +25,26 @@ export function TaskDetailModal({ task, goals, onSave, onClose }: Props) {
   const [title, setTitle] = useState(task.title);
   const [memo, setMemo] = useState(task.memo);
   const [goalId, setGoalId] = useState(task.goalId);
+  const [kpiId, setKpiId] = useState(task.kpiId);
   const [priority, setPriority] = useState<KanbanTask["priority"]>(task.priority);
   const [estH, setEstH] = useState(Math.floor(task.estimatedMinutes / 60));
   const [estM, setEstM] = useState(task.estimatedMinutes % 60);
 
   const linkedGoal = goalId ? goals.find((g) => g.id === goalId) : undefined;
+  const timeKpis = useMemo(
+    () => (linkedGoal ? linkedGoal.kpis.filter((k) => k.unit === "time") : []),
+    [linkedGoal],
+  );
   const overlayMouseDownRef = useRef(false);
   const { closing, close } = useModalClose(onClose);
   const isFirstRender = useRef(true);
+
+  // 目標が変わって紐付け先 KPI が存在しない場合は紐付けをクリアする。
+  useEffect(() => {
+    if (kpiId && !timeKpis.some((k) => k.id === kpiId)) {
+      setKpiId("");
+    }
+  }, [kpiId, timeKpis]);
 
   useEffect(() => {
     if (isFirstRender.current) {
@@ -41,10 +53,12 @@ export function TaskDetailModal({ task, goals, onSave, onClose }: Props) {
     }
     const estimatedMinutes = Math.max(0, estH * 60 + estM);
     const nextTitle = title.trim() || task.title;
+    const nextKpiId = goalId ? kpiId : "";
     if (
       nextTitle === task.title &&
       memo === task.memo &&
       goalId === task.goalId &&
+      nextKpiId === task.kpiId &&
       priority === task.priority &&
       estimatedMinutes === task.estimatedMinutes
     ) {
@@ -56,12 +70,13 @@ export function TaskDetailModal({ task, goals, onSave, onClose }: Props) {
         title: nextTitle,
         memo,
         goalId,
+        kpiId: nextKpiId,
         priority,
         estimatedMinutes,
       });
     }, AUTOSAVE_DELAY);
     return () => window.clearTimeout(timer);
-  }, [title, memo, goalId, priority, estH, estM, task, onSave]);
+  }, [title, memo, goalId, kpiId, priority, estH, estM, task, onSave]);
 
   return (
     <div
@@ -140,6 +155,32 @@ export function TaskDetailModal({ task, goals, onSave, onClose }: Props) {
                 )}
               </div>
             </div>
+
+            {linkedGoal && timeKpis.length > 0 && (
+              <div className="detail-prop">
+                <div className="detail-prop-label">KPI紐付け</div>
+                <div className="detail-prop-value">
+                  <select
+                    className="detail-prop-select"
+                    value={kpiId}
+                    onChange={(e) => setKpiId(e.target.value)}
+                  >
+                    <option value="">なし</option>
+                    {timeKpis.map((k) => (
+                      <option key={k.id} value={k.id}>
+                        {k.name} ({formatKpiTimeValue(k.currentValue)}/
+                        {formatKpiTimeValue(k.targetValue)})
+                      </option>
+                    ))}
+                  </select>
+                  <div className="detail-prop-meta">
+                    {task.kpiContributed
+                      ? "完了済み: 計測時間が加算されています"
+                      : "完了すると計測時間がKPIに加算されます"}
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="detail-prop">
               <div className="detail-prop-label">見積もり</div>
