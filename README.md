@@ -183,6 +183,10 @@ todome/
 └──────────────────┘                   └──────────────────┘
 ```
 
+## Special Thanks
+
+開発にあたって参考にさせていただいた資料は [docs/special-thanks.md](docs/special-thanks.md) に記載しています。
+
 ## ライセンス
 
 MIT

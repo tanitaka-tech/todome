@@ -25,6 +25,10 @@ client/.vite/
 # OS
 .DS_Store
 
+# IDE / editor local settings
+.idea/
+.claude/settings.local.json
+
 # Playwright E2E
 e2e/node_modules/
 e2e/data-e2e/

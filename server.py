@@ -9,6 +9,7 @@ import datetime
 import json
 import os
 import re
+import shlex
 import shutil
 import sqlite3
 import uuid
@@ -31,6 +32,7 @@ from claude_agent_sdk import (
 )
 from claude_agent_sdk.types import (
     PermissionResultAllow,
+    PermissionResultDeny,
     ToolPermissionContext,
 )
 
@@ -81,6 +83,22 @@ AI_TOOL_CATALOG: tuple[str, ...] = (
 )
 AI_DEFAULT_ALLOWED_TOOLS: tuple[str, ...] = ("TodoWrite", "Bash")
 
+# Bash ツールが実行可能なコマンドの prefix allowlist。常時許可。
+AI_BASH_ALLOWED_PREFIXES: tuple[tuple[str, ...], ...] = (
+    ("gh", "issue", "list"),
+    ("gh", "issue", "view"),
+    ("gh", "pr", "list"),
+    ("gh", "pr", "view"),
+    ("gh", "repo", "view"),
+    ("git", "status"),
+    ("git", "log"),
+    ("git", "diff"),
+)
+# allowGhApi=True のときのみ追加で許可する prefix。
+AI_BASH_OPTIONAL_PREFIXES: tuple[tuple[str, ...], ...] = (("gh", "api"),)
+# シェル展開・複文・リダイレクトを示すメタ文字。含まれるコマンドは常に拒否する。
+_BASH_SHELL_META: tuple[str, ...] = (";", "&", "|", ">", "<", "`", "$(", "${")
+
 _cfg_cache: dict[str, Any] | None = None
 _ai_cfg_cache: dict[str, Any] | None = None
 
@@ -88,17 +106,47 @@ _ai_cfg_cache: dict[str, Any] | None = None
 def _normalize_ai_config(cfg: Any) -> dict[str, Any]:
     """保存用 AI 設定を正規化する。未知ツール除外・重複除外・空は既定に戻す。"""
     if not isinstance(cfg, dict):
-        return {"allowedTools": list(AI_DEFAULT_ALLOWED_TOOLS)}
+        return {
+            "allowedTools": list(AI_DEFAULT_ALLOWED_TOOLS),
+            "allowGhApi": False,
+        }
     raw = cfg.get("allowedTools")
     if not isinstance(raw, list):
-        return {"allowedTools": list(AI_DEFAULT_ALLOWED_TOOLS)}
+        return {
+            "allowedTools": list(AI_DEFAULT_ALLOWED_TOOLS),
+            "allowGhApi": bool(cfg.get("allowGhApi", False)),
+        }
     seen: set[str] = set()
     result: list[str] = []
     for tool in raw:
         if isinstance(tool, str) and tool in AI_TOOL_CATALOG and tool not in seen:
             result.append(tool)
             seen.add(tool)
-    return {"allowedTools": result}
+    return {"allowedTools": result, "allowGhApi": bool(cfg.get("allowGhApi", False))}
+
+
+def _is_bash_command_allowed(command: Any, *, allow_gh_api: bool) -> bool:
+    """Bash ツールが実行するコマンドが allowlist に合致するか判定する。
+
+    シェル制御文字（;, &, |, >, <, `, $(, ${）を含む場合は allow_gh_api に関わらず拒否する。
+    """
+    if not isinstance(command, str) or not command.strip():
+        return False
+    if any(meta in command for meta in _BASH_SHELL_META):
+        return False
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        return False
+    if not tokens:
+        return False
+    prefixes = AI_BASH_ALLOWED_PREFIXES
+    if allow_gh_api:
+        prefixes = prefixes + AI_BASH_OPTIONAL_PREFIXES
+    for prefix in prefixes:
+        if len(tokens) >= len(prefix) and tuple(tokens[: len(prefix)]) == prefix:
+            return True
+    return False
 
 
 def load_ai_config() -> dict[str, Any]:
@@ -111,9 +159,9 @@ def load_ai_config() -> dict[str, Any]:
                 json.loads(AI_CONFIG_PATH.read_text())
             )
         except (OSError, json.JSONDecodeError):
-            _ai_cfg_cache = {"allowedTools": list(AI_DEFAULT_ALLOWED_TOOLS)}
+            _ai_cfg_cache = _normalize_ai_config(None)
     else:
-        _ai_cfg_cache = {"allowedTools": list(AI_DEFAULT_ALLOWED_TOOLS)}
+        _ai_cfg_cache = _normalize_ai_config(None)
     return _ai_cfg_cache
 
 
@@ -2639,9 +2687,21 @@ async def websocket_endpoint(ws: WebSocket):
                     tool_name: str,
                     tool_input: dict[str, Any],
                     context: ToolPermissionContext,
-                ) -> PermissionResultAllow:
+                ) -> PermissionResultAllow | PermissionResultDeny:
                     if tool_name == "AskUserQuestion":
                         return await handle_ask_user_via_ws(ws, tool_input)
+                    if tool_name == "Bash":
+                        cfg = load_ai_config()
+                        command = tool_input.get("command", "")
+                        if not _is_bash_command_allowed(
+                            command, allow_gh_api=bool(cfg.get("allowGhApi", False))
+                        ):
+                            return PermissionResultDeny(
+                                message=(
+                                    "この Bash コマンドは allowlist に含まれていません: "
+                                    f"{command!r}"
+                                )
+                            )
                     return PermissionResultAllow(updated_input=tool_input)
 
                 if client is None:

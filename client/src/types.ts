@@ -118,6 +118,17 @@ export function totalSeconds(task: KanbanTask): number {
   return task.timeSpent + getRunningSeconds(task);
 }
 
+export function isTaskCompletedInPeriod(
+  task: KanbanTask,
+  periodStart: string,
+  periodEnd: string,
+): boolean {
+  if (task.column !== "done") return false;
+  const ca = (task.completedAt || "").replace("Z", "").slice(0, 19);
+  if (!ca) return false;
+  return ca >= `${periodStart}T00:00:00` && ca <= `${periodEnd}T23:59:59`;
+}
+
 // --- Messages ---
 
 export type MessageRole = "user" | "assistant" | "system" | "tool";
@@ -216,6 +227,7 @@ export interface CommitDiffEntry {
 
 export interface AIToolConfig {
   allowedTools: string[];
+  allowGhApi: boolean;
 }
 
 // --- Retrospective ---

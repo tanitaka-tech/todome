@@ -1,8 +1,15 @@
 import { useMemo, useState } from "react";
-import type { RetroType, Retrospective } from "../types";
+import type {
+  KanbanTask,
+  RetroDocument,
+  RetroType,
+  Retrospective,
+} from "../types";
+import { isTaskCompletedInPeriod } from "../types";
 
 interface Props {
   retros: Retrospective[];
+  tasks: KanbanTask[];
   type: RetroType;
   onOpenRetro: (retro: Retrospective) => void;
 }
@@ -24,24 +31,20 @@ const TYPE_LABEL: Record<RetroType, string> = {
   yearly: "年次",
 };
 
-function retroSummary(r: Retrospective): string {
-  const raw =
-    r.aiComment ||
-    r.document.did ||
-    r.document.learned ||
-    r.document.next ||
-    "";
-  const s = raw.trim().replace(/\s+/g, " ");
-  if (!s) return "(まだ内容がありません)";
-  return s.length > 120 ? s.slice(0, 118) + "…" : s;
-}
-
 function formatDateTime(iso: string): string {
   if (!iso) return "";
   return iso.replace("T", " ").slice(0, 16);
 }
 
-export function RetroCalendar({ retros, type, onOpenRetro }: Props) {
+function formatDailyMeta(doc: RetroDocument): string {
+  const parts: string[] = [];
+  if (doc.dayRating > 0) parts.push(`評価 ${doc.dayRating}/10`);
+  if (doc.wakeUpTime) parts.push(`起床 ${doc.wakeUpTime}`);
+  if (doc.bedtime) parts.push(`就寝 ${doc.bedtime}`);
+  return parts.join(" · ");
+}
+
+export function RetroCalendar({ retros, tasks, type, onOpenRetro }: Props) {
   const [cursor, setCursor] = useState<Date>(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -155,9 +158,64 @@ export function RetroCalendar({ retros, type, onOpenRetro }: Props) {
                         : `${d.retro!.periodStart} 〜 ${d.retro!.periodEnd}`}
                     </span>
                   </div>
-                  <div className="retro-calendar-popup-summary">
-                    {retroSummary(d.retro!)}
-                  </div>
+                  {d.retro!.type === "daily" &&
+                    formatDailyMeta(d.retro!.document) && (
+                      <div className="retro-calendar-popup-daily">
+                        {formatDailyMeta(d.retro!.document)}
+                      </div>
+                    )}
+                  {d.retro!.document.learned && (
+                    <div className="retro-calendar-popup-learned">
+                      <div className="retro-calendar-popup-learned-title">
+                        わかったこと
+                      </div>
+                      <div className="retro-calendar-popup-learned-body">
+                        {d.retro!.document.learned}
+                      </div>
+                    </div>
+                  )}
+                  {(() => {
+                    const doneTasks = tasks.filter((t) =>
+                      isTaskCompletedInPeriod(
+                        t,
+                        d.retro!.periodStart,
+                        d.retro!.periodEnd,
+                      ),
+                    );
+                    return (
+                      <div className="retro-calendar-popup-tasks">
+                        <div className="retro-calendar-popup-tasks-title">
+                          ✅ 達成タスク ({doneTasks.length}件)
+                        </div>
+                        {doneTasks.length === 0 ? (
+                          <div className="retro-calendar-popup-tasks-empty">
+                            この期間に完了したタスクはありません。
+                          </div>
+                        ) : (
+                          <ul className="retro-calendar-popup-tasks-list">
+                            {doneTasks.map((t) => (
+                              <li
+                                key={t.id}
+                                className="retro-calendar-popup-tasks-item"
+                              >
+                                {t.title}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    );
+                  })()}
+                  {d.retro!.aiComment && (
+                    <div className="retro-calendar-popup-ai">
+                      <div className="retro-calendar-popup-ai-title">
+                        AI コメント
+                      </div>
+                      <div className="retro-calendar-popup-ai-body">
+                        {d.retro!.aiComment}
+                      </div>
+                    </div>
+                  )}
                   <div className="retro-calendar-popup-meta">
                     {d.retro!.completedAt
                       ? `完了 ${formatDateTime(d.retro!.completedAt)}`
