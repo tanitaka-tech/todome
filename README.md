@@ -39,7 +39,7 @@ TrelloライクなKanbanボードでタスクを管理しながら、AIエージ
 - **Node.js** 18+
 - **Python** 3.11+
 - **[uv](https://docs.astral.sh/uv/)** (Python パッケージマネージャー)
-- **Anthropic API Key**
+- **Anthropic API Key** もしくは `claude login` でログイン済みの環境
 - **[gh CLI](https://cli.github.com/)** (任意 — GitHub 同期機能を使う場合)
 
 ### 1. リポジトリをクローン
