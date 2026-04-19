@@ -2,6 +2,14 @@
 
 TrelloライクなKanbanボードでタスクを管理しながら、AIエージェントに相談してタスクの更新や新たなタスクの提案を受けられるWebアプリです。
 
+## 画面説明書
+
+ゲーム画面風の画面説明書を `docs/manual/` に配置しています。GitHub Pages で公開します。
+
+- 公開 URL: https://tanitaka-tech.github.io/todome/manual/
+- 更新手順: [docs/manual/README.md](docs/manual/README.md) を参照
+- ローカル表示: `cd docs && python3 -m http.server 8765` → `http://127.0.0.1:8765/manual/`
+
 ## 特徴
 
 - **Kanbanボード** — TODO / 進行中 / 完了の3カラム、ドラッグ&ドロップ

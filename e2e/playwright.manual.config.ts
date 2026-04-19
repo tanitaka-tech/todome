@@ -9,6 +9,7 @@ const dataDir = path.join(__dirname, "data-manual");
 
 export default defineConfig({
   testDir: "./manual",
+  testMatch: /capture\.spec\.ts$/,
   fullyParallel: false,
   workers: 1,
   reporter: "list",
