@@ -1638,6 +1638,77 @@ async def run_retro_turn(
     return new_retro
 
 
+async def run_retro_reopen_greeting(
+    ws: WebSocket,
+    retro: RetrospectiveData,
+    tasks: list[KanbanTask],
+    goals: list[GoalData],
+    profile: ProfileData,
+) -> RetrospectiveData:
+    """会話再開時に AI が短い挨拶と次の問いかけを生成し、messages に追加して返す。"""
+    base_system = _build_retro_system_prompt(retro, tasks, goals, profile)
+    system_prompt = (
+        base_system
+        + "\n\n## 会話再開モード\n"
+        "この振り返りは一度完了状態で、ユーザーが「会話を再開」を選びました。"
+        "短い「おかえりなさい」系の挨拶 (1 文) と、これまでの振り返り内容 "
+        "(やったこと/わかったこと/次やること) を踏まえて追加で深掘り・修正したい "
+        "部分を 1 つ具体的に問いかける (1〜2 文) を返してください。"
+        "<retrodoc> ブロックは含めない。"
+    )
+
+    options = ClaudeAgentOptions(
+        model="sonnet",
+        cwd=str(Path(__file__).parent),
+        system_prompt=system_prompt,
+        include_partial_messages=True,
+        permission_mode="acceptEdits",
+        allowed_tools=[],
+    )
+    client = ClaudeSDKClient(options=options)
+    await client.connect()
+    text_parts: list[str] = []
+    try:
+        await client.query(
+            "（会話を再開しました。挨拶と次の問いかけだけを返してください）"
+        )
+        async for msg in client.receive_response():
+            if isinstance(msg, StreamEvent):
+                event = msg.event
+                if event.get("type") == "content_block_delta":
+                    delta = event.get("delta", {})
+                    if delta.get("type") == "text_delta":
+                        await ws.send_json(
+                            {
+                                "type": "retro_stream_delta",
+                                "text": delta.get("text", ""),
+                            }
+                        )
+            elif isinstance(msg, AssistantMessage):
+                for block in msg.content:
+                    if isinstance(block, TextBlock):
+                        text_parts.append(block.text)
+    finally:
+        try:
+            await client.disconnect()
+        except Exception:
+            pass
+
+    cleaned, _ = _strip_retrodoc_block("".join(text_parts).strip())
+    if not cleaned:
+        cleaned = "おかえりなさい！追加で振り返りたいことや直したい部分はありますか？"
+
+    new_retro = dict(retro)
+    new_messages = list(retro["messages"])
+    new_messages.append({"role": "assistant", "text": cleaned})
+    new_retro["messages"] = new_messages
+    new_retro["updatedAt"] = datetime.datetime.now().isoformat(timespec="seconds")
+    save_retro(new_retro)
+    schedule_autosync()
+    await ws.send_json({"type": "retro_assistant", "text": cleaned})
+    return new_retro
+
+
 async def _generate_retro_review_text(
     ws: WebSocket,
     retro: RetrospectiveData,
@@ -2432,27 +2503,40 @@ async def websocket_endpoint(ws: WebSocket):
                     )
                     continue
                 now_iso = datetime.datetime.now().isoformat(timespec="seconds")
-                welcome = _retro_welcome_text(
-                    retro_entry["type"],
-                    retro_entry["periodStart"],
-                    retro_entry["periodEnd"],
-                )
                 reopened = dict(retro_entry)
                 reopened["completedAt"] = ""
                 reopened["aiComment"] = ""
-                reopened["messages"] = [
-                    {"role": "assistant", "text": welcome}
-                ]
+                reopened["messages"] = []
                 reopened["updatedAt"] = now_iso
                 save_retro(reopened)
                 schedule_autosync()
+                # 直ちに「会話再開済み」状態を反映
                 await ws.send_json({"type": "retro_sync", "retro": reopened})
-                await broadcast(
-                    {
-                        "type": "retro_list_sync",
-                        "retros": load_retros(),
-                    }
+                await ws.send_json(
+                    {"type": "retro_session_waiting", "waiting": True}
                 )
+                try:
+                    reopened = await run_retro_reopen_greeting(
+                        ws, reopened, kanban_tasks, goals, profile
+                    )
+                    await broadcast(
+                        {
+                            "type": "retro_list_sync",
+                            "retros": load_retros(),
+                        }
+                    )
+                except Exception as e:
+                    print(f"retro reopen greeting error: {e}")
+                    await ws.send_json(
+                        {
+                            "type": "retro_error",
+                            "message": f"再開時の挨拶生成中にエラーが発生しました: {e}",
+                        }
+                    )
+                finally:
+                    await ws.send_json(
+                        {"type": "retro_session_waiting", "waiting": False}
+                    )
                 continue
 
             if data["type"] == "retro_edit_document":

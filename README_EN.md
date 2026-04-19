@@ -8,7 +8,7 @@
 - **Time tracking** — Per-task play/pause, estimate comparison, completion time recording
 - **Stats dashboard** — Pie chart of work time per goal, bar charts for daily/monthly/yearly trends
 - **Profile definition** — Reflects your current state, balance wheel, principles, and wishes into the AI context
-- **GitHub sync** — Share data across devices & link repositories to goals to feed the AI context
+- **GitHub sync** — Share data across devices & link repositories to goals to feed the AI context ([Terms of Service notes](docs/github-sync-compliance.md))
 
 | Task management with Kanban | Leave task management to AI | Retrospective with AI | Switch themes to change mood |
 |:---:|:---:|:---:|:---:|

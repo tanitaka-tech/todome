@@ -19,10 +19,12 @@ import { applyTheme, getInitialTheme, type ThemeName } from "../theme";
 import {
   loadBoardGoalFilter,
   loadBoardRecentDays,
+  loadPopupTaskId,
   loadRetroTab,
   loadRetroViewMode,
   saveBoardGoalFilter,
   saveBoardRecentDays,
+  savePopupTaskId,
   saveRetroTab,
   saveRetroViewMode,
 } from "../viewState";
@@ -145,7 +147,9 @@ export function App() {
   const [selectedTask, setSelectedTask] = useState<KanbanTask | null>(null);
   const [activeView, setActiveView] = useState<ActiveView>("overview");
   const [tick, setTick] = useState(0);
-  const [popupTaskId, setPopupTaskId] = useState<string | null>(null);
+  const [popupTaskId, setPopupTaskIdState] = useState<string | null>(() =>
+    loadPopupTaskId(),
+  );
   const [celebrations, setCelebrations] = useState<Celebration[]>([]);
   const [theme, setThemeState] = useState<ThemeName>(() => getInitialTheme());
   const [chatOpen, setChatOpen] = useState(true);
@@ -189,6 +193,10 @@ export function App() {
   const setRetroViewMode = useCallback((value: RetroViewMode) => {
     setRetroViewModeState(value);
     saveRetroViewMode(value);
+  }, []);
+  const setPopupTaskId = useCallback((value: string | null) => {
+    setPopupTaskIdState(value);
+    savePopupTaskId(value);
   }, []);
   const chatInputRef = useRef<HTMLInputElement>(null);
   const gChordRef = useRef<number | null>(null);
@@ -590,7 +598,7 @@ export function App() {
         }
       });
     },
-    [send, stopTask],
+    [send, stopTask, setPopupTaskId],
   );
 
   const handleMoveColumn = useCallback(
@@ -640,7 +648,7 @@ export function App() {
         return prev.map((t) => (t.id === taskId ? updated : t));
       });
     },
-    [send, showCelebration],
+    [send, showCelebration, setPopupTaskId],
   );
 
   const handleRetroStart = useCallback(
@@ -678,6 +686,7 @@ export function App() {
 
   const handleRetroReopen = useCallback(() => {
     if (!activeRetro || !activeRetro.completedAt) return;
+    setRetroWaiting(true);
     setRetroStreamText("");
     send({ type: "retro_reopen", retroId: activeRetro.id });
   }, [activeRetro, send]);
@@ -911,7 +920,9 @@ export function App() {
 
   const popupTask = useMemo(() => {
     if (!popupTaskId) return undefined;
-    return tasks.find((t) => t.id === popupTaskId);
+    const found = tasks.find((t) => t.id === popupTaskId);
+    if (!found || found.column === "done") return undefined;
+    return found;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [popupTaskId, tasks, tick]);
 
