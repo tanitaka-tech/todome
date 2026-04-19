@@ -336,7 +336,6 @@ export function App() {
       case "retro_error":
         setRetroWaiting(false);
         setRetroStreamText("");
-        // eslint-disable-next-line no-console
         console.error("retro error:", msg.message);
         break;
       case "retro_thinking_delta":
@@ -418,6 +417,7 @@ export function App() {
         title: task.title,
         memo: task.memo,
         goalId: task.goalId,
+        kpiId: task.kpiId,
         priority: task.priority,
         estimatedMinutes: task.estimatedMinutes,
       });

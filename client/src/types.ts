@@ -1,6 +1,6 @@
 export type ColumnId = "todo" | "in_progress" | "done";
 
-export type KPIUnit = "number" | "percent";
+export type KPIUnit = "number" | "percent" | "time";
 
 export interface KPI {
   id: string;
@@ -48,6 +48,8 @@ export interface KanbanTask {
   priority: "low" | "medium" | "high";
   memo: string;
   goalId: string;
+  kpiId: string;           // 紐付け先 KPI (unit=time 限定, "" = 未紐付け)
+  kpiContributed: boolean; // 完了時に KPI へ加算済みかどうか (二重加算防止)
   estimatedMinutes: number; // 見積もり時間 (分), 0 = 未設定
   timeSpent: number;       // total seconds
   timerStartedAt: string;  // ISO datetime or ""
@@ -85,6 +87,25 @@ export function formatDuration(seconds: number): string {
   const s = seconds % 60;
   if (h > 0) return `${h}h${m > 0 ? ` ${m}m` : ""}`;
   return `${m}m${s > 0 ? ` ${s}s` : ""}`;
+}
+
+export function formatKpiTimeValue(seconds: number): string {
+  const safe = Math.max(0, Math.round(seconds));
+  const h = Math.floor(safe / 3600);
+  const m = Math.floor((safe % 3600) / 60);
+  if (h > 0) return m > 0 ? `${h}h${m}m` : `${h}h`;
+  return `${m}m`;
+}
+
+export function secondsToHM(seconds: number): { h: number; m: number } {
+  const safe = Math.max(0, Math.round(seconds));
+  return { h: Math.floor(safe / 3600), m: Math.floor((safe % 3600) / 60) };
+}
+
+export function hmToSeconds(h: number, m: number): number {
+  const hh = Math.max(0, Math.floor(h) || 0);
+  const mm = Math.max(0, Math.floor(m) || 0);
+  return hh * 3600 + mm * 60;
 }
 
 export function getRunningSeconds(task: KanbanTask): number {
