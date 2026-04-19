@@ -484,11 +484,28 @@ export function App() {
             const stopped = stopTask(running, now);
             next = next.map((t) => (t.id === running.id ? stopped : t));
           }
-          const updated = {
-            ...next.find((t) => t.id === taskId)!,
+          const current = next.find((t) => t.id === taskId)!;
+          const shouldMove = current.column !== "in_progress";
+          const updated: KanbanTask = {
+            ...current,
             timerStartedAt: now,
+            ...(shouldMove
+              ? { column: "in_progress" as KanbanTask["column"], completedAt: "" }
+              : {}),
           };
-          send({ type: "kanban_edit", taskId, timerStartedAt: now });
+          if (shouldMove) {
+            send({
+              type: "kanban_move",
+              taskId,
+              column: "in_progress",
+              timeSpent: updated.timeSpent,
+              timerStartedAt: now,
+              completedAt: "",
+              timeLogs: updated.timeLogs,
+            });
+          } else {
+            send({ type: "kanban_edit", taskId, timerStartedAt: now });
+          }
           setPopupTaskId(taskId);
           return next.map((t) => (t.id === taskId ? updated : t));
         }
@@ -687,7 +704,15 @@ export function App() {
       {/* === Sidebar === */}
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <div className="sidebar-brand-mark">t</div>
+          <a
+            className="sidebar-brand-mark"
+            href="https://github.com/tanitaka-tech/todome"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="GitHub リポジトリを開く"
+          >
+            t
+          </a>
         </div>
 
         <nav className="sidebar-nav sidebar-nav--top">
