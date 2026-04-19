@@ -4,7 +4,7 @@ import { clickNav, gotoApp, uniqueMark } from "../fixtures/helpers";
 test.describe("プロフィール編集", () => {
   test.beforeEach(async ({ page }) => {
     await gotoApp(page);
-    await clickNav(page, "自分について");
+    await clickNav(page, "プロフィール");
   });
 
   test("現在の自分の状態を入力すると再読込後も残る", async ({ page }) => {
@@ -16,7 +16,7 @@ test.describe("プロフィール編集", () => {
 
     await page.reload();
     await page.waitForSelector(".topbar-status-dot--online");
-    await clickNav(page, "自分について");
+    await clickNav(page, "プロフィール");
 
     await expect(page.locator(".profile-textarea").first()).toHaveValue(text);
   });

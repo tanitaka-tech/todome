@@ -499,7 +499,7 @@ export function ProfilePanel({ profile, setProfile, send }: Props) {
     <div className="profile-panel">
       <div className="page-head">
         <div className="page-head-title-wrap">
-          <h1 className="page-title">自分について</h1>
+          <h1 className="page-title">プロフィール</h1>
           <div className="page-subtitle">
             AIアシスタントのコンテキストとして使われます
           </div>

@@ -78,7 +78,7 @@ const NAV_ITEMS: {
   { id: "goals", label: "目標", icon: "⌖", group: "work" },
   { id: "retro", label: "振り返り", icon: "↻", group: "work" },
   { id: "stats", label: "統計", icon: "〽", group: "work" },
-  { id: "profile", label: "自分について", icon: "◉", group: "app" },
+  { id: "profile", label: "プロフィール", icon: "◉", group: "app" },
   { id: "settings", label: "設定", icon: "⚙", group: "app" },
 ];
 
@@ -88,7 +88,7 @@ const VIEW_LABEL: Record<ActiveView, string> = {
   goals: "目標管理",
   retro: "振り返り",
   stats: "統計",
-  profile: "自分について",
+  profile: "プロフィール",
   settings: "設定",
 };
 

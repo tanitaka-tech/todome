@@ -6,7 +6,7 @@ export type NavLabel =
   | "目標"
   | "振り返り"
   | "統計"
-  | "自分について"
+  | "プロフィール"
   | "設定";
 
 export async function gotoApp(page: Page): Promise<void> {
