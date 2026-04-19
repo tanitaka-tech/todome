@@ -20,6 +20,7 @@ TrelloライクなKanbanボードでタスク管理しつつ、Claude Agent SDK 
 | Lint | `cd client && npm run lint` |
 | Python構文チェック | `uv run python -c "import ast; ast.parse(open('server.py').read())"` |
 | Pythonテスト | `uv run pytest -q` |
+| E2E (Playwright) | `./test.sh` (build → e2e deps → playwright install → test) |
 
 ## ディレクトリ
 

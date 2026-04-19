@@ -1,0 +1,15 @@
+{
+  "name": "todome-e2e",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "pretest": "cd ../client && npm run build",
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:clean": "rm -rf data-e2e test-results playwright-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0",
+    "@types/node": "^22.0.0"
+  }
+}

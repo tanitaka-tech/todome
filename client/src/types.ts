@@ -32,6 +32,7 @@ export interface Goal {
   achieved: boolean;
   achievedAt: string; // ISO datetime or ""
   icon?: string; // 絵文字アイコン
+  repository?: string; // "owner/name" 形式、空はリポジトリ未紐付け
 }
 
 export interface TimeLog {
@@ -145,6 +146,12 @@ export interface RepoInfo {
   url: string;
 }
 
+// --- AI tool config ---
+
+export interface AIToolConfig {
+  allowedTools: string[];
+}
+
 // --- Retrospective ---
 
 export type RetroType = "daily" | "weekly" | "monthly" | "yearly";
@@ -187,6 +194,7 @@ export type WSMessage =
   | { type: "profile_sync"; profile: UserProfile }
   | { type: "github_status"; status: GitHubStatus }
   | { type: "github_repo_list"; repos: RepoInfo[] }
+  | { type: "ai_config_sync"; config: AIToolConfig }
   | { type: "result"; result: string; cost: number; turns: number; sessionId: string }
   | { type: "retro_list_sync"; retros: Retrospective[] }
   | { type: "retro_sync"; retro: Retrospective }

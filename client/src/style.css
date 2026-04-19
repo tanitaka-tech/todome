@@ -2638,6 +2638,23 @@ body {
   margin-bottom: 6px;
 }
 
+.goal-card-repo {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--fg-muted);
+  text-decoration: none;
+  border-bottom: 1px dashed var(--border);
+}
+.goal-card-repo:hover {
+  color: var(--accent, #4c8cf5);
+  border-bottom-color: var(--accent, #4c8cf5);
+}
+.goal-card-repo-mark {
+  font-size: 11px;
+  line-height: 1;
+}
+
 .goal-card-memo {
   font-size: 12px;
   color: var(--fg-muted);
@@ -3882,6 +3899,50 @@ body {
   border-radius: 4px;
   border: 1px solid rgba(208, 64, 64, 0.3);
   word-break: break-word;
+}
+
+.ai-tool-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ai-tool-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  cursor: pointer;
+}
+.ai-tool-item:hover {
+  border-color: var(--accent, #4c8cf5);
+}
+.ai-tool-item input[type="checkbox"] {
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+.ai-tool-text {
+  flex: 1;
+  min-width: 0;
+}
+.ai-tool-name {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--fg);
+}
+.ai-tool-desc {
+  font-size: 12px;
+  color: var(--fg-muted);
+  line-height: 1.5;
+  margin-top: 2px;
+}
+.ai-tool-warning {
+  font-size: 11px;
+  color: #c88500;
+  margin-top: 4px;
 }
 
 .gh-picker-overlay {

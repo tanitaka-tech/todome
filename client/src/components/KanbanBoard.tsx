@@ -315,11 +315,14 @@ export function KanbanBoard({
   const submitAdd = () => {
     const title = newTitle.trim();
     if (!title || !addingTo) return;
+    const goalId =
+      goalFilter && goalFilter !== GOAL_FILTER_NONE ? goalFilter : "";
     send({
       type: "kanban_add",
       title,
       column: addingTo,
       priority: newPriority,
+      goalId,
     });
     setAddingTo(null);
     setNewTitle("");

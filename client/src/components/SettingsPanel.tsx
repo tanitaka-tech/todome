@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import type { ThemeName } from "../theme";
-import type { GitHubStatus, RepoInfo } from "../types";
+import type { AIToolConfig, GitHubStatus, RepoInfo } from "../types";
 
 interface Props {
   theme: ThemeName;
@@ -18,7 +18,56 @@ interface Props {
   onSyncNow: () => void;
   onPullNow: () => void;
   onToggleAutoSync: (value: boolean) => void;
+  aiConfig: AIToolConfig;
+  onUpdateAIConfig: (config: AIToolConfig) => void;
 }
+
+interface AIToolDef {
+  id: string;
+  label: string;
+  desc: string;
+  warning?: string;
+}
+
+const AI_TOOL_CATALOG: AIToolDef[] = [
+  {
+    id: "TodoWrite",
+    label: "TodoWrite",
+    desc: "タスクの追加/更新、目標の追加/更新 (GOAL_ADD / GOAL_UPDATE)。",
+    warning: "これをオフにするとAIからタスクや目標を操作できなくなります。",
+  },
+  {
+    id: "Bash",
+    label: "Bash",
+    desc: "シェルコマンド実行。gh / git で GitHub リポジトリの状況確認に使用。",
+    warning: "任意のコマンドをAIが実行できる権限です。",
+  },
+  {
+    id: "Read",
+    label: "Read",
+    desc: "ローカルファイル読み取り。プロジェクトコードを参照して回答するときに使用。",
+  },
+  {
+    id: "Glob",
+    label: "Glob",
+    desc: "ファイル名パターンによる検索。",
+  },
+  {
+    id: "Grep",
+    label: "Grep",
+    desc: "ファイル内容のパターン検索。",
+  },
+  {
+    id: "WebFetch",
+    label: "WebFetch",
+    desc: "指定URLの内容を取得。ドキュメント参照などに使用。",
+  },
+  {
+    id: "WebSearch",
+    label: "WebSearch",
+    desc: "Web検索。最新情報を調べたいときに使用。",
+  },
+];
 
 type ThemeDef = {
   id: ThemeName;
@@ -236,7 +285,19 @@ export function SettingsPanel({
   onSyncNow,
   onPullNow,
   onToggleAutoSync,
+  aiConfig,
+  onUpdateAIConfig,
 }: Props) {
+  const toggleTool = (toolId: string, enabled: boolean) => {
+    const current = new Set(aiConfig.allowedTools);
+    if (enabled) current.add(toolId);
+    else current.delete(toolId);
+    // カタログ順に並べ直す
+    const next = AI_TOOL_CATALOG.filter((t) => current.has(t.id)).map(
+      (t) => t.id,
+    );
+    onUpdateAIConfig({ allowedTools: next });
+  };
   return (
     <div className="settings-panel">
       <div className="page-head">
@@ -306,6 +367,40 @@ export function SettingsPanel({
               onPullNow={onPullNow}
               onToggleAutoSync={onToggleAutoSync}
             />
+          </div>
+        </div>
+
+        <div className="widget" style={{ maxWidth: 720 }}>
+          <div className="widget-head">
+            <span className="widget-title">AIエージェント</span>
+          </div>
+          <div className="widget-body">
+            <div className="settings-row-desc" style={{ marginBottom: 12 }}>
+              AIアシスタントが使えるツールを選びます。変更は次のチャット送信から反映されます。
+            </div>
+            <div className="ai-tool-list">
+              {AI_TOOL_CATALOG.map((tool) => {
+                const enabled = aiConfig.allowedTools.includes(tool.id);
+                return (
+                  <label key={tool.id} className="ai-tool-item">
+                    <input
+                      type="checkbox"
+                      checked={enabled}
+                      onChange={(e) => toggleTool(tool.id, e.target.checked)}
+                    />
+                    <div className="ai-tool-text">
+                      <div className="ai-tool-name">{tool.label}</div>
+                      <div className="ai-tool-desc">{tool.desc}</div>
+                      {tool.warning && (
+                        <div className="ai-tool-warning">
+                          ⚠ {tool.warning}
+                        </div>
+                      )}
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>

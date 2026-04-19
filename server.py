@@ -60,13 +60,70 @@ GOAL_UPDATE_PREFIX = "GOAL_UPDATE:"
 
 
 # --- SQLite storage ---
-DATA_DIR = Path(__file__).parent / "data"
-DATA_DIR.mkdir(exist_ok=True)
+_env_data_dir = os.environ.get("TODOME_DATA_DIR")
+DATA_DIR = Path(_env_data_dir) if _env_data_dir else Path(__file__).parent / "data"
+DATA_DIR.mkdir(parents=True, exist_ok=True)
 DEFAULT_DB = DATA_DIR / "todome.db"
 REPO_DIR = DATA_DIR / "repo"
 CONFIG_PATH = DATA_DIR / "github_config.json"
+AI_CONFIG_PATH = DATA_DIR / "ai_config.json"
+
+# UIで切り替え可能な候補。ここに無いツール名が保存されていても無視する。
+AI_TOOL_CATALOG: tuple[str, ...] = (
+    "TodoWrite",
+    "Bash",
+    "Read",
+    "Glob",
+    "Grep",
+    "WebFetch",
+    "WebSearch",
+)
+AI_DEFAULT_ALLOWED_TOOLS: tuple[str, ...] = ("TodoWrite", "Bash")
 
 _cfg_cache: dict[str, Any] | None = None
+_ai_cfg_cache: dict[str, Any] | None = None
+
+
+def _normalize_ai_config(cfg: Any) -> dict[str, Any]:
+    """保存用 AI 設定を正規化する。未知ツール除外・重複除外・空は既定に戻す。"""
+    if not isinstance(cfg, dict):
+        return {"allowedTools": list(AI_DEFAULT_ALLOWED_TOOLS)}
+    raw = cfg.get("allowedTools")
+    if not isinstance(raw, list):
+        return {"allowedTools": list(AI_DEFAULT_ALLOWED_TOOLS)}
+    seen: set[str] = set()
+    result: list[str] = []
+    for tool in raw:
+        if isinstance(tool, str) and tool in AI_TOOL_CATALOG and tool not in seen:
+            result.append(tool)
+            seen.add(tool)
+    return {"allowedTools": result}
+
+
+def load_ai_config() -> dict[str, Any]:
+    global _ai_cfg_cache
+    if _ai_cfg_cache is not None:
+        return _ai_cfg_cache
+    if AI_CONFIG_PATH.exists():
+        try:
+            _ai_cfg_cache = _normalize_ai_config(
+                json.loads(AI_CONFIG_PATH.read_text())
+            )
+        except (OSError, json.JSONDecodeError):
+            _ai_cfg_cache = {"allowedTools": list(AI_DEFAULT_ALLOWED_TOOLS)}
+    else:
+        _ai_cfg_cache = {"allowedTools": list(AI_DEFAULT_ALLOWED_TOOLS)}
+    return _ai_cfg_cache
+
+
+def save_ai_config(cfg: dict[str, Any]) -> dict[str, Any]:
+    global _ai_cfg_cache
+    normalized = _normalize_ai_config(cfg)
+    _ai_cfg_cache = normalized
+    AI_CONFIG_PATH.write_text(
+        json.dumps(normalized, ensure_ascii=False, indent=2)
+    )
+    return normalized
 
 
 def _load_github_config() -> dict[str, Any]:
@@ -622,12 +679,34 @@ def _ensure_kpi_ids(kpis: list[dict]) -> list[dict]:
             kpi["targetValue"] = max(0, int(round(float(kpi.get("targetValue", 0) or 0))))
         except (TypeError, ValueError):
             kpi["targetValue"] = 0
+        if kpi["unit"] == "percent":
+            kpi["targetValue"] = 100
         try:
             kpi["currentValue"] = max(0, int(round(float(kpi.get("currentValue", 0) or 0))))
         except (TypeError, ValueError):
             kpi["currentValue"] = 0
         kpi.pop("value", None)
     return kpis
+
+
+_REPO_NAME_WITH_OWNER_RE = re.compile(r"^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$")
+
+
+def _normalize_goal_repository(goal: dict) -> dict:
+    """Goal.repository を "owner/name" 形式に正規化する。
+    - 空/空白/フォーマット不正は空文字にして保存から落とす。
+    - 余計なスラッシュや前後空白は trim する。
+    """
+    raw = goal.get("repository")
+    if not isinstance(raw, str):
+        goal.pop("repository", None)
+        return goal
+    value = raw.strip()
+    if value and _REPO_NAME_WITH_OWNER_RE.match(value):
+        goal["repository"] = value
+    else:
+        goal.pop("repository", None)
+    return goal
 
 
 def _is_goal_all_kpis_achieved(goal: dict) -> bool:
@@ -695,6 +774,7 @@ def process_todos(
                 existing["kpis"] = _ensure_kpi_ids(
                     existing.get("kpis", [])
                 )
+                _normalize_goal_repository(existing)
                 _sync_goal_achievement(existing)
             else:
                 new_goal: GoalData = {
@@ -706,6 +786,9 @@ def process_todos(
                     "achieved": bool(goal_data.get("achieved", False)),
                     "achievedAt": goal_data.get("achievedAt", ""),
                 }
+                if "repository" in goal_data:
+                    new_goal["repository"] = goal_data["repository"]
+                _normalize_goal_repository(new_goal)
                 _sync_goal_achievement(new_goal)
                 goals.append(new_goal)
                 existing_goal_map[new_goal["name"]] = new_goal
@@ -728,6 +811,7 @@ def process_todos(
                 for k, v in updates.items():
                     target[k] = v
                 target["kpis"] = _ensure_kpi_ids(target.get("kpis", []))
+                _normalize_goal_repository(target)
                 _sync_goal_achievement(target)
             continue
 
@@ -869,6 +953,8 @@ def build_board_context(
                 lines.append(f"    達成日: {g['achievedAt'][:10]}")
             if g.get("memo"):
                 lines.append(f"    メモ: {g['memo']}")
+            if g.get("repository"):
+                lines.append(f"    リポジトリ: {g['repository']}")
             for kpi in g.get("kpis", []):
                 unit_suffix = "%" if kpi.get("unit") == "percent" else ""
                 target = kpi.get("targetValue", 0)
@@ -1338,7 +1424,7 @@ TodoWrite ツールで todos 配列を渡してタスクを管理する。
 各 KPI は以下のフィールドを持つ:
 - name: KPI名 (必須)
 - unit: "number" または "percent"
-- targetValue: 目標値 (数値、0より大)
+- targetValue: 目標値 (数値、0より大)。unit が "percent" の場合は常に 100 固定
 - currentValue: 現在の値 (数値)
 目標には必ず1つ以上の KPI を設定すること。全 KPI が targetValue に到達すると、目標は自動的に達成扱いになる。
 
@@ -1348,12 +1434,22 @@ content を以下の形式にする (status は "completed"):
 
 ### 目標の更新
 content を以下の形式にする (status は "completed"):
-  GOAL_UPDATE:既存の目標名:{{"memo":"新しいメモ","kpis":[{{"name":"KPI名","unit":"percent","targetValue":80,"currentValue":40}}]}}
+  GOAL_UPDATE:既存の目標名:{{"memo":"新しいメモ","kpis":[{{"name":"KPI名","unit":"percent","targetValue":100,"currentValue":40}}]}}
 更新では変更したいフィールドだけ含めればよい。KPI の currentValue を更新することで進捗を反映できる。
 
 ### 例: タスク追加と目標追加を同時に行う
 TodoWrite の todos:
   [{{"content":"[HIGH] 企画書を作成","status":"pending"}},{{"content":"GOAL_ADD:{{\\\"name\\\":\\\"Q3売上目標\\\",\\\"memo\\\":\\\"前年比120%\\\",\\\"kpis\\\":[{{\\\"name\\\":\\\"月間売上(万円)\\\",\\\"unit\\\":\\\"number\\\",\\\"targetValue\\\":1000,\\\"currentValue\\\":0}}],\\\"deadline\\\":\\\"2026-09-30\\\"}}","status":"completed"}}]
+
+## 目標に紐付いた GitHub リポジトリ
+目標には `repository` ("owner/name") を任意で紐付けられる。紐付いた目標については、
+ユーザーから次のタスク提案や進捗相談を受けたら、必要に応じて Bash で gh コマンドを
+実行してリポジトリの状況を確認してよい。例:
+- `gh issue list -R owner/name --state open --limit 20`
+- `gh pr list -R owner/name --state open --limit 20`
+- `gh repo view owner/name`
+確認した状況（未対応 issue、直近の PR、README の ToDo など）から、目標達成に向けた
+具体的な次のタスクを提案・追加する。毎回機械的に叩かず、必要なときに限って使うこと。
 
 ## 制約
 - AskUserQuestion: 質問は最大4つ、各質問の選択肢は2〜4個まで
@@ -1381,6 +1477,7 @@ async def websocket_endpoint(ws: WebSocket):
         {"type": "retro_list_sync", "retros": load_retros()}
     )
     await ws.send_json(await _build_github_status())
+    await ws.send_json({"type": "ai_config_sync", "config": load_ai_config()})
 
     msg_queue: asyncio.Queue = asyncio.Queue()
 
@@ -1523,6 +1620,7 @@ async def websocket_endpoint(ws: WebSocket):
                 goal["kpis"] = _ensure_kpi_ids(goal.get("kpis", []))
                 goal.setdefault("achieved", False)
                 goal.setdefault("achievedAt", "")
+                _normalize_goal_repository(goal)
                 _sync_goal_achievement(goal)
                 goals.append(goal)
                 save_goals(goals)
@@ -1535,6 +1633,7 @@ async def websocket_endpoint(ws: WebSocket):
                 incoming["kpis"] = _ensure_kpi_ids(
                     incoming.get("kpis", [])
                 )
+                _normalize_goal_repository(incoming)
                 _sync_goal_achievement(incoming)
                 goals = [
                     incoming if g["id"] == incoming.get("id") else g
@@ -1625,6 +1724,22 @@ async def websocket_endpoint(ws: WebSocket):
                 cfg["autoSync"] = bool(data.get("value", True))
                 _save_github_config(cfg)
                 await broadcast(await _build_github_status())
+                continue
+
+            # --- AI ツール設定 ---
+            if data["type"] == "ai_config_update":
+                incoming = data.get("config", {})
+                normalized = save_ai_config(incoming)
+                # 次回メッセージで新しい allowed_tools を適用するため、既存クライアントを破棄
+                if client is not None:
+                    try:
+                        await client.disconnect()
+                    except Exception:
+                        pass
+                    client = None
+                await broadcast(
+                    {"type": "ai_config_sync", "config": normalized}
+                )
                 continue
 
             # --- 振り返り操作 ---
@@ -1934,7 +2049,7 @@ async def websocket_endpoint(ws: WebSocket):
                         can_use_tool=can_use_tool,
                         permission_mode="acceptEdits",
                         thinking={"type": "enabled", "budget_tokens": 10000},
-                        allowed_tools=["TodoWrite"],
+                        allowed_tools=load_ai_config()["allowedTools"],
                     )
                     client = ClaudeSDKClient(options=options)
                     await client.connect()
