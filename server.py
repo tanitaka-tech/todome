@@ -1060,7 +1060,6 @@ async def websocket_endpoint(ws: WebSocket):
                     tool_input: dict[str, Any],
                     context: ToolPermissionContext,
                 ) -> PermissionResultAllow:
-                    print(f"[can_use_tool] {tool_name} input={str(tool_input)[:200]}", flush=True)
                     if tool_name == "AskUserQuestion":
                         return await handle_ask_user_via_ws(ws, tool_input)
                     return PermissionResultAllow(updated_input=tool_input)
@@ -1086,7 +1085,6 @@ async def websocket_endpoint(ws: WebSocket):
                         permission_mode="acceptEdits",
                         thinking={"type": "enabled", "budget_tokens": 10000},
                         allowed_tools=["TodoWrite"],
-                        stderr=lambda s: print(f"[cli-stderr] {s}", flush=True),
                     )
                     client = ClaudeSDKClient(options=options)
                     await client.connect()
@@ -1101,7 +1099,6 @@ async def websocket_endpoint(ws: WebSocket):
                 result_sent = False
                 try:
                     async for msg in client.receive_response():
-                        print(f"[msg] {type(msg).__name__}", flush=True)
                         if isinstance(msg, StreamEvent):
                             event = msg.event
                             if event.get("type") == "content_block_delta":
@@ -1179,9 +1176,7 @@ async def websocket_endpoint(ws: WebSocket):
                                 }
                             )
                 except Exception as e:
-                    import traceback
                     print(f"response error: {e}")
-                    traceback.print_exc()
                 finally:
                     if not result_sent:
                         await ws.send_json(

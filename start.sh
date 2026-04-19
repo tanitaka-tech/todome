@@ -26,7 +26,15 @@ case "$MODE" in
     (cd client && npm run dev) &
     pids+=($!)
 
-    uv run uvicorn server:app --host 0.0.0.0 --port 3002 --reload &
+    # AI アシスタントが任意の .py を作成/編集すると
+    # uvicorn の既定 '*.py' ウォッチで再起動し、
+    # SDK サブプロセスと WebSocket が落ちてチャットが「止まる」ので、
+    # サーバー側の .py に限定してウォッチする。
+    uv run uvicorn server:app --host 0.0.0.0 --port 3002 \
+      --reload \
+      --reload-exclude '*.py' \
+      --reload-include 'server.py' \
+      --reload-include 'github_sync.py' &
     pids+=($!)
 
     wait -n "${pids[@]}"

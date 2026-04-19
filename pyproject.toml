@@ -11,6 +11,7 @@ dependencies = [
     "fastapi>=0.115.0",
     "python-dotenv>=1.0.0",
     "uvicorn>=0.30.0",
+    "watchfiles>=0.21.0",
     "websockets>=13.0",
 ]
 

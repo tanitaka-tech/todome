@@ -8,21 +8,42 @@ export function useWebSocket(onMessage: (msg: WSMessage) => void) {
   onMessageRef.current = onMessage;
 
   useEffect(() => {
-    const proto = location.protocol === "https:" ? "wss:" : "ws:";
-    const ws = new WebSocket(`${proto}//${location.hostname}:3002/ws`);
-    wsRef.current = ws;
+    let disposed = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let retryDelay = 500;
 
-    ws.onopen = () => setConnected(true);
-    ws.onclose = () => setConnected(false);
-    ws.onmessage = (e) => {
-      try {
-        onMessageRef.current(JSON.parse(e.data));
-      } catch {
-        /* ignore malformed */
-      }
+    const connect = () => {
+      if (disposed) return;
+      const proto = location.protocol === "https:" ? "wss:" : "ws:";
+      const ws = new WebSocket(`${proto}//${location.hostname}:3002/ws`);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        retryDelay = 500;
+        setConnected(true);
+      };
+      ws.onclose = () => {
+        setConnected(false);
+        if (disposed) return;
+        retryTimer = setTimeout(connect, retryDelay);
+        retryDelay = Math.min(retryDelay * 2, 5000);
+      };
+      ws.onmessage = (e) => {
+        try {
+          onMessageRef.current(JSON.parse(e.data));
+        } catch {
+          /* ignore malformed */
+        }
+      };
     };
 
-    return () => ws.close();
+    connect();
+
+    return () => {
+      disposed = true;
+      if (retryTimer) clearTimeout(retryTimer);
+      wsRef.current?.close();
+    };
   }, []);
 
   const send = useCallback((data: unknown) => {
