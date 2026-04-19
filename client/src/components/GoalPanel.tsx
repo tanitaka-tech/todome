@@ -3,8 +3,11 @@ import { createPortal } from "react-dom";
 import EmojiPicker, { EmojiStyle, Theme } from "emoji-picker-react";
 import {
   areAllKpisAchieved,
+  formatKpiTimeValue,
+  hmToSeconds,
   isKpiAchieved,
   kpiProgress,
+  secondsToHM,
   type Goal,
   type KPI,
   type KPIUnit,
@@ -34,12 +37,19 @@ function generateId() {
 }
 
 function formatKpiValue(value: number, unit: KPIUnit): string {
+  if (unit === "time") return formatKpiTimeValue(value);
   const v = Math.round(value);
   return unit === "percent" ? `${v}%` : String(v);
 }
 
 function toInt(v: string | number): number {
   return Math.max(0, Math.round(Number(v) || 0));
+}
+
+function timeSliderStep(targetSeconds: number): number {
+  if (targetSeconds >= 3600 * 10) return 300; // 10h超: 5分刻み
+  if (targetSeconds >= 3600) return 60; // 1h超: 1分刻み
+  return 30; // 短時間: 30秒刻み
 }
 
 function newKpi(): KPI {
@@ -441,7 +451,11 @@ export function GoalPanel({
                             className={`kpi-slider kpi-slider--card ${achieved ? "kpi-slider--done" : ""}`}
                             min={0}
                             max={kpi.targetValue > 0 ? kpi.targetValue : 100}
-                            step={1}
+                            step={
+                              kpi.unit === "time"
+                                ? timeSliderStep(kpi.targetValue)
+                                : 1
+                            }
                             value={Math.min(
                               Math.round(kpi.currentValue),
                               kpi.targetValue > 0
@@ -646,25 +660,70 @@ export function GoalPanel({
                       </button>
                     </div>
                     <div className="kpi-edit-row-bottom">
-                      <label className="kpi-field">
-                        <span className="kpi-field-label">目標値</span>
-                        <input
-                          className="kpi-input kpi-input-num"
-                          type="number"
-                          inputMode="numeric"
-                          step={1}
-                          min={0}
-                          value={kpi.unit === "percent" ? 100 : kpi.targetValue}
-                          disabled={kpi.unit === "percent"}
-                          onChange={(e) =>
-                            updateKpi(
-                              kpi.id,
-                              "targetValue",
-                              toInt(e.target.value),
-                            )
-                          }
-                        />
-                      </label>
+                      {kpi.unit === "time" ? (
+                        <label className="kpi-field">
+                          <span className="kpi-field-label">目標時間</span>
+                          <div className="kpi-time-input">
+                            <input
+                              className="kpi-input kpi-input-num"
+                              type="number"
+                              inputMode="numeric"
+                              min={0}
+                              value={secondsToHM(kpi.targetValue).h}
+                              onChange={(e) =>
+                                updateKpi(
+                                  kpi.id,
+                                  "targetValue",
+                                  hmToSeconds(
+                                    toInt(e.target.value),
+                                    secondsToHM(kpi.targetValue).m,
+                                  ),
+                                )
+                              }
+                            />
+                            <span className="kpi-time-unit">h</span>
+                            <input
+                              className="kpi-input kpi-input-num"
+                              type="number"
+                              inputMode="numeric"
+                              min={0}
+                              max={59}
+                              value={secondsToHM(kpi.targetValue).m}
+                              onChange={(e) =>
+                                updateKpi(
+                                  kpi.id,
+                                  "targetValue",
+                                  hmToSeconds(
+                                    secondsToHM(kpi.targetValue).h,
+                                    Math.min(59, toInt(e.target.value)),
+                                  ),
+                                )
+                              }
+                            />
+                            <span className="kpi-time-unit">m</span>
+                          </div>
+                        </label>
+                      ) : (
+                        <label className="kpi-field">
+                          <span className="kpi-field-label">目標値</span>
+                          <input
+                            className="kpi-input kpi-input-num"
+                            type="number"
+                            inputMode="numeric"
+                            step={1}
+                            min={0}
+                            value={kpi.unit === "percent" ? 100 : kpi.targetValue}
+                            disabled={kpi.unit === "percent"}
+                            onChange={(e) =>
+                              updateKpi(
+                                kpi.id,
+                                "targetValue",
+                                toInt(e.target.value),
+                              )
+                            }
+                          />
+                        </label>
+                      )}
                       <label className="kpi-field">
                         <span className="kpi-field-label">単位</span>
                         <select
@@ -680,6 +739,7 @@ export function GoalPanel({
                         >
                           <option value="number">数値</option>
                           <option value="percent">パーセンテージ</option>
+                          <option value="time">時間</option>
                         </select>
                       </label>
                     </div>
@@ -701,7 +761,11 @@ export function GoalPanel({
                         className={`kpi-slider ${isKpiAchieved(kpi) ? "kpi-slider--done" : ""}`}
                         min={0}
                         max={kpi.targetValue > 0 ? kpi.targetValue : 100}
-                        step={1}
+                        step={
+                          kpi.unit === "time"
+                            ? timeSliderStep(kpi.targetValue)
+                            : 1
+                        }
                         value={Math.min(
                           Math.round(kpi.currentValue),
                           kpi.targetValue > 0
