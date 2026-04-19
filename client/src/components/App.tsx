@@ -533,8 +533,8 @@ export function App() {
   );
 
   const handleRetroStart = useCallback(
-    (retroType: RetroType, resumeDraftId?: string) => {
-      send({ type: "retro_start", retroType, resumeDraftId });
+    (retroType: RetroType, anchorDate?: string, resumeDraftId?: string) => {
+      send({ type: "retro_start", retroType, anchorDate, resumeDraftId });
       setRetroStreamText("");
     },
     [send],

@@ -4050,6 +4050,58 @@ body {
   gap: 8px;
   flex-wrap: wrap;
 }
+.retro-start-period-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px dashed var(--border);
+}
+.retro-start-period-label {
+  font-size: 12px;
+  color: var(--fg-muted);
+  font-weight: 500;
+}
+.retro-start-date-input {
+  font-size: 13px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: inherit;
+}
+.retro-start-period-range {
+  font-size: 12px;
+  color: var(--fg-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.retro-start-period-tag {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--surface-2, var(--surface));
+  border: 1px solid var(--border);
+  color: var(--fg-muted);
+  letter-spacing: 0.04em;
+}
+.retro-start-period-today {
+  font-size: 11px;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+.retro-start-period-today:hover {
+  color: var(--fg);
+  background: var(--surface);
+}
 
 .retro-history-title {
   font-family: var(--font-mono);

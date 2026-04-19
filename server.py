@@ -1664,6 +1664,13 @@ async def websocket_endpoint(ws: WebSocket):
                 if retro_type not in RETRO_TYPES:
                     retro_type = "weekly"
                 resume_id = data.get("resumeDraftId") or None
+                anchor_raw = (data.get("anchorDate") or "").strip()
+                anchor_date: datetime.date | None = None
+                if anchor_raw:
+                    try:
+                        anchor_date = datetime.date.fromisoformat(anchor_raw)
+                    except ValueError:
+                        anchor_date = None
 
                 retro_entry: RetrospectiveData | None = None
                 if resume_id:
@@ -1672,7 +1679,9 @@ async def websocket_endpoint(ws: WebSocket):
                         # 完了済みは再開不可
                         retro_entry = None
                 if retro_entry is None:
-                    period_start, period_end = _compute_retro_period(retro_type)
+                    period_start, period_end = _compute_retro_period(
+                        retro_type, anchor_date
+                    )
                     completed_ids = _completed_task_ids_in_period(
                         kanban_tasks, period_start, period_end
                     )

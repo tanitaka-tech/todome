@@ -9,7 +9,7 @@ interface Props {
   tasks: KanbanTask[];
   streamText: string;
   waiting: boolean;
-  onStart: (type: RetroType, resumeDraftId?: string) => void;
+  onStart: (type: RetroType, anchorDate?: string, resumeDraftId?: string) => void;
   onSend: (text: string) => void;
   onComplete: () => void;
   onCloseSession: () => void;
@@ -60,6 +60,45 @@ function formatDateTime(iso: string): string {
   return iso.replace("T", " ").slice(0, 16);
 }
 
+function todayIsoDate(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function fmtDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function computePeriod(
+  type: RetroType,
+  dateStr: string,
+): { start: string; end: string } {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  if (!y || !m || !d) {
+    const t = todayIsoDate();
+    return { start: t, end: t };
+  }
+  const date = new Date(y, m - 1, d);
+  if (type === "daily") {
+    const s = fmtDate(date);
+    return { start: s, end: s };
+  }
+  if (type === "weekly") {
+    const dow = (date.getDay() + 6) % 7; // Mon=0
+    const start = new Date(date);
+    start.setDate(date.getDate() - dow);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    return { start: fmtDate(start), end: fmtDate(end) };
+  }
+  if (type === "monthly") {
+    const start = new Date(y, m - 1, 1);
+    const end = new Date(y, m, 0);
+    return { start: fmtDate(start), end: fmtDate(end) };
+  }
+  return { start: `${y}-01-01`, end: `${y}-12-31` };
+}
+
 export function RetroPanel({
   retros,
   activeRetro,
@@ -77,6 +116,7 @@ export function RetroPanel({
   onEditDayRating,
 }: Props) {
   const [tab, setTab] = useState<RetroType>("weekly");
+  const [anchorDate, setAnchorDate] = useState<string>(() => todayIsoDate());
   const [discardTarget, setDiscardTarget] = useState<Retrospective | null>(
     null,
   );
@@ -107,8 +147,23 @@ export function RetroPanel({
   }, [retros]);
 
   const currentList = retrosByType[tab];
-  const draft = currentList.find((r) => !r.completedAt) || null;
+  const targetPeriod = useMemo(
+    () => computePeriod(tab, anchorDate),
+    [tab, anchorDate],
+  );
+  const draft =
+    currentList.find(
+      (r) =>
+        !r.completedAt &&
+        r.periodStart === targetPeriod.start &&
+        r.periodEnd === targetPeriod.end,
+    ) || null;
+  const otherDrafts = currentList.filter(
+    (r) => !r.completedAt && r.id !== (draft?.id ?? ""),
+  );
   const completed = currentList.filter((r) => !!r.completedAt);
+  const today = todayIsoDate();
+  const isPastPeriod = targetPeriod.end < today;
 
   if (activeRetro) {
     return (
@@ -153,10 +208,36 @@ export function RetroPanel({
 
       <div className="page-body">
         <div className="retro-start-card">
+          <div className="retro-start-period-row">
+            <label className="retro-start-period-label">対象日</label>
+            <input
+              type="date"
+              className="retro-start-date-input"
+              value={anchorDate}
+              max={today}
+              onChange={(e) => setAnchorDate(e.target.value || today)}
+            />
+            <span className="retro-start-period-range">
+              {targetPeriod.start === targetPeriod.end
+                ? targetPeriod.start
+                : `${targetPeriod.start} 〜 ${targetPeriod.end}`}
+              {isPastPeriod && (
+                <span className="retro-start-period-tag">過去</span>
+              )}
+            </span>
+            {anchorDate !== today && (
+              <button
+                className="retro-start-period-today"
+                onClick={() => setAnchorDate(today)}
+              >
+                今日に戻す
+              </button>
+            )}
+          </div>
           {draft ? (
             <>
               <div className="retro-start-title">
-                進行中のドラフトがあります
+                この期間のドラフトがあります
               </div>
               <div className="retro-start-meta">
                 {draft.periodStart} 〜 {draft.periodEnd} · 最終更新{" "}
@@ -165,7 +246,7 @@ export function RetroPanel({
               <div className="retro-start-actions">
                 <button
                   className="btn btn--primary"
-                  onClick={() => onStart(tab, draft.id)}
+                  onClick={() => onStart(tab, anchorDate, draft.id)}
                 >
                   前回の続きから再開
                 </button>
@@ -188,7 +269,7 @@ export function RetroPanel({
               <div className="retro-start-actions">
                 <button
                   className="btn btn--primary"
-                  onClick={() => onStart(tab)}
+                  onClick={() => onStart(tab, anchorDate)}
                 >
                   振り返りを始める
                 </button>
@@ -199,32 +280,32 @@ export function RetroPanel({
 
         <div className="retro-history-title">履歴</div>
         <div className="retro-history">
-          {draft && (
-            <div key={draft.id} className="retro-history-card-wrap">
+          {[...(draft ? [draft] : []), ...otherDrafts].map((d) => (
+            <div key={d.id} className="retro-history-card-wrap">
               <button
                 className="retro-history-card retro-history-card--draft"
-                onClick={() => onOpenRetro(draft)}
+                onClick={() => onOpenRetro(d)}
               >
                 <div className="retro-history-card-head">
                   <span className="retro-history-badge retro-history-badge--draft">
                     ドラフト
                   </span>
                   <span className="retro-history-period">
-                    {draft.periodStart} 〜 {draft.periodEnd}
+                    {d.periodStart} 〜 {d.periodEnd}
                   </span>
                 </div>
                 <div className="retro-history-summary">
-                  {summaryFromRetro(draft)}
+                  {summaryFromRetro(d)}
                 </div>
                 <div className="retro-history-meta">
-                  最終更新 {formatDateTime(draft.updatedAt)}
+                  最終更新 {formatDateTime(d.updatedAt)}
                 </div>
               </button>
               <button
                 className="retro-history-delete"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setDeleteTarget(draft);
+                  setDeleteTarget(d);
                 }}
                 title="削除"
                 aria-label="削除"
@@ -232,8 +313,8 @@ export function RetroPanel({
                 &times;
               </button>
             </div>
-          )}
-          {completed.length === 0 && !draft && (
+          ))}
+          {completed.length === 0 && !draft && otherDrafts.length === 0 && (
             <div className="retro-history-empty">
               まだ{TYPE_LABEL[tab]}の履歴はありません。
             </div>
@@ -319,7 +400,7 @@ export function RetroPanel({
                   onDiscardDraft(discardTarget.id);
                   closeDiscard();
                   // 新規作成開始
-                  setTimeout(() => onStart(tab), 0);
+                  setTimeout(() => onStart(tab, anchorDate), 0);
                 }}
               >
                 破棄して新規作成
