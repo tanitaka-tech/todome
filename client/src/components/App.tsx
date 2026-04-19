@@ -6,6 +6,8 @@ import type {
   Goal,
   KanbanTask,
   RepoInfo,
+  Retrospective,
+  RetroType,
   UserProfile,
   WSMessage,
 } from "../types";
@@ -20,6 +22,7 @@ import { ProfilePanel } from "./ProfilePanel";
 import { StatsPanel } from "./StatsPanel";
 import { OverviewPanel } from "./OverviewPanel";
 import { SettingsPanel } from "./SettingsPanel";
+import { RetroPanel } from "./RetroPanel";
 
 let msgId = 0;
 const nextId = () => String(++msgId);
@@ -28,6 +31,7 @@ type ActiveView =
   | "overview"
   | "board"
   | "goals"
+  | "retro"
   | "stats"
   | "profile"
   | "settings";
@@ -67,6 +71,7 @@ const NAV_ITEMS: {
   { id: "overview", label: "Overview", icon: "▦", group: "work" },
   { id: "board", label: "ボード", icon: "▤", group: "work" },
   { id: "goals", label: "目標", icon: "◎", group: "work" },
+  { id: "retro", label: "振り返り", icon: "↻", group: "work" },
   { id: "stats", label: "統計", icon: "▨", group: "work" },
   { id: "profile", label: "自分について", icon: "◉", group: "app" },
   { id: "settings", label: "設定", icon: "⚙", group: "app" },
@@ -76,6 +81,7 @@ const VIEW_LABEL: Record<ActiveView, string> = {
   overview: "Overview",
   board: "ボード",
   goals: "目標管理",
+  retro: "振り返り",
   stats: "統計",
   profile: "自分について",
   settings: "設定",
@@ -130,6 +136,10 @@ export function App() {
   const [chatOpen, setChatOpen] = useState(true);
   const [githubStatus, setGithubStatus] = useState<GitHubStatus | null>(null);
   const [githubRepos, setGithubRepos] = useState<RepoInfo[]>([]);
+  const [retros, setRetros] = useState<Retrospective[]>([]);
+  const [activeRetro, setActiveRetro] = useState<Retrospective | null>(null);
+  const [retroStreamText, setRetroStreamText] = useState("");
+  const [retroWaiting, setRetroWaiting] = useState(false);
 
   useEffect(() => {
     applyTheme(theme);
@@ -241,6 +251,80 @@ export function App() {
             text: `完了 — $${msg.cost.toFixed(4)} / ${msg.turns} turns`,
           },
         ]);
+        break;
+      case "retro_list_sync":
+        setRetros(msg.retros);
+        setActiveRetro((prev) => {
+          if (!prev) return prev;
+          const updated = msg.retros.find((r) => r.id === prev.id);
+          return updated ?? prev;
+        });
+        break;
+      case "retro_sync":
+        setRetros((prev) => {
+          const exists = prev.some((r) => r.id === msg.retro.id);
+          return exists
+            ? prev.map((r) => (r.id === msg.retro.id ? msg.retro : r))
+            : [msg.retro, ...prev];
+        });
+        setActiveRetro(msg.retro);
+        setRetroStreamText("");
+        break;
+      case "retro_doc_update":
+        setRetros((prev) =>
+          prev.map((r) =>
+            r.id === msg.retroId ? { ...r, document: msg.document } : r,
+          ),
+        );
+        setActiveRetro((prev) =>
+          prev && prev.id === msg.retroId
+            ? { ...prev, document: msg.document }
+            : prev,
+        );
+        break;
+      case "retro_stream_delta":
+        setRetroStreamText((p) => p + msg.text);
+        break;
+      case "retro_assistant":
+        setRetroStreamText("");
+        setActiveRetro((prev) =>
+          prev
+            ? {
+                ...prev,
+                messages: [
+                  ...prev.messages,
+                  { role: "assistant", text: msg.text },
+                ],
+              }
+            : prev,
+        );
+        break;
+      case "retro_completed":
+        setRetros((prev) => {
+          const exists = prev.some((r) => r.id === msg.retro.id);
+          return exists
+            ? prev.map((r) => (r.id === msg.retro.id ? msg.retro : r))
+            : [msg.retro, ...prev];
+        });
+        setActiveRetro(msg.retro);
+        setRetroStreamText("");
+        setRetroWaiting(false);
+        break;
+      case "retro_session_waiting":
+        setRetroWaiting(msg.waiting);
+        break;
+      case "retro_session_closed":
+        setActiveRetro(null);
+        setRetroStreamText("");
+        setRetroWaiting(false);
+        break;
+      case "retro_error":
+        setRetroWaiting(false);
+        setRetroStreamText("");
+        // eslint-disable-next-line no-console
+        console.error("retro error:", msg.message);
+        break;
+      case "retro_thinking_delta":
         break;
     }
   }, []);
@@ -390,7 +474,7 @@ export function App() {
         if (!task) return prev;
         const now = new Date().toISOString();
         let updated = { ...task, column: column as KanbanTask["column"] };
-        if (task.timerStartedAt) {
+        if (task.timerStartedAt && column === "done") {
           const elapsed = Math.floor(
             (Date.now() - new Date(task.timerStartedAt).getTime()) / 1000,
           );
@@ -431,6 +515,56 @@ export function App() {
       });
     },
     [send, showCelebration],
+  );
+
+  const handleRetroStart = useCallback(
+    (retroType: RetroType, resumeDraftId?: string) => {
+      send({ type: "retro_start", retroType, resumeDraftId });
+      setRetroStreamText("");
+    },
+    [send],
+  );
+
+  const handleRetroSend = useCallback(
+    (text: string) => {
+      if (!activeRetro) return;
+      setActiveRetro((prev) =>
+        prev
+          ? {
+              ...prev,
+              messages: [...prev.messages, { role: "user", text }],
+            }
+          : prev,
+      );
+      setRetroWaiting(true);
+      setRetroStreamText("");
+      send({ type: "retro_message", retroId: activeRetro.id, text });
+    },
+    [activeRetro, send],
+  );
+
+  const handleRetroComplete = useCallback(() => {
+    if (!activeRetro) return;
+    setRetroWaiting(true);
+    setRetroStreamText("");
+    send({ type: "retro_complete", retroId: activeRetro.id });
+  }, [activeRetro, send]);
+
+  const handleRetroCloseSession = useCallback(() => {
+    setActiveRetro(null);
+    setRetroStreamText("");
+  }, []);
+
+  const handleRetroOpen = useCallback((retro: Retrospective) => {
+    setActiveRetro(retro);
+    setRetroStreamText("");
+  }, []);
+
+  const handleRetroDiscardDraft = useCallback(
+    (draftId: string) => {
+      send({ type: "retro_discard_draft", draftId });
+    },
+    [send],
   );
 
   const popupTask = useMemo(() => {
@@ -551,6 +685,20 @@ export function App() {
           />
         ) : activeView === "goals" ? (
           <GoalPanel goals={goals} setGoals={setGoals} send={send} />
+        ) : activeView === "retro" ? (
+          <RetroPanel
+            retros={retros}
+            activeRetro={activeRetro}
+            tasks={tasks}
+            streamText={retroStreamText}
+            waiting={retroWaiting}
+            onStart={handleRetroStart}
+            onSend={handleRetroSend}
+            onComplete={handleRetroComplete}
+            onCloseSession={handleRetroCloseSession}
+            onOpenRetro={handleRetroOpen}
+            onDiscardDraft={handleRetroDiscardDraft}
+          />
         ) : activeView === "stats" ? (
           <StatsPanel tasks={tasks} goals={goals} tick={tick} />
         ) : activeView === "profile" ? (

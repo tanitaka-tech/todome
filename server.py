@@ -127,6 +127,18 @@ def init_db() -> None:
                 id INTEGER PRIMARY KEY CHECK (id = 1),
                 data TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS retrospectives (
+                id TEXT PRIMARY KEY,
+                type TEXT NOT NULL,
+                period_start TEXT NOT NULL,
+                period_end TEXT NOT NULL,
+                document TEXT NOT NULL,
+                messages TEXT NOT NULL,
+                ai_comment TEXT NOT NULL DEFAULT '',
+                completed_at TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
             """
         )
 
@@ -186,6 +198,89 @@ def save_profile(profile: ProfileData) -> None:
             "ON CONFLICT(id) DO UPDATE SET data = excluded.data",
             (json.dumps(profile, ensure_ascii=False),),
         )
+
+
+# --- Retrospective storage ---
+RetrospectiveData = dict[str, Any]
+
+
+def _retro_row_to_dict(row: sqlite3.Row) -> RetrospectiveData:
+    return {
+        "id": row["id"],
+        "type": row["type"],
+        "periodStart": row["period_start"],
+        "periodEnd": row["period_end"],
+        "document": json.loads(row["document"]),
+        "messages": json.loads(row["messages"]),
+        "aiComment": row["ai_comment"] or "",
+        "completedAt": row["completed_at"] or "",
+        "createdAt": row["created_at"],
+        "updatedAt": row["updated_at"],
+    }
+
+
+def load_retros() -> list[RetrospectiveData]:
+    with _db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM retrospectives ORDER BY created_at DESC"
+        ).fetchall()
+    return [_retro_row_to_dict(r) for r in rows]
+
+
+def get_retro(retro_id: str) -> RetrospectiveData | None:
+    with _db() as conn:
+        row = conn.execute(
+            "SELECT * FROM retrospectives WHERE id = ?", (retro_id,)
+        ).fetchone()
+    return _retro_row_to_dict(row) if row else None
+
+
+def get_retro_draft(retro_type: str) -> RetrospectiveData | None:
+    """同一種別で completedAt が空 (ドラフト) の最新の振り返りを返す。"""
+    with _db() as conn:
+        row = conn.execute(
+            "SELECT * FROM retrospectives "
+            "WHERE type = ? AND (completed_at = '' OR completed_at IS NULL) "
+            "ORDER BY updated_at DESC LIMIT 1",
+            (retro_type,),
+        ).fetchone()
+    return _retro_row_to_dict(row) if row else None
+
+
+def save_retro(retro: RetrospectiveData) -> None:
+    with _db() as conn:
+        conn.execute(
+            "INSERT INTO retrospectives "
+            "(id, type, period_start, period_end, document, messages, "
+            " ai_comment, completed_at, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(id) DO UPDATE SET "
+            "  type = excluded.type, "
+            "  period_start = excluded.period_start, "
+            "  period_end = excluded.period_end, "
+            "  document = excluded.document, "
+            "  messages = excluded.messages, "
+            "  ai_comment = excluded.ai_comment, "
+            "  completed_at = excluded.completed_at, "
+            "  updated_at = excluded.updated_at",
+            (
+                retro["id"],
+                retro["type"],
+                retro["periodStart"],
+                retro["periodEnd"],
+                json.dumps(retro["document"], ensure_ascii=False),
+                json.dumps(retro["messages"], ensure_ascii=False),
+                retro.get("aiComment", ""),
+                retro.get("completedAt", ""),
+                retro["createdAt"],
+                retro["updatedAt"],
+            ),
+        )
+
+
+def delete_retro(retro_id: str) -> None:
+    with _db() as conn:
+        conn.execute("DELETE FROM retrospectives WHERE id = ?", (retro_id,))
 
 
 init_db()
@@ -335,9 +430,11 @@ async def _broadcast_db_state() -> None:
     tasks = load_tasks()
     goals = load_goals()
     profile = load_profile()
+    retros = load_retros()
     await broadcast({"type": "kanban_sync", "tasks": tasks})
     await broadcast({"type": "goal_sync", "goals": goals})
     await broadcast({"type": "profile_sync", "profile": profile})
+    await broadcast({"type": "retro_list_sync", "retros": retros})
 
 
 async def _do_link(
@@ -737,6 +834,390 @@ def build_board_context(
     return "\n".join(lines)
 
 
+# --- Retrospective helpers ---
+
+RETRO_TYPES = ("daily", "weekly", "monthly", "yearly")
+
+
+def _compute_retro_period(retro_type: str, today: datetime.date | None = None) -> tuple[str, str]:
+    """振り返り種別から対象期間 (ISO date start/end) を計算。
+
+    - daily   : 当日 0:00〜23:59 (同日)
+    - weekly  : 直近の月曜〜日曜
+    - monthly : 当月 1日〜月末
+    - yearly  : 当年 1/1〜12/31
+    """
+    d = today or datetime.date.today()
+    if retro_type == "daily":
+        return d.isoformat(), d.isoformat()
+    if retro_type == "weekly":
+        # Monday = 0 〜 Sunday = 6
+        start = d - datetime.timedelta(days=d.weekday())
+        end = start + datetime.timedelta(days=6)
+        return start.isoformat(), end.isoformat()
+    if retro_type == "monthly":
+        start = d.replace(day=1)
+        if d.month == 12:
+            next_first = datetime.date(d.year + 1, 1, 1)
+        else:
+            next_first = datetime.date(d.year, d.month + 1, 1)
+        end = next_first - datetime.timedelta(days=1)
+        return start.isoformat(), end.isoformat()
+    if retro_type == "yearly":
+        start = datetime.date(d.year, 1, 1)
+        end = datetime.date(d.year, 12, 31)
+        return start.isoformat(), end.isoformat()
+    # fallback: today
+    return d.isoformat(), d.isoformat()
+
+
+def _completed_task_ids_in_period(
+    tasks: list[KanbanTask], period_start: str, period_end: str
+) -> list[str]:
+    """期間内に completedAt が入ったタスクの id を返す。"""
+    result: list[str] = []
+    try:
+        start_dt = datetime.datetime.fromisoformat(period_start + "T00:00:00")
+        end_dt = datetime.datetime.fromisoformat(period_end + "T23:59:59")
+    except ValueError:
+        return result
+    for t in tasks:
+        if t.get("column") != "done":
+            continue
+        completed_at = t.get("completedAt") or ""
+        if not completed_at:
+            continue
+        try:
+            # タイムゾーン非依存で比較するために末尾の Z などは除去
+            ca = completed_at.replace("Z", "")
+            cdt = datetime.datetime.fromisoformat(ca[:19])
+        except ValueError:
+            continue
+        if start_dt <= cdt <= end_dt:
+            result.append(t["id"])
+    return result
+
+
+RETRO_TYPE_LABEL = {
+    "daily": "日次振り返り",
+    "weekly": "週次振り返り",
+    "monthly": "月次振り返り",
+    "yearly": "年次振り返り",
+}
+
+
+RETRO_DOC_TAG_OPEN = "<retrodoc>"
+RETRO_DOC_TAG_CLOSE = "</retrodoc>"
+
+
+def _strip_retrodoc_block(text: str) -> tuple[str, dict[str, Any] | None]:
+    """アシスタント応答から <retrodoc>{...}</retrodoc> を取り除き、JSONをパースして返す。"""
+    start = text.find(RETRO_DOC_TAG_OPEN)
+    if start == -1:
+        return text, None
+    end = text.find(RETRO_DOC_TAG_CLOSE, start)
+    if end == -1:
+        return text, None
+    payload = text[start + len(RETRO_DOC_TAG_OPEN) : end].strip()
+    cleaned = (text[:start] + text[end + len(RETRO_DOC_TAG_CLOSE) :]).strip()
+    try:
+        parsed = json.loads(payload)
+    except json.JSONDecodeError:
+        return cleaned, None
+    if not isinstance(parsed, dict):
+        return cleaned, None
+    return cleaned, parsed
+
+
+def _merge_retro_document(
+    current: dict[str, Any], updates: dict[str, Any]
+) -> dict[str, Any]:
+    """AIからの更新を現在のドキュメントにマージ。想定フィールドのみ受け付ける。"""
+    merged = dict(current)
+    for key in ("findings", "improvements", "idealState", "actions"):
+        val = updates.get(key)
+        if isinstance(val, str):
+            merged[key] = val.strip()
+    return merged
+
+
+def _retro_done_tasks_context(
+    task_ids: list[str], tasks: list[KanbanTask], goals: list[GoalData]
+) -> str:
+    if not task_ids:
+        return "(この期間中に完了したタスクはありません)"
+    goal_map = {g["id"]: g for g in goals}
+    task_map = {t["id"]: t for t in tasks}
+    lines: list[str] = []
+    for tid in task_ids:
+        t = task_map.get(tid)
+        if not t:
+            continue
+        goal_note = ""
+        if t.get("goalId") and t["goalId"] in goal_map:
+            goal_note = f' (目標: {goal_map[t["goalId"]]["name"]})'
+        memo = f" — メモ: {t['memo']}" if t.get("memo") else ""
+        lines.append(f"- {t['title']}{goal_note}{memo}")
+    return "\n".join(lines) if lines else "(タスク情報なし)"
+
+
+def _build_retro_system_prompt(
+    retro: RetrospectiveData,
+    tasks: list[KanbanTask],
+    goals: list[GoalData],
+    profile: ProfileData,
+) -> str:
+    profile_ctx = build_profile_context(profile)
+    done_ctx = _retro_done_tasks_context(
+        retro["document"].get("completedTasks", []), tasks, goals
+    )
+    doc = retro["document"]
+    type_label = RETRO_TYPE_LABEL.get(retro["type"], "振り返り")
+    current_doc_json = json.dumps(
+        {
+            "findings": doc.get("findings", ""),
+            "improvements": doc.get("improvements", ""),
+            "idealState": doc.get("idealState", ""),
+            "actions": doc.get("actions", ""),
+        },
+        ensure_ascii=False,
+    )
+    return f"""\
+あなたはユーザーの{type_label}を伴走するコーチAIです。
+対象期間: {retro['periodStart']} 〜 {retro['periodEnd']}
+
+## 役割
+ユーザーに温かく寄り添い、下記4観点を順番に深掘りしながら振り返りを構造化してください。
+1. 気づいたこと (findings): 期間内に起きた出来事・感じたこと
+2. 改善点 (improvements): 気づきから派生する具体的な改善アクション
+3. 次のどうなっていたら最高か？ (idealState): 理想の状態・ゴールイメージ
+4. そのためにやること・辞めること (actions): 具体アクション (やる / 辞める)
+
+## 対話の進め方
+- 一度に1〜2個の質問だけに絞る
+- ユーザーの回答を受け、該当セクションのドキュメントを更新する
+- 全観点がある程度埋まったら、「いつでも完了ボタンを押して終了できます」とユーザーに伝える
+- 冒頭メッセージでは簡単に挨拶し、まずは気づいたこと・印象的だった出来事を尋ねる
+
+## 応答フォーマット (厳守)
+毎回の応答の最後に、必ず以下のタグでドキュメントの最新状態を返すこと:
+<retrodoc>{{"findings":"...","improvements":"...","idealState":"...","actions":"..."}}</retrodoc>
+
+- 値は Markdown 箇条書き (- ...) 推奨。空欄の場合は "" のまま返す
+- 既存の内容を削らず、必要に応じて追記・整理する
+- ユーザーの発言を勝手に広げすぎず、事実ベースで要約する
+
+## 現時点のドキュメント
+{current_doc_json}
+
+## 期間内の達成タスク
+{done_ctx}
+
+{profile_ctx}
+"""
+
+
+def _retro_welcome_text(retro_type: str, period_start: str, period_end: str) -> str:
+    label = RETRO_TYPE_LABEL.get(retro_type, "振り返り")
+    return (
+        f"{label}をはじめましょう ({period_start} 〜 {period_end})。\n\n"
+        "まずは、この期間で印象に残った出来事や気づいたことを教えてください。"
+    )
+
+
+def _build_retro_transcript(retro: RetrospectiveData, new_user_msg: str | None) -> str:
+    parts: list[str] = []
+    for m in retro["messages"]:
+        role = "assistant" if m.get("role") == "assistant" else "user"
+        parts.append(f"[{role}]\n{m.get('text', '')}")
+    if new_user_msg is not None:
+        parts.append(f"[user]\n{new_user_msg}")
+    return "\n\n".join(parts)
+
+
+async def run_retro_turn(
+    ws: WebSocket,
+    retro: RetrospectiveData,
+    user_msg: str,
+    tasks: list[KanbanTask],
+    goals: list[GoalData],
+    profile: ProfileData,
+) -> RetrospectiveData:
+    """retro に対して AI 1 ターン実行し、更新後の retro を返す。"""
+    system_prompt = _build_retro_system_prompt(retro, tasks, goals, profile)
+    transcript = _build_retro_transcript(retro, user_msg)
+
+    options = ClaudeAgentOptions(
+        model="sonnet",
+        cwd=str(Path(__file__).parent),
+        system_prompt=system_prompt,
+        include_partial_messages=True,
+        permission_mode="acceptEdits",
+        thinking={"type": "enabled", "budget_tokens": 4000},
+        allowed_tools=[],
+    )
+    client = ClaudeSDKClient(options=options)
+    await client.connect()
+    text_parts: list[str] = []
+    try:
+        await client.query(transcript)
+        async for msg in client.receive_response():
+            if isinstance(msg, StreamEvent):
+                event = msg.event
+                if event.get("type") == "content_block_delta":
+                    delta = event.get("delta", {})
+                    if delta.get("type") == "text_delta":
+                        await ws.send_json(
+                            {
+                                "type": "retro_stream_delta",
+                                "text": delta.get("text", ""),
+                            }
+                        )
+                    elif delta.get("type") == "thinking_delta":
+                        await ws.send_json(
+                            {
+                                "type": "retro_thinking_delta",
+                                "text": delta.get("thinking", ""),
+                            }
+                        )
+            elif isinstance(msg, AssistantMessage):
+                for block in msg.content:
+                    if isinstance(block, TextBlock):
+                        text_parts.append(block.text)
+            elif isinstance(msg, ResultMessage):
+                pass
+    finally:
+        try:
+            await client.disconnect()
+        except Exception:
+            pass
+
+    full = "".join(text_parts).strip()
+    cleaned, doc_updates = _strip_retrodoc_block(full)
+    if not cleaned:
+        cleaned = "（応答を生成できませんでした。もう一度試してください）"
+
+    now_iso = datetime.datetime.now().isoformat(timespec="seconds")
+    new_retro = dict(retro)
+    new_messages = list(retro["messages"])
+    new_messages.append({"role": "user", "text": user_msg})
+    new_messages.append({"role": "assistant", "text": cleaned})
+    new_retro["messages"] = new_messages
+    new_retro["updatedAt"] = now_iso
+    if doc_updates:
+        merged = _merge_retro_document(retro["document"], doc_updates)
+        merged["completedTasks"] = retro["document"].get("completedTasks", [])
+        new_retro["document"] = merged
+
+    save_retro(new_retro)
+    schedule_autosync()
+    await ws.send_json({"type": "retro_assistant", "text": cleaned})
+    await ws.send_json(
+        {
+            "type": "retro_doc_update",
+            "retroId": new_retro["id"],
+            "document": new_retro["document"],
+        }
+    )
+    return new_retro
+
+
+async def finalize_retro(
+    ws: WebSocket,
+    retro: RetrospectiveData,
+    tasks: list[KanbanTask],
+    goals: list[GoalData],
+    profile: ProfileData,
+) -> RetrospectiveData:
+    """振り返りを完了状態にし、AI 評価コメントを生成して保存する。"""
+    profile_ctx = build_profile_context(profile)
+    doc = retro["document"]
+    done_ctx = _retro_done_tasks_context(
+        doc.get("completedTasks", []), tasks, goals
+    )
+    type_label = RETRO_TYPE_LABEL.get(retro["type"], "振り返り")
+    doc_text = json.dumps(
+        {
+            "findings": doc.get("findings", ""),
+            "improvements": doc.get("improvements", ""),
+            "idealState": doc.get("idealState", ""),
+            "actions": doc.get("actions", ""),
+        },
+        ensure_ascii=False,
+        indent=2,
+    )
+
+    system_prompt = (
+        f"あなたはユーザーの{type_label}に対して、総評コメントを書くコーチAIです。\n"
+        "以下の制約を守って、ユーザーを勇気づけ、次の一歩を後押しする短い評価コメントを日本語で返してください。\n"
+        "- 200〜350 字程度\n"
+        "- 1〜2 段落、Markdown 箇条書きは使わない\n"
+        "- 観点: ポジティブなフィードバック1点 + 次にフォーカスするとよいこと1点\n"
+        "- <retrodoc> タグは不要\n"
+    )
+    user_msg = (
+        f"対象期間: {retro['periodStart']} 〜 {retro['periodEnd']}\n\n"
+        f"## 振り返りドキュメント\n{doc_text}\n\n"
+        f"## 期間内の達成タスク\n{done_ctx}\n\n"
+        f"{profile_ctx}\n\n"
+        "この振り返りに対して総評コメントを書いてください。"
+    )
+
+    options = ClaudeAgentOptions(
+        model="sonnet",
+        cwd=str(Path(__file__).parent),
+        system_prompt=system_prompt,
+        include_partial_messages=True,
+        permission_mode="acceptEdits",
+        allowed_tools=[],
+    )
+    client = ClaudeSDKClient(options=options)
+    await client.connect()
+    text_parts: list[str] = []
+    try:
+        await client.query(user_msg)
+        async for msg in client.receive_response():
+            if isinstance(msg, StreamEvent):
+                event = msg.event
+                if event.get("type") == "content_block_delta":
+                    delta = event.get("delta", {})
+                    if delta.get("type") == "text_delta":
+                        await ws.send_json(
+                            {
+                                "type": "retro_stream_delta",
+                                "text": delta.get("text", ""),
+                            }
+                        )
+            elif isinstance(msg, AssistantMessage):
+                for block in msg.content:
+                    if isinstance(block, TextBlock):
+                        text_parts.append(block.text)
+            elif isinstance(msg, ResultMessage):
+                pass
+    finally:
+        try:
+            await client.disconnect()
+        except Exception:
+            pass
+
+    ai_comment = "".join(text_parts).strip() or "お疲れさまでした。振り返りの積み重ねが次の一歩に繋がります。"
+
+    now_iso = datetime.datetime.now().isoformat(timespec="seconds")
+    new_retro = dict(retro)
+    new_messages = list(retro["messages"])
+    new_messages.append({"role": "assistant", "text": ai_comment})
+    new_retro["messages"] = new_messages
+    new_retro["aiComment"] = ai_comment
+    new_retro["completedAt"] = now_iso
+    new_retro["updatedAt"] = now_iso
+    save_retro(new_retro)
+    schedule_autosync()
+
+    await ws.send_json({"type": "retro_assistant", "text": ai_comment})
+    await ws.send_json({"type": "retro_completed", "retro": new_retro})
+    return new_retro
+
+
 SYSTEM_PROMPT_APPEND = """\
 あなたは TODO 管理 & ライフコーチ AI アシスタントです。
 ユーザーのタスク管理を支援し、対話を通じて
@@ -801,10 +1282,14 @@ async def websocket_endpoint(ws: WebSocket):
     kanban_tasks: list[KanbanTask] = load_tasks()
     goals: list[GoalData] = load_goals()
     profile: ProfileData = load_profile()
+    pending_retros: dict[str, RetrospectiveData] = {}
 
     await ws.send_json({"type": "kanban_sync", "tasks": kanban_tasks})
     await ws.send_json({"type": "goal_sync", "goals": goals})
     await ws.send_json({"type": "profile_sync", "profile": profile})
+    await ws.send_json(
+        {"type": "retro_list_sync", "retros": load_retros()}
+    )
     await ws.send_json(await _build_github_status())
 
     msg_queue: asyncio.Queue = asyncio.Queue()
@@ -1050,6 +1535,178 @@ async def websocket_endpoint(ws: WebSocket):
                 cfg["autoSync"] = bool(data.get("value", True))
                 _save_github_config(cfg)
                 await broadcast(await _build_github_status())
+                continue
+
+            # --- 振り返り操作 ---
+            if data["type"] == "retro_list":
+                retros = load_retros()
+                await ws.send_json(
+                    {"type": "retro_list_sync", "retros": retros}
+                )
+                continue
+
+            if data["type"] == "retro_discard_draft":
+                did = data.get("draftId", "")
+                if did:
+                    pending_retros.pop(did, None)
+                    delete_retro(did)
+                    schedule_autosync()
+                retros = load_retros()
+                await ws.send_json(
+                    {"type": "retro_list_sync", "retros": retros}
+                )
+                continue
+
+            if data["type"] == "retro_start":
+                retro_type = data.get("retroType", "weekly")
+                if retro_type not in RETRO_TYPES:
+                    retro_type = "weekly"
+                resume_id = data.get("resumeDraftId") or None
+
+                retro_entry: RetrospectiveData | None = None
+                if resume_id:
+                    retro_entry = get_retro(resume_id)
+                    if retro_entry and retro_entry.get("completedAt"):
+                        # 完了済みは再開不可
+                        retro_entry = None
+                if retro_entry is None:
+                    period_start, period_end = _compute_retro_period(retro_type)
+                    completed_ids = _completed_task_ids_in_period(
+                        kanban_tasks, period_start, period_end
+                    )
+                    now_iso = datetime.datetime.now().isoformat(
+                        timespec="seconds"
+                    )
+                    welcome = _retro_welcome_text(
+                        retro_type, period_start, period_end
+                    )
+                    retro_entry = {
+                        "id": f"{_short_id()}{_short_id()}",
+                        "type": retro_type,
+                        "periodStart": period_start,
+                        "periodEnd": period_end,
+                        "document": {
+                            "findings": "",
+                            "improvements": "",
+                            "idealState": "",
+                            "actions": "",
+                            "completedTasks": completed_ids,
+                        },
+                        "messages": [
+                            {"role": "assistant", "text": welcome}
+                        ],
+                        "aiComment": "",
+                        "completedAt": "",
+                        "createdAt": now_iso,
+                        "updatedAt": now_iso,
+                    }
+                    # 初期状態の振り返りは DB に保存せずメモリ上でのみ保持。
+                    # 最初のユーザー発言を受信した時点で永続化する。
+                    pending_retros[retro_entry["id"]] = retro_entry
+                await ws.send_json(
+                    {"type": "retro_sync", "retro": retro_entry}
+                )
+                continue
+
+            if data["type"] == "retro_message":
+                rid = data.get("retroId", "")
+                user_text = (data.get("text", "") or "").strip()
+                if not rid or not user_text:
+                    continue
+                retro_entry = get_retro(rid) or pending_retros.get(rid)
+                if retro_entry is None or retro_entry.get("completedAt"):
+                    await ws.send_json(
+                        {
+                            "type": "retro_error",
+                            "message": "セッションが見つかりません",
+                        }
+                    )
+                    continue
+                await ws.send_json(
+                    {"type": "retro_session_waiting", "waiting": True}
+                )
+                try:
+                    await run_retro_turn(
+                        ws,
+                        retro_entry,
+                        user_text,
+                        kanban_tasks,
+                        goals,
+                        profile,
+                    )
+                    # run_retro_turn の中で DB 保存済み。pending から外す。
+                    pending_retros.pop(rid, None)
+                    # 新たに永続化されたドラフトを履歴に反映。
+                    await ws.send_json(
+                        {
+                            "type": "retro_list_sync",
+                            "retros": load_retros(),
+                        }
+                    )
+                except Exception as e:
+                    print(f"retro turn error: {e}")
+                    await ws.send_json(
+                        {
+                            "type": "retro_error",
+                            "message": f"AI応答中にエラーが発生しました: {e}",
+                        }
+                    )
+                finally:
+                    await ws.send_json(
+                        {"type": "retro_session_waiting", "waiting": False}
+                    )
+                continue
+
+            if data["type"] == "retro_complete":
+                rid = data.get("retroId", "")
+                retro_entry = get_retro(rid) or pending_retros.get(rid)
+                if retro_entry is None:
+                    await ws.send_json(
+                        {
+                            "type": "retro_error",
+                            "message": "セッションが見つかりません",
+                        }
+                    )
+                    continue
+                if retro_entry.get("completedAt"):
+                    await ws.send_json(
+                        {"type": "retro_completed", "retro": retro_entry}
+                    )
+                    continue
+                await ws.send_json(
+                    {"type": "retro_session_waiting", "waiting": True}
+                )
+                try:
+                    await finalize_retro(
+                        ws,
+                        retro_entry,
+                        kanban_tasks,
+                        goals,
+                        profile,
+                    )
+                    pending_retros.pop(rid, None)
+                    await ws.send_json(
+                        {
+                            "type": "retro_list_sync",
+                            "retros": load_retros(),
+                        }
+                    )
+                except Exception as e:
+                    print(f"retro complete error: {e}")
+                    await ws.send_json(
+                        {
+                            "type": "retro_error",
+                            "message": f"完了処理中にエラーが発生しました: {e}",
+                        }
+                    )
+                finally:
+                    await ws.send_json(
+                        {"type": "retro_session_waiting", "waiting": False}
+                    )
+                continue
+
+            if data["type"] == "retro_close_session":
+                await ws.send_json({"type": "retro_session_closed"})
                 continue
 
             # --- チャットメッセージ ---

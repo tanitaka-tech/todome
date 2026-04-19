@@ -144,6 +144,36 @@ export interface RepoInfo {
   url: string;
 }
 
+// --- Retrospective ---
+
+export type RetroType = "daily" | "weekly" | "monthly" | "yearly";
+
+export interface RetroDocument {
+  findings: string;
+  improvements: string;
+  idealState: string;
+  actions: string;
+  completedTasks: string[];
+}
+
+export interface RetroMessage {
+  role: "user" | "assistant";
+  text: string;
+}
+
+export interface Retrospective {
+  id: string;
+  type: RetroType;
+  periodStart: string;
+  periodEnd: string;
+  document: RetroDocument;
+  messages: RetroMessage[];
+  aiComment: string;
+  completedAt: string; // "" = draft
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type WSMessage =
   | { type: "stream_delta"; text: string }
   | { type: "thinking_delta"; text: string }
@@ -156,4 +186,14 @@ export type WSMessage =
   | { type: "profile_sync"; profile: UserProfile }
   | { type: "github_status"; status: GitHubStatus }
   | { type: "github_repo_list"; repos: RepoInfo[] }
-  | { type: "result"; result: string; cost: number; turns: number; sessionId: string };
+  | { type: "result"; result: string; cost: number; turns: number; sessionId: string }
+  | { type: "retro_list_sync"; retros: Retrospective[] }
+  | { type: "retro_sync"; retro: Retrospective }
+  | { type: "retro_doc_update"; retroId: string; document: RetroDocument }
+  | { type: "retro_stream_delta"; text: string }
+  | { type: "retro_assistant"; text: string }
+  | { type: "retro_thinking_delta"; text: string }
+  | { type: "retro_completed"; retro: Retrospective }
+  | { type: "retro_session_closed" }
+  | { type: "retro_session_waiting"; waiting: boolean }
+  | { type: "retro_error"; message: string };
