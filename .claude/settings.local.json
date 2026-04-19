@@ -16,7 +16,8 @@
       "mcp__Claude_in_Chrome__javascript_tool",
       "Bash(echo \"tsc exit: $?\")",
       "mcp__Claude_Preview__preview_start",
-      "Bash(uv run *)"
+      "Bash(uv run *)",
+      "Bash(img2webp -version)"
     ]
   }
 }
