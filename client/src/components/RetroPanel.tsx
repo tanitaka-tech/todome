@@ -15,6 +15,12 @@ interface Props {
   onCloseSession: () => void;
   onOpenRetro: (retro: Retrospective) => void;
   onDiscardDraft: (draftId: string) => void;
+  onDelete: (retroId: string) => void;
+  onEditField: (
+    retroId: string,
+    key: "findings" | "improvements" | "idealState" | "actions" | "aiComment",
+    value: string,
+  ) => void;
 }
 
 const RETRO_TABS: { id: RetroType; label: string }[] = [
@@ -60,6 +66,8 @@ export function RetroPanel({
   onCloseSession,
   onOpenRetro,
   onDiscardDraft,
+  onDelete,
+  onEditField,
 }: Props) {
   const [tab, setTab] = useState<RetroType>("weekly");
   const [discardTarget, setDiscardTarget] = useState<Retrospective | null>(
@@ -69,6 +77,13 @@ export function RetroPanel({
   const clearDiscardTarget = () => setDiscardTarget(null);
   const { closing: discardClosing, close: closeDiscard } = useModalClose(
     clearDiscardTarget,
+  );
+
+  const [deleteTarget, setDeleteTarget] = useState<Retrospective | null>(null);
+  const deleteOverlayDownRef = useRef(false);
+  const clearDeleteTarget = () => setDeleteTarget(null);
+  const { closing: deleteClosing, close: closeDelete } = useModalClose(
+    clearDeleteTarget,
   );
 
   const retrosByType = useMemo(() => {
@@ -99,6 +114,7 @@ export function RetroPanel({
         onSend={onSend}
         onComplete={onComplete}
         onClose={onCloseSession}
+        onEditField={onEditField}
       />
     );
   }
@@ -176,26 +192,38 @@ export function RetroPanel({
         <div className="retro-history-title">履歴</div>
         <div className="retro-history">
           {draft && (
-            <button
-              key={draft.id}
-              className="retro-history-card retro-history-card--draft"
-              onClick={() => onOpenRetro(draft)}
-            >
-              <div className="retro-history-card-head">
-                <span className="retro-history-badge retro-history-badge--draft">
-                  ドラフト
-                </span>
-                <span className="retro-history-period">
-                  {draft.periodStart} 〜 {draft.periodEnd}
-                </span>
-              </div>
-              <div className="retro-history-summary">
-                {summaryFromRetro(draft)}
-              </div>
-              <div className="retro-history-meta">
-                最終更新 {formatDateTime(draft.updatedAt)}
-              </div>
-            </button>
+            <div key={draft.id} className="retro-history-card-wrap">
+              <button
+                className="retro-history-card retro-history-card--draft"
+                onClick={() => onOpenRetro(draft)}
+              >
+                <div className="retro-history-card-head">
+                  <span className="retro-history-badge retro-history-badge--draft">
+                    ドラフト
+                  </span>
+                  <span className="retro-history-period">
+                    {draft.periodStart} 〜 {draft.periodEnd}
+                  </span>
+                </div>
+                <div className="retro-history-summary">
+                  {summaryFromRetro(draft)}
+                </div>
+                <div className="retro-history-meta">
+                  最終更新 {formatDateTime(draft.updatedAt)}
+                </div>
+              </button>
+              <button
+                className="retro-history-delete"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDeleteTarget(draft);
+                }}
+                title="削除"
+                aria-label="削除"
+              >
+                &times;
+              </button>
+            </div>
           )}
           {completed.length === 0 && !draft && (
             <div className="retro-history-empty">
@@ -203,26 +231,38 @@ export function RetroPanel({
             </div>
           )}
           {completed.map((r) => (
-            <button
-              key={r.id}
-              className="retro-history-card"
-              onClick={() => onOpenRetro(r)}
-            >
-              <div className="retro-history-card-head">
-                <span className="retro-history-badge">
-                  {TYPE_LABEL[r.type]}
-                </span>
-                <span className="retro-history-period">
-                  {r.periodStart} 〜 {r.periodEnd}
-                </span>
-              </div>
-              <div className="retro-history-summary">
-                {summaryFromRetro(r)}
-              </div>
-              <div className="retro-history-meta">
-                完了 {formatDateTime(r.completedAt)}
-              </div>
-            </button>
+            <div key={r.id} className="retro-history-card-wrap">
+              <button
+                className="retro-history-card"
+                onClick={() => onOpenRetro(r)}
+              >
+                <div className="retro-history-card-head">
+                  <span className="retro-history-badge">
+                    {TYPE_LABEL[r.type]}
+                  </span>
+                  <span className="retro-history-period">
+                    {r.periodStart} 〜 {r.periodEnd}
+                  </span>
+                </div>
+                <div className="retro-history-summary">
+                  {summaryFromRetro(r)}
+                </div>
+                <div className="retro-history-meta">
+                  完了 {formatDateTime(r.completedAt)}
+                </div>
+              </button>
+              <button
+                className="retro-history-delete"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDeleteTarget(r);
+                }}
+                title="削除"
+                aria-label="削除"
+              >
+                &times;
+              </button>
+            </div>
           ))}
         </div>
       </div>
@@ -275,6 +315,58 @@ export function RetroPanel({
                 }}
               >
                 破棄して新規作成
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteTarget && (
+        <div
+          className={`modal-overlay${deleteClosing ? " is-closing" : ""}`}
+          onMouseDown={(e) => {
+            deleteOverlayDownRef.current = e.target === e.currentTarget;
+          }}
+          onClick={(e) => {
+            if (
+              e.target === e.currentTarget &&
+              deleteOverlayDownRef.current
+            ) {
+              closeDelete();
+            }
+          }}
+        >
+          <div
+            className="modal-content modal-content--sm"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header">
+              <h2 className="modal-title">振り返りを削除</h2>
+              <button className="modal-close" onClick={closeDelete}>
+                &times;
+              </button>
+            </div>
+            <div className="modal-body">
+              <p className="modal-confirm-text">
+                {TYPE_LABEL[deleteTarget.type]} ({deleteTarget.periodStart}{" "}
+                〜 {deleteTarget.periodEnd}) を削除しますか？
+              </p>
+              <p className="modal-confirm-sub">
+                この操作は元に戻せません。
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button className="modal-btn-secondary" onClick={closeDelete}>
+                キャンセル
+              </button>
+              <button
+                className="modal-btn-primary modal-btn-danger"
+                onClick={() => {
+                  onDelete(deleteTarget.id);
+                  closeDelete();
+                }}
+              >
+                削除
               </button>
             </div>
           </div>

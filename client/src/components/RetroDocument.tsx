@@ -1,6 +1,10 @@
+import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { KanbanTask, RetroDocument as RetroDocumentT } from "../types";
+
+type DocFieldKey = "findings" | "improvements" | "idealState" | "actions";
+type EditableKey = DocFieldKey | "aiComment";
 
 interface Props {
   document: RetroDocumentT;
@@ -9,10 +13,11 @@ interface Props {
   periodStart: string;
   periodEnd: string;
   typeLabel: string;
+  onEditField?: (key: EditableKey, value: string) => void;
 }
 
 const SECTIONS: {
-  key: keyof Omit<RetroDocumentT, "completedTasks">;
+  key: DocFieldKey;
   label: string;
   placeholder: string;
 }[] = [
@@ -38,6 +43,99 @@ const SECTIONS: {
   },
 ];
 
+function EditableMarkdownSection({
+  value,
+  placeholder,
+  onSave,
+}: {
+  value: string;
+  placeholder: string;
+  onSave?: (next: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const taRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (!editing) setDraft(value);
+  }, [value, editing]);
+
+  useEffect(() => {
+    if (editing && taRef.current) {
+      taRef.current.focus();
+      const len = taRef.current.value.length;
+      taRef.current.setSelectionRange(len, len);
+    }
+  }, [editing]);
+
+  const startEdit = () => {
+    setDraft(value);
+    setEditing(true);
+  };
+  const cancel = () => setEditing(false);
+  const save = () => {
+    setEditing(false);
+    if (draft !== value) onSave?.(draft);
+  };
+
+  if (editing) {
+    return (
+      <div className="retro-doc-edit">
+        <textarea
+          ref={taRef}
+          className="retro-doc-edit-textarea"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              e.preventDefault();
+              cancel();
+            } else if (
+              (e.metaKey || e.ctrlKey) &&
+              e.key === "Enter"
+            ) {
+              e.preventDefault();
+              save();
+            }
+          }}
+          rows={Math.max(4, draft.split("\n").length + 1)}
+        />
+        <div className="retro-doc-edit-actions">
+          <button className="btn" onClick={cancel}>
+            キャンセル
+          </button>
+          <button className="btn btn--primary" onClick={save}>
+            保存
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`retro-doc-view${onSave ? " retro-doc-view--editable" : ""}`}
+      onClick={onSave ? startEdit : undefined}
+      role={onSave ? "button" : undefined}
+      tabIndex={onSave ? 0 : undefined}
+      onKeyDown={(e) => {
+        if (!onSave) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          startEdit();
+        }
+      }}
+      title={onSave ? "クリックして編集" : undefined}
+    >
+      {value ? (
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{value}</ReactMarkdown>
+      ) : (
+        <div className="retro-doc-placeholder">{placeholder}</div>
+      )}
+    </div>
+  );
+}
+
 export function RetroDocumentView({
   document,
   tasks,
@@ -45,6 +143,7 @@ export function RetroDocumentView({
   periodStart,
   periodEnd,
   typeLabel,
+  onEditField,
 }: Props) {
   const completedTasks = tasks.filter((t) =>
     document.completedTasks.includes(t.id),
@@ -63,13 +162,15 @@ export function RetroDocumentView({
         <section key={s.key} className="retro-doc-section">
           <h3 className="retro-doc-section-title">{s.label}</h3>
           <div className="retro-doc-section-body">
-            {document[s.key] ? (
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {document[s.key]}
-              </ReactMarkdown>
-            ) : (
-              <div className="retro-doc-placeholder">{s.placeholder}</div>
-            )}
+            <EditableMarkdownSection
+              value={document[s.key]}
+              placeholder={s.placeholder}
+              onSave={
+                onEditField
+                  ? (next) => onEditField(s.key, next)
+                  : undefined
+              }
+            />
           </div>
         </section>
       ))}
@@ -93,13 +194,19 @@ export function RetroDocumentView({
         </div>
       </section>
 
-      {aiComment && (
+      {(aiComment || onEditField) && (
         <section className="retro-doc-section retro-doc-section--ai">
           <h3 className="retro-doc-section-title">AI からのコメント</h3>
           <div className="retro-doc-section-body">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {aiComment}
-            </ReactMarkdown>
+            <EditableMarkdownSection
+              value={aiComment || ""}
+              placeholder="AI からのコメントはまだありません。"
+              onSave={
+                onEditField
+                  ? (next) => onEditField("aiComment", next)
+                  : undefined
+              }
+            />
           </div>
         </section>
       )}

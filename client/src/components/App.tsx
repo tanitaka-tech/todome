@@ -258,15 +258,29 @@ export function App() {
         setActiveRetro((prev) => {
           if (!prev) return prev;
           const updated = msg.retros.find((r) => r.id === prev.id);
-          return updated ?? prev;
+          if (!updated) {
+            setRetroStreamText("");
+            setRetroWaiting(false);
+            return null;
+          }
+          return updated;
         });
         break;
       case "retro_sync":
         setRetros((prev) => {
           const exists = prev.some((r) => r.id === msg.retro.id);
-          return exists
-            ? prev.map((r) => (r.id === msg.retro.id ? msg.retro : r))
-            : [msg.retro, ...prev];
+          if (exists) {
+            return prev.map((r) => (r.id === msg.retro.id ? msg.retro : r));
+          }
+          const doc = msg.retro.document;
+          const hasContent = !!(
+            doc.findings.trim() ||
+            doc.improvements.trim() ||
+            doc.idealState.trim() ||
+            doc.actions.trim() ||
+            msg.retro.aiComment.trim()
+          );
+          return hasContent ? [msg.retro, ...prev] : prev;
         });
         setActiveRetro(msg.retro);
         setRetroStreamText("");
@@ -568,6 +582,44 @@ export function App() {
     [send],
   );
 
+  const handleRetroDelete = useCallback(
+    (retroId: string) => {
+      send({ type: "retro_delete", retroId });
+    },
+    [send],
+  );
+
+  const handleRetroEditField = useCallback(
+    (
+      retroId: string,
+      key: "findings" | "improvements" | "idealState" | "actions" | "aiComment",
+      value: string,
+    ) => {
+      setRetros((prev) =>
+        prev.map((r) => {
+          if (r.id !== retroId) return r;
+          if (key === "aiComment") return { ...r, aiComment: value };
+          return { ...r, document: { ...r.document, [key]: value } };
+        }),
+      );
+      setActiveRetro((prev) => {
+        if (!prev || prev.id !== retroId) return prev;
+        if (key === "aiComment") return { ...prev, aiComment: value };
+        return { ...prev, document: { ...prev.document, [key]: value } };
+      });
+      if (key === "aiComment") {
+        send({ type: "retro_edit_document", retroId, aiComment: value });
+      } else {
+        send({
+          type: "retro_edit_document",
+          retroId,
+          document: { [key]: value },
+        });
+      }
+    },
+    [send],
+  );
+
   const popupTask = useMemo(() => {
     if (!popupTaskId) return undefined;
     return tasks.find((t) => t.id === popupTaskId);
@@ -707,6 +759,8 @@ export function App() {
             onCloseSession={handleRetroCloseSession}
             onOpenRetro={handleRetroOpen}
             onDiscardDraft={handleRetroDiscardDraft}
+            onDelete={handleRetroDelete}
+            onEditField={handleRetroEditField}
           />
         ) : activeView === "stats" ? (
           <StatsPanel tasks={tasks} goals={goals} tick={tick} />

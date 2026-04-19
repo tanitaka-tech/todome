@@ -17,6 +17,11 @@ interface Props {
   onSend: (text: string) => void;
   onComplete: () => void;
   onClose: () => void;
+  onEditField: (
+    retroId: string,
+    key: "findings" | "improvements" | "idealState" | "actions" | "aiComment",
+    value: string,
+  ) => void;
 }
 
 export function RetroSession({
@@ -28,6 +33,7 @@ export function RetroSession({
   onSend,
   onComplete,
   onClose,
+  onEditField,
 }: Props) {
   const [input, setInput] = useState("");
   const flowRef = useRef<HTMLDivElement>(null);
@@ -172,6 +178,7 @@ export function RetroSession({
             periodStart={retro.periodStart}
             periodEnd={retro.periodEnd}
             typeLabel={typeLabel}
+            onEditField={(key, value) => onEditField(retro.id, key, value)}
           />
         </div>
       </div>

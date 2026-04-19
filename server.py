@@ -1121,8 +1121,16 @@ async def run_retro_turn(
         merged["completedTasks"] = retro["document"].get("completedTasks", [])
         new_retro["document"] = merged
 
-    save_retro(new_retro)
-    schedule_autosync()
+    # ドキュメントが空のままの場合は DB に保存せず、ドラフト化しない。
+    # (findings/improvements/idealState/actions のいずれかに内容が入ったら永続化)
+    doc_for_check = new_retro["document"]
+    has_content = any(
+        (doc_for_check.get(k) or "").strip()
+        for k in ("findings", "improvements", "idealState", "actions")
+    )
+    if has_content:
+        save_retro(new_retro)
+        schedule_autosync()
     await ws.send_json({"type": "retro_assistant", "text": cleaned})
     await ws.send_json(
         {
@@ -1569,6 +1577,18 @@ async def websocket_endpoint(ws: WebSocket):
                 )
                 continue
 
+            if data["type"] == "retro_delete":
+                rid = data.get("retroId", "")
+                if rid:
+                    pending_retros.pop(rid, None)
+                    delete_retro(rid)
+                    schedule_autosync()
+                retros = load_retros()
+                await broadcast(
+                    {"type": "retro_list_sync", "retros": retros}
+                )
+                continue
+
             if data["type"] == "retro_start":
                 retro_type = data.get("retroType", "weekly")
                 if retro_type not in RETRO_TYPES:
@@ -1638,7 +1658,7 @@ async def websocket_endpoint(ws: WebSocket):
                     {"type": "retro_session_waiting", "waiting": True}
                 )
                 try:
-                    await run_retro_turn(
+                    updated = await run_retro_turn(
                         ws,
                         retro_entry,
                         user_text,
@@ -1646,15 +1666,21 @@ async def websocket_endpoint(ws: WebSocket):
                         goals,
                         profile,
                     )
-                    # run_retro_turn の中で DB 保存済み。pending から外す。
-                    pending_retros.pop(rid, None)
-                    # 新たに永続化されたドラフトを履歴に反映。
-                    await ws.send_json(
-                        {
-                            "type": "retro_list_sync",
-                            "retros": load_retros(),
-                        }
-                    )
+                    # 中身が入った時点でのみ DB 保存されるため、保存済みかは get_retro で判定。
+                    persisted = get_retro(rid) is not None
+                    if persisted:
+                        pending_retros.pop(rid, None)
+                        # 永続化されたドラフトを履歴に反映。
+                        await ws.send_json(
+                            {
+                                "type": "retro_list_sync",
+                                "retros": load_retros(),
+                            }
+                        )
+                    else:
+                        # まだ空ドキュメントの場合はメモリ上の最新状態を保持。
+                        # (履歴に載せたくないので retro_list_sync は送らない)
+                        pending_retros[rid] = updated
                 except Exception as e:
                     print(f"retro turn error: {e}")
                     await ws.send_json(
@@ -1715,6 +1741,82 @@ async def websocket_endpoint(ws: WebSocket):
                     await ws.send_json(
                         {"type": "retro_session_waiting", "waiting": False}
                     )
+                continue
+
+            if data["type"] == "retro_edit_document":
+                rid = data.get("retroId", "")
+                if not rid:
+                    continue
+                retro_entry = get_retro(rid) or pending_retros.get(rid)
+                if retro_entry is None:
+                    await ws.send_json(
+                        {
+                            "type": "retro_error",
+                            "message": "セッションが見つかりません",
+                        }
+                    )
+                    continue
+
+                updated = dict(retro_entry)
+                updated["document"] = dict(updated.get("document", {}))
+
+                doc_update = data.get("document")
+                if isinstance(doc_update, dict):
+                    for key in (
+                        "findings",
+                        "improvements",
+                        "idealState",
+                        "actions",
+                    ):
+                        if key in doc_update and isinstance(
+                            doc_update[key], str
+                        ):
+                            updated["document"][key] = doc_update[key]
+
+                ai_comment_update = data.get("aiComment")
+                if isinstance(ai_comment_update, str):
+                    updated["aiComment"] = ai_comment_update
+
+                updated["updatedAt"] = datetime.datetime.now().isoformat(
+                    timespec="seconds"
+                )
+
+                doc_for_check = updated["document"]
+                has_content = any(
+                    (doc_for_check.get(k) or "").strip()
+                    for k in (
+                        "findings",
+                        "improvements",
+                        "idealState",
+                        "actions",
+                    )
+                ) or bool((updated.get("aiComment") or "").strip())
+
+                was_persisted = get_retro(rid) is not None
+
+                if has_content:
+                    save_retro(updated)
+                    pending_retros.pop(rid, None)
+                    schedule_autosync()
+                elif was_persisted:
+                    delete_retro(rid)
+                    pending_retros[rid] = updated
+                    schedule_autosync()
+                else:
+                    pending_retros[rid] = updated
+
+                await broadcast(
+                    {
+                        "type": "retro_list_sync",
+                        "retros": load_retros(),
+                    }
+                )
+                await ws.send_json(
+                    {
+                        "type": "retro_sync",
+                        "retro": updated,
+                    }
+                )
                 continue
 
             if data["type"] == "retro_close_session":

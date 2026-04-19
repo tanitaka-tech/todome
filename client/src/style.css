@@ -4067,6 +4067,37 @@ body {
   gap: 12px;
 }
 
+.retro-history-card-wrap {
+  position: relative;
+}
+.retro-history-card-wrap > .retro-history-card {
+  width: 100%;
+}
+.retro-history-delete {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  color: var(--fg-muted);
+  font-size: 18px;
+  line-height: 1;
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.1s, background 0.1s, color 0.1s;
+}
+.retro-history-card-wrap:hover .retro-history-delete,
+.retro-history-delete:focus-visible {
+  opacity: 1;
+}
+.retro-history-delete:hover {
+  background: var(--surface-hover);
+  color: var(--danger, #e14c4c);
+}
+
 .retro-history-card {
   display: flex;
   flex-direction: column;
@@ -4390,4 +4421,50 @@ body {
 }
 .retro-doc-task-list li {
   margin-bottom: 2px;
+}
+
+.retro-doc-view {
+  border-radius: 6px;
+}
+.retro-doc-view--editable {
+  cursor: text;
+  padding: 4px 6px;
+  margin: -4px -6px;
+  transition: background 0.12s ease;
+}
+.retro-doc-view--editable:hover {
+  background: var(--surface-hover, rgba(127, 127, 127, 0.08));
+}
+.retro-doc-view--editable:focus {
+  outline: 2px solid var(--accent, #4c8cf5);
+  outline-offset: 1px;
+}
+
+.retro-doc-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.retro-doc-edit-textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 80px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  box-sizing: border-box;
+}
+.retro-doc-edit-textarea:focus {
+  outline: none;
+  border-color: var(--accent, #4c8cf5);
+}
+.retro-doc-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
