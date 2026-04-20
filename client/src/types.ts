@@ -332,6 +332,13 @@ export const LIFE_CATEGORY_LABELS: Record<LifeCategory, string> = {
   other: "その他",
 };
 
+export const LIFE_CATEGORY_COLORS: Record<LifeCategory, string> = {
+  rest: "#3b82f6",
+  play: "#ec4899",
+  routine: "#10b981",
+  other: "#6b7280",
+};
+
 export const LIFE_LIMIT_SCOPE_LABELS: Record<LifeLimitScope, string> = {
   per_session: "1回ごと",
   per_day: "1日合計",
@@ -357,6 +364,38 @@ export function lifeActivityTodayTotalSeconds(
   return logs
     .filter((l) => l.activityId === activityId)
     .reduce((sum, l) => sum + lifeLogDurationSeconds(l, nowMs), 0);
+}
+
+export interface DayRange {
+  startMs: number;
+  endMs: number;
+  /** ISO "YYYY-MM-DD" of the day this range belongs to (境界基準の開始日)。 */
+  dateKey: string;
+}
+
+export function getDayRangeForDate(
+  dateIso: string,
+  boundaryHour: number,
+): DayRange {
+  // dateIso の 境界時刻 ~ 翌日の境界時刻 の区間。
+  const [y, m, d] = dateIso.split("-").map((v) => parseInt(v, 10));
+  const start = new Date(y, (m || 1) - 1, d || 1, boundaryHour, 0, 0, 0);
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+  return { startMs: start.getTime(), endMs: end.getTime(), dateKey: dateIso };
+}
+
+export function getTodayDayRange(
+  boundaryHour: number,
+  now: Date = new Date(),
+): DayRange {
+  const start = new Date(now);
+  start.setHours(boundaryHour, 0, 0, 0);
+  if (now.getTime() < start.getTime()) {
+    start.setDate(start.getDate() - 1);
+  }
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+  const dateKey = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-${String(start.getDate()).padStart(2, "0")}`;
+  return { startMs: start.getTime(), endMs: end.getTime(), dateKey };
 }
 
 export function lifeLogAlertLevel(
@@ -405,4 +444,5 @@ export type WSMessage =
   | { type: "life_activity_sync"; activities: LifeActivity[] }
   | { type: "life_log_sync"; logs: LifeLog[] }
   | { type: "life_log_started"; log: LifeLog }
-  | { type: "life_log_stopped"; log: LifeLog };
+  | { type: "life_log_stopped"; log: LifeLog }
+  | { type: "life_log_range_sync"; requestId: string; logs: LifeLog[] };

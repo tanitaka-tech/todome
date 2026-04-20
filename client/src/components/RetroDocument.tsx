@@ -2,8 +2,15 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { KanbanTask, RetroDocument as RetroDocumentT, RetroType } from "../types";
-import { isTaskCompletedInPeriod } from "../types";
+import type {
+  KanbanTask,
+  LifeActivity,
+  LifeLog,
+  RetroDocument as RetroDocumentT,
+  RetroType,
+} from "../types";
+import { getDayRangeForDate, isTaskCompletedInPeriod } from "../types";
+import { TimelineBar } from "./TimelineBar";
 
 
 type DocFieldKey = "did" | "learned" | "next";
@@ -18,6 +25,9 @@ interface Props {
   periodStart: string;
   periodEnd: string;
   typeLabel: string;
+  lifeActivities: LifeActivity[];
+  lifeLogsForPeriod: LifeLog[];
+  dayBoundaryHour: number;
   onEditField?: (key: EditableKey, value: string) => void;
   onEditDayRating?: (value: number) => void;
   onEditSleep?: (key: SleepKey, value: string) => void;
@@ -252,6 +262,9 @@ export function RetroDocumentView({
   periodStart,
   periodEnd,
   typeLabel,
+  lifeActivities,
+  lifeLogsForPeriod,
+  dayBoundaryHour,
   onEditField,
   onEditDayRating,
   onEditSleep,
@@ -261,6 +274,9 @@ export function RetroDocumentView({
     isTaskCompletedInPeriod(t, periodStart, periodEnd),
   );
   const isDaily = retroType === "daily";
+  const dayRange = isDaily
+    ? getDayRangeForDate(periodStart, dayBoundaryHour)
+    : null;
 
   return (
     <div className="retro-doc">
@@ -291,6 +307,23 @@ export function RetroDocumentView({
               wakeUpTime={document.wakeUpTime || ""}
               bedtime={document.bedtime || ""}
               onChange={onEditSleep}
+            />
+          </div>
+        </section>
+      )}
+
+      {isDaily && dayRange && (
+        <section className="retro-doc-section">
+          <h3 className="retro-doc-section-title">
+            {t("docSectionTimeline", "タイムスケジュール")}
+          </h3>
+          <div className="retro-doc-section-body">
+            <TimelineBar
+              rangeStartMs={dayRange.startMs}
+              rangeEndMs={dayRange.endMs}
+              tasks={tasks}
+              lifeLogs={lifeLogsForPeriod}
+              lifeActivities={lifeActivities}
             />
           </div>
         </section>

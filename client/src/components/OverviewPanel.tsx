@@ -1,8 +1,9 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { formatDate, formatDateTime } from "../i18n/format";
-import type { Goal, KanbanTask } from "../types";
-import { formatDuration, totalSeconds } from "../types";
+import type { Goal, KanbanTask, LifeActivity, LifeLog } from "../types";
+import { formatDuration, getTodayDayRange, totalSeconds } from "../types";
+import { TimelineBar } from "./TimelineBar";
 
 interface Props {
   tasks: KanbanTask[];
@@ -10,6 +11,9 @@ interface Props {
   tick: number;
   onOpenBoard: () => void;
   onCardClick: (task: KanbanTask) => void;
+  lifeActivities: LifeActivity[];
+  lifeLogs: LifeLog[];
+  dayBoundaryHour: number;
 }
 
 const COLUMN_COLORS: Record<string, string> = {
@@ -48,8 +52,16 @@ export function OverviewPanel({
   tick: _tick,
   onOpenBoard,
   onCardClick,
+  lifeActivities,
+  lifeLogs,
+  dayBoundaryHour,
 }: Props) {
   const { t } = useTranslation("overview");
+  const todayRange = useMemo(
+    () => getTodayDayRange(dayBoundaryHour),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [dayBoundaryHour, _tick],
+  );
   const activeTask = tasks.find((t) => t.timerStartedAt);
 
   const todaySeconds = useMemo(() => {
@@ -180,6 +192,25 @@ export function OverviewPanel({
               >
                 {activeTask ? activeTask.title : t("kpiNoActiveTask")}
               </div>
+            </div>
+          </div>
+
+          <div className="widget col-12">
+            <div className="widget-head">
+              <span className="widget-title">
+                {t("sectionTimeline", "今日のタイムスケジュール")}
+              </span>
+            </div>
+            <div className="widget-body">
+              <TimelineBar
+                rangeStartMs={todayRange.startMs}
+                rangeEndMs={todayRange.endMs}
+                tasks={tasks}
+                lifeLogs={lifeLogs}
+                lifeActivities={lifeActivities}
+                tick={_tick}
+                autoScrollToNow
+              />
             </div>
           </div>
 

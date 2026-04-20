@@ -16,4 +16,5 @@ export const ja_overview: Record<string, string> = {
   sectionRecentDone: "最近完了",
   sectionRecentDoneCount: "last {{count}}",
   emptyRecentDone: "完了したタスクはまだありません",
+  sectionTimeline: "今日のタイムスケジュール",
 };

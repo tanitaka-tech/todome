@@ -16,4 +16,5 @@ export const en_overview: Record<string, string> = {
   sectionRecentDone: "Recently completed",
   sectionRecentDoneCount: "last {{count}}",
   emptyRecentDone: "No completed tasks yet",
+  sectionTimeline: "Today's schedule",
 };

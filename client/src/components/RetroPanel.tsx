@@ -2,6 +2,8 @@ import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type {
   KanbanTask,
+  LifeActivity,
+  LifeLog,
   RetroDocument,
   RetroType,
   Retrospective,
@@ -23,6 +25,9 @@ interface Props {
   setTab: (tab: RetroType) => void;
   viewMode: RetroViewMode;
   setViewMode: (mode: RetroViewMode) => void;
+  lifeActivities: LifeActivity[];
+  lifeLogsForActiveRetro: LifeLog[];
+  dayBoundaryHour: number;
   onStart: (type: RetroType, anchorDate?: string, resumeDraftId?: string) => void;
   onSend: (text: string) => void;
   onComplete: () => void;
@@ -147,6 +152,9 @@ export function RetroPanel({
   setTab,
   viewMode,
   setViewMode,
+  lifeActivities,
+  lifeLogsForActiveRetro,
+  dayBoundaryHour,
   onStart,
   onSend,
   onComplete,
@@ -227,6 +235,9 @@ export function RetroPanel({
         typeLabel={t(TYPE_LABEL_KEYS[activeRetro.type])}
         streamText={streamText}
         waiting={waiting}
+        lifeActivities={lifeActivities}
+        lifeLogsForPeriod={lifeLogsForActiveRetro}
+        dayBoundaryHour={dayBoundaryHour}
         onSend={onSend}
         onComplete={onComplete}
         onReopen={onReopen}

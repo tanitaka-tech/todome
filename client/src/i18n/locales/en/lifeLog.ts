@@ -36,4 +36,8 @@ export const en_lifeLog: Record<string, string> = {
   memoPlaceholder: "Memo (optional)",
   close: "Close",
   stopNow: "Stop",
+  timelineTasks: "Tasks",
+  timelineLife: "Life log",
+  timelineNow: "Now",
+  timelineEmpty: "No entries logged for this day yet.",
 };

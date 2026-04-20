@@ -487,6 +487,19 @@ def load_today_life_logs(today_iso: str | None = None) -> list[LifeLog]:
     return [_life_log_row_to_dict(r) for r in rows]
 
 
+def load_life_logs_in_range(start_iso: str, end_iso: str) -> list[LifeLog]:
+    """[start_iso, end_iso) に重なるライフログを返す（ISO文字列は辞書順比較可能)。"""
+    with _db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM life_logs "
+            "WHERE started_at < ? "
+            "AND (ended_at = '' OR ended_at > ?) "
+            "ORDER BY started_at ASC",
+            (end_iso, start_iso),
+        ).fetchall()
+    return [_life_log_row_to_dict(r) for r in rows]
+
+
 def _stop_all_active_life_logs(now_iso: str) -> None:
     with _db() as conn:
         conn.execute(
@@ -2796,6 +2809,24 @@ async def websocket_endpoint(ws: WebSocket):
                             "logs": load_today_life_logs(),
                         }
                     )
+                continue
+
+            if data["type"] == "life_log_range_request":
+                request_id = str(data.get("requestId", ""))
+                start_iso = str(data.get("startIso", ""))
+                end_iso = str(data.get("endIso", ""))
+                logs = (
+                    load_life_logs_in_range(start_iso, end_iso)
+                    if start_iso and end_iso
+                    else []
+                )
+                await ws.send_json(
+                    {
+                        "type": "life_log_range_sync",
+                        "requestId": request_id,
+                        "logs": logs,
+                    }
+                )
                 continue
 
             # --- 振り返り操作 ---

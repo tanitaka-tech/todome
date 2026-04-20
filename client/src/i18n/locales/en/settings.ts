@@ -12,6 +12,10 @@ export const en_settings: Record<string, string> = {
     "Switch the UI language. Your selection is saved in this browser.",
   langJa: "日本語",
   langEn: "English",
+  timeline: "Timeline",
+  dayBoundaryHour: "Day cutoff",
+  dayBoundaryHourDesc:
+    "Treat this hour as the boundary between \"yesterday\" and \"today\". (default: 4:00)",
   github: "GitHub",
   aiAgent: "AI Agent",
   aiAgentDesc:
