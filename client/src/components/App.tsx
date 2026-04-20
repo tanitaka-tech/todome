@@ -10,13 +10,20 @@ import type {
   GitHubStatus,
   Goal,
   KanbanTask,
+  LifeActivity,
+  LifeLog,
   RepoInfo,
   Retrospective,
   RetroType,
   UserProfile,
   WSMessage,
 } from "../types";
-import { formatDuration, totalSeconds } from "../types";
+import {
+  formatDuration,
+  getDayRangeForDate,
+  isLifeLogActive,
+  totalSeconds,
+} from "../types";
 import { applyTheme, getInitialTheme, type ThemeName } from "../theme";
 import {
   applyLanguage,
@@ -26,11 +33,13 @@ import {
 import {
   loadBoardGoalFilter,
   loadBoardRecentDays,
+  loadDayBoundaryHour,
   loadPopupTaskId,
   loadRetroTab,
   loadRetroViewMode,
   saveBoardGoalFilter,
   saveBoardRecentDays,
+  saveDayBoundaryHour,
   savePopupTaskId,
   saveRetroTab,
   saveRetroViewMode,
@@ -47,6 +56,7 @@ import { SettingsPanel } from "./SettingsPanel";
 import { RetroPanel, type RetroViewMode } from "./RetroPanel";
 import { GitHubSyncTab } from "./GitHubSyncTab";
 import { ShortcutsHelpModal } from "./ShortcutsHelpModal";
+import { LifeLogTimer } from "./LifeLogTimer";
 
 let msgId = 0;
 const nextId = () => String(++msgId);
@@ -169,6 +179,11 @@ export function App() {
     model: "claude-sonnet-4-6",
     thinkingEffort: "high",
   });
+  const [lifeActivities, setLifeActivities] = useState<LifeActivity[]>([]);
+  const [lifeLogs, setLifeLogs] = useState<LifeLog[]>([]);
+  const [lifeLogPopupDismissedId, setLifeLogPopupDismissedId] = useState<
+    string | null
+  >(null);
   const [retros, setRetros] = useState<Retrospective[]>([]);
   const [activeRetro, setActiveRetro] = useState<Retrospective | null>(null);
   const [retroStreamText, setRetroStreamText] = useState("");
@@ -180,6 +195,12 @@ export function App() {
   const [boardRecentDays, setBoardRecentDaysState] = useState<number>(() =>
     loadBoardRecentDays(),
   );
+  const [dayBoundaryHour, setDayBoundaryHourState] = useState<number>(() =>
+    loadDayBoundaryHour(),
+  );
+  const [lifeLogsByRetroId, setLifeLogsByRetroId] = useState<
+    Record<string, LifeLog[]>
+  >({});
   const [retroTab, setRetroTabState] = useState<RetroType>(() => loadRetroTab());
   const [retroViewMode, setRetroViewModeState] = useState<RetroViewMode>(() =>
     loadRetroViewMode(),
@@ -204,6 +225,11 @@ export function App() {
   const setPopupTaskId = useCallback((value: string | null) => {
     setPopupTaskIdState(value);
     savePopupTaskId(value);
+  }, []);
+  const setDayBoundaryHour = useCallback((value: number) => {
+    const clamped = Math.max(0, Math.min(23, Math.floor(value)));
+    setDayBoundaryHourState(clamped);
+    saveDayBoundaryHour(clamped);
   }, []);
   const chatInputRef = useRef<HTMLInputElement>(null);
   const gChordRef = useRef<number | null>(null);
@@ -429,6 +455,21 @@ export function App() {
         console.error("retro error:", msg.message);
         break;
       case "retro_thinking_delta":
+        break;
+      case "life_activity_sync":
+        setLifeActivities(msg.activities);
+        break;
+      case "life_log_sync":
+        setLifeLogs(msg.logs);
+        break;
+      case "life_log_started":
+      case "life_log_stopped":
+        break;
+      case "life_log_range_sync":
+        setLifeLogsByRetroId((prev) => ({
+          ...prev,
+          [msg.requestId]: msg.logs,
+        }));
         break;
     }
   }, []);
@@ -964,6 +1005,59 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [popupTaskId, tasks, tick]);
 
+  const activeLifeLog = useMemo(
+    () => lifeLogs.find((l) => isLifeLogActive(l)) ?? null,
+    [lifeLogs],
+  );
+  const activeLifeActivity = useMemo(
+    () =>
+      activeLifeLog
+        ? (lifeActivities.find((a) => a.id === activeLifeLog.activityId) ??
+          null)
+        : null,
+    [activeLifeLog, lifeActivities],
+  );
+  const showLifeLogPopup =
+    !!activeLifeLog &&
+    !!activeLifeActivity &&
+    activeLifeLog.id !== lifeLogPopupDismissedId;
+
+  const handleLifeLogStop = useCallback(() => {
+    if (!activeLifeLog) return;
+    send({ type: "life_log_stop", log_id: activeLifeLog.id });
+  }, [activeLifeLog, send]);
+
+  // daily retro が開かれたらその日のタイムボックスを範囲取得。
+  useEffect(() => {
+    if (!activeRetro || activeRetro.type !== "daily") return;
+    if (lifeLogsByRetroId[activeRetro.id] !== undefined) return;
+    if (!connected) return;
+    const range = getDayRangeForDate(
+      activeRetro.periodStart,
+      dayBoundaryHour,
+    );
+    // サーバー側は naive local ISO で保存しているので、こちらも local ISO で送る。
+    const toLocalIso = (ms: number): string => {
+      const d = new Date(ms);
+      const pad = (n: number) => String(n).padStart(2, "0");
+      return (
+        `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+        `T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+      );
+    };
+    send({
+      type: "life_log_range_request",
+      requestId: activeRetro.id,
+      startIso: toLocalIso(range.startMs),
+      endIso: toLocalIso(range.endMs),
+    });
+  }, [activeRetro, connected, dayBoundaryHour, lifeLogsByRetroId, send]);
+
+  const lifeLogsForActiveRetro = useMemo(() => {
+    if (!activeRetro) return [];
+    return lifeLogsByRetroId[activeRetro.id] ?? [];
+  }, [activeRetro, lifeLogsByRetroId]);
+
   const popupGoalName = useMemo(() => {
     if (!popupTask?.goalId) return undefined;
     return goals.find((g) => g.id === popupTask.goalId)?.name;
@@ -1095,6 +1189,9 @@ export function App() {
             tick={tick}
             onOpenBoard={() => setActiveView("board")}
             onCardClick={setSelectedTask}
+            lifeActivities={lifeActivities}
+            lifeLogs={lifeLogs}
+            dayBoundaryHour={dayBoundaryHour}
           />
         ) : activeView === "board" ? (
           <KanbanBoard
@@ -1110,6 +1207,8 @@ export function App() {
             setGoalFilter={setBoardGoalFilter}
             recentDays={boardRecentDays}
             setRecentDays={setBoardRecentDays}
+            lifeActivities={lifeActivities}
+            lifeLogs={lifeLogs}
           />
         ) : activeView === "goals" ? (
           <GoalPanel
@@ -1131,6 +1230,9 @@ export function App() {
             setTab={setRetroTab}
             viewMode={retroViewMode}
             setViewMode={setRetroViewMode}
+            lifeActivities={lifeActivities}
+            lifeLogsForActiveRetro={lifeLogsForActiveRetro}
+            dayBoundaryHour={dayBoundaryHour}
             onStart={handleRetroStart}
             onSend={handleRetroSend}
             onComplete={handleRetroComplete}
@@ -1163,6 +1265,8 @@ export function App() {
             onToggleAutoSync={handleToggleAutoSync}
             aiConfig={aiConfig}
             onUpdateAIConfig={handleUpdateAIConfig}
+            dayBoundaryHour={dayBoundaryHour}
+            onDayBoundaryHourChange={setDayBoundaryHour}
           />
         )}
       </main>
@@ -1200,7 +1304,7 @@ export function App() {
         />
       )}
 
-      {popupTask && (
+      {popupTask && !showLifeLogPopup && (
         <div
           className={`timer-popup ${isPopupRunning ? "" : "timer-popup--paused"}`}
         >
@@ -1264,6 +1368,16 @@ export function App() {
             </button>
           </div>
         </div>
+      )}
+
+      {showLifeLogPopup && activeLifeLog && activeLifeActivity && (
+        <LifeLogTimer
+          activity={activeLifeActivity}
+          log={activeLifeLog}
+          tick={tick}
+          onStop={handleLifeLogStop}
+          onClose={() => setLifeLogPopupDismissedId(activeLifeLog.id)}
+        />
       )}
 
       {celebrations.map((c) => (

@@ -25,6 +25,8 @@ interface Props {
   onToggleAutoSync: (value: boolean) => void;
   aiConfig: AIToolConfig;
   onUpdateAIConfig: (config: AIToolConfig) => void;
+  dayBoundaryHour: number;
+  onDayBoundaryHourChange: (hour: number) => void;
 }
 
 interface AIToolDef {
@@ -269,6 +271,8 @@ export function SettingsPanel({
   onToggleAutoSync,
   aiConfig,
   onUpdateAIConfig,
+  dayBoundaryHour,
+  onDayBoundaryHourChange,
 }: Props) {
   const { t } = useTranslation("settings");
   const toggleTool = (toolId: string, enabled: boolean) => {
@@ -361,6 +365,40 @@ export function SettingsPanel({
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="widget" style={{ maxWidth: 720 }}>
+          <div className="widget-head">
+            <span className="widget-title">{t("timeline", "タイムライン")}</span>
+          </div>
+          <div className="widget-body">
+            <div className="settings-row">
+              <div>
+                <div className="settings-row-label">
+                  {t("dayBoundaryHour", "日の切り替え時刻")}
+                </div>
+                <div className="settings-row-desc">
+                  {t(
+                    "dayBoundaryHourDesc",
+                    "この時刻を境に「今日」が切り替わります。(デフォルト: 4:00)",
+                  )}
+                </div>
+              </div>
+              <select
+                className="detail-prop-select"
+                value={dayBoundaryHour}
+                onChange={(e) =>
+                  onDayBoundaryHourChange(Number(e.target.value))
+                }
+              >
+                {Array.from({ length: 24 }, (_, i) => i).map((h) => (
+                  <option key={h} value={h}>
+                    {String(h).padStart(2, "0")}:00
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         </div>

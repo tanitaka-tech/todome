@@ -10,6 +10,10 @@ export const ja_settings: Record<string, string> = {
   languageDesc: "UIの表示言語を切り替えます。設定はこのブラウザに保存されます。",
   langJa: "日本語",
   langEn: "English",
+  timeline: "タイムライン",
+  dayBoundaryHour: "日の切り替え時刻",
+  dayBoundaryHourDesc:
+    "この時刻を境に「今日」が切り替わります。(デフォルト: 4:00)",
   github: "GitHub連携",
   aiAgent: "AIエージェント",
   aiAgentDesc: "AIアシスタントが使えるツールを選びます。変更は次のチャット送信から反映されます。",

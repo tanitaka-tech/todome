@@ -6,6 +6,8 @@ const BOARD_RECENT_DAYS_KEY = "todome.board.recentDays";
 const RETRO_TAB_KEY = "todome.retro.tab";
 const RETRO_VIEW_MODE_KEY = "todome.retro.viewMode";
 const POPUP_TASK_ID_KEY = "todome.board.popupTaskId";
+const DAY_BOUNDARY_HOUR_KEY = "todome.dayBoundaryHour";
+const DEFAULT_DAY_BOUNDARY_HOUR = 4;
 
 const RETRO_TYPES: RetroType[] = ["daily", "weekly", "monthly", "yearly"];
 const VALID_RECENT_DAYS = new Set([0, 1, 3, 7, 30]);
@@ -84,6 +86,24 @@ export function savePopupTaskId(value: string | null): void {
     } else {
       window.localStorage.removeItem(POPUP_TASK_ID_KEY);
     }
+  } catch {
+    /* ignore quota errors */
+  }
+}
+
+export function loadDayBoundaryHour(): number {
+  if (typeof window === "undefined") return DEFAULT_DAY_BOUNDARY_HOUR;
+  const raw = window.localStorage.getItem(DAY_BOUNDARY_HOUR_KEY);
+  if (raw === null) return DEFAULT_DAY_BOUNDARY_HOUR;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 0 || n > 23) return DEFAULT_DAY_BOUNDARY_HOUR;
+  return n;
+}
+
+export function saveDayBoundaryHour(value: number): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(DAY_BOUNDARY_HOUR_KEY, String(value));
   } catch {
     /* ignore quota errors */
   }

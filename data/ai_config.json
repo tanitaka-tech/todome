@@ -4,6 +4,6 @@
     "Bash"
   ],
   "allowGhApi": false,
-  "model": "claude-sonnet-4-6",
+  "model": "claude-opus-4-7",
   "thinkingEffort": "high"
 }
