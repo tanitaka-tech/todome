@@ -74,19 +74,44 @@ def _get_user_meta() -> dict[str, str]:
     return {"login": login, "email": email, "name": data.get("name") or login}
 
 
+def gh_list_orgs() -> list[str]:
+    """ユーザーが所属する org の login 一覧。read:org スコープ未付与なら空。"""
+    proc = _run(["gh", "api", "user/orgs", "--jq", ".[].login"], check=False)
+    if proc.returncode != 0:
+        return []
+    return [line.strip() for line in proc.stdout.splitlines() if line.strip()]
+
+
 def gh_list_repos() -> list[dict[str, Any]]:
-    proc = _run(
-        [
-            "gh",
-            "repo",
-            "list",
-            "--json",
-            "name,owner,isPrivate,updatedAt,url,nameWithOwner",
-            "--limit",
-            "200",
-        ]
-    )
-    return json.loads(proc.stdout)
+    """ユーザー本人 + 所属 org のリポジトリを nameWithOwner で重複排除して返す。"""
+    fields = "name,owner,isPrivate,updatedAt,url,nameWithOwner"
+
+    def _list(owner: str | None) -> list[dict[str, Any]]:
+        cmd = ["gh", "repo", "list"]
+        if owner:
+            cmd.append(owner)
+        cmd += ["--json", fields, "--limit", "200"]
+        proc = _run(cmd)
+        return json.loads(proc.stdout)
+
+    repos: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for r in _list(None):
+        key = r.get("nameWithOwner", "")
+        if key and key not in seen:
+            seen.add(key)
+            repos.append(r)
+    for org in gh_list_orgs():
+        try:
+            for r in _list(org):
+                key = r.get("nameWithOwner", "")
+                if key and key not in seen:
+                    seen.add(key)
+                    repos.append(r)
+        except GitHubSyncError:
+            # 1 org の取得失敗で全体を落とさない（権限エラー等）
+            continue
+    return repos
 
 
 def gh_repo_has_db(owner: str, name: str, path: str = "todome.db") -> bool:
