@@ -972,6 +972,55 @@ body {
   background: var(--warning);
 }
 
+.offline-banner {
+  position: fixed;
+  top: 50px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: var(--warning);
+  color: #1a1204;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  max-width: calc(100vw - 32px);
+  font-size: 12px;
+  animation: offline-banner-in 0.2s ease;
+}
+.offline-banner-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #1a1204;
+  animation: offline-banner-pulse 1.2s ease infinite;
+  flex-shrink: 0;
+}
+.offline-banner-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.offline-banner-text strong {
+  font-size: 12px;
+  font-weight: 600;
+}
+.offline-banner-text span {
+  font-size: 11px;
+  opacity: 0.8;
+}
+@keyframes offline-banner-in {
+  from { opacity: 0; transform: translate(-50%, -12px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+@keyframes offline-banner-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
 .topbar-toggle {
   width: 26px;
   height: 26px;

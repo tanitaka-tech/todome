@@ -433,6 +433,16 @@ export function App() {
 
   const { send, connected } = useWebSocket(handleMessage);
 
+  // 切断直後のフラッシュを避けるため、1.5 秒続いた切断状態のみバナー表示する。
+  const [showOfflineBanner, setShowOfflineBanner] = useState(false);
+  useEffect(() => {
+    const id = setTimeout(
+      () => setShowOfflineBanner(!connected),
+      connected ? 0 : 1500,
+    );
+    return () => clearTimeout(id);
+  }, [connected]);
+
   const handleSendMessage = useCallback(
     (text: string) => {
       if (!connected) return;
@@ -1020,6 +1030,16 @@ export function App() {
           )}
         </nav>
       </aside>
+
+      {showOfflineBanner && (
+        <div className="offline-banner" role="alert">
+          <span className="offline-banner-dot" />
+          <div className="offline-banner-text">
+            <strong>{tNav("offlineBanner")}</strong>
+            <span>{tNav("offlineBannerHint")}</span>
+          </div>
+        </div>
+      )}
 
       {/* === Topbar === */}
       <header className="topbar">

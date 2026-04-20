@@ -17,11 +17,8 @@ export function useWebSocket(onMessage: (msg: WSMessage) => void) {
     const connect = () => {
       if (disposed) return;
       const proto = location.protocol === "https:" ? "wss:" : "ws:";
-      // Vite dev (5173) → バックエンドは別ポート 3002、
-      // 本番 build & E2E (3102) → 同じオリジンに WS がある。
-      const port = location.port === "5173" ? 3002 : location.port;
-      const host = port ? `${location.hostname}:${port}` : location.hostname;
-      const ws = new WebSocket(`${proto}//${host}/ws`);
+      // dev は Vite の proxy ('/ws' → backend) が間に入るため常に same-origin で OK。
+      const ws = new WebSocket(`${proto}//${location.host}/ws`);
       wsRef.current = ws;
 
       ws.onopen = () => {
