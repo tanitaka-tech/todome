@@ -2781,6 +2781,11 @@ async def websocket_endpoint(ws: WebSocket):
                                     )
                                     if block.name == "TodoWrite":
                                         todos = block.input.get("todos", [])
+                                        # AI応答待ちの間に他セッション/UIが書き込んだ
+                                        # 変更を潰さないよう最新をDBから読み直す
+                                        kanban_tasks = load_tasks()
+                                        goals = load_goals()
+                                        profile = load_profile()
                                         (
                                             kanban_tasks,
                                             goals,
