@@ -63,9 +63,11 @@ git clone https://github.com/<your-org>/todome.git
 cd todome
 ```
 
-### 2. Configure environment variables
+### 2. Configure environment variables (skip if already logged in via `claude login`)
 
-Create `.env` in the project root and set your Anthropic API Key.
+If you're already logged in with `claude login`, you don't need to set an Anthropic API Key. Skip this step and move on.
+
+Only when you want to use an API Key instead, create `.env` in the project root:
 
 ```bash
 cat > .env <<'EOF'

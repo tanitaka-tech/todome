@@ -59,9 +59,11 @@ git clone https://github.com/<your-org>/todome.git
 cd todome
 ```
 
-### 2. 環境変数を設定
+### 2. 環境変数を設定（`claude login` 済みならスキップ可）
 
-プロジェクトルートに `.env` を作成し、Anthropic API Key を設定します。
+`claude login` でログイン済みの環境では Anthropic API Key の設定は不要です。このステップは飛ばして次へ進んでください。
+
+API Key で利用する場合のみ、プロジェクトルートに `.env` を作成して設定します。
 
 ```bash
 cat > .env <<'EOF'
