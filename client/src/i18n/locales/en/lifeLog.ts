@@ -1,5 +1,5 @@
 export const en_lifeLog: Record<string, string> = {
-  sectionTitle: "Life log",
+  sectionTitle: "Timebox",
   addActivity: "+ Add",
   manage: "⚙ Edit",
   todayTotal: "Today total",
@@ -37,7 +37,7 @@ export const en_lifeLog: Record<string, string> = {
   close: "Close",
   stopNow: "Stop",
   timelineTasks: "Tasks",
-  timelineLife: "Life log",
+  timelineLife: "Timebox",
   timelineNow: "Now",
   timelineEmpty: "No entries logged for this day yet.",
 };

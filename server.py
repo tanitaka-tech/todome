@@ -392,7 +392,7 @@ def save_profile(profile: ProfileData) -> None:
         )
 
 
-# --- Life log storage ---
+# --- Timebox storage ---
 LifeActivity = dict[str, Any]
 LifeLog = dict[str, Any]
 
@@ -475,7 +475,7 @@ def _life_log_row_to_dict(row: sqlite3.Row) -> LifeLog:
 
 
 def load_today_life_logs(today_iso: str | None = None) -> list[LifeLog]:
-    """当日分 (指定日) のライフログを開始時刻昇順で返す。"""
+    """当日分 (指定日) のタイムボックスを開始時刻昇順で返す。"""
     if today_iso is None:
         today_iso = datetime.date.today().isoformat()
     with _db() as conn:
@@ -488,7 +488,7 @@ def load_today_life_logs(today_iso: str | None = None) -> list[LifeLog]:
 
 
 def load_life_logs_in_range(start_iso: str, end_iso: str) -> list[LifeLog]:
-    """[start_iso, end_iso) に重なるライフログを返す（ISO文字列は辞書順比較可能)。"""
+    """[start_iso, end_iso) に重なるタイムボックスを返す（ISO文字列は辞書順比較可能)。"""
     with _db() as conn:
         rows = conn.execute(
             "SELECT * FROM life_logs "
@@ -509,7 +509,7 @@ def _stop_all_active_life_logs(now_iso: str) -> None:
 
 
 def start_life_log(activity_id: str) -> LifeLog:
-    """ライフログ計測を開始する。既存の active ログは自動停止する。"""
+    """タイムボックス計測を開始する。既存の active ログは自動停止する。"""
     now_iso = datetime.datetime.now().isoformat(timespec="seconds")
     _stop_all_active_life_logs(now_iso)
     log_id = _short_id()
@@ -579,7 +579,7 @@ def _stop_task_timers_if_running(tasks: list[dict[str, Any]]) -> list[str]:
 
 
 def _stop_active_life_log_if_any() -> str:
-    """計測中のライフログを全て停止し、停止したログIDを返す（なければ "")。"""
+    """計測中のタイムボックスを全て停止し、停止したログIDを返す（なければ "")。"""
     now_iso = datetime.datetime.now().isoformat(timespec="seconds")
     with _db() as conn:
         row = conn.execute(
@@ -2686,7 +2686,7 @@ async def websocket_endpoint(ws: WebSocket):
                 )
                 continue
 
-            # --- ライフログ ---
+            # --- タイムボックス ---
             if data["type"] == "life_activity_upsert":
                 incoming = data.get("activity", {}) or {}
                 activities = load_life_activities()

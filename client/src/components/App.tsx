@@ -1027,7 +1027,7 @@ export function App() {
     send({ type: "life_log_stop", log_id: activeLifeLog.id });
   }, [activeLifeLog, send]);
 
-  // daily retro が開かれたらその日のライフログを範囲取得。
+  // daily retro が開かれたらその日のタイムボックスを範囲取得。
   useEffect(() => {
     if (!activeRetro || activeRetro.type !== "daily") return;
     if (lifeLogsByRetroId[activeRetro.id] !== undefined) return;
