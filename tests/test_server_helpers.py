@@ -184,6 +184,8 @@ class TestNormalizeAIConfig:
         assert _normalize_ai_config(cfg) == {
             "allowedTools": ["TodoWrite", "Bash", "Read"],
             "allowGhApi": False,
+            "model": "claude-sonnet-4-6",
+            "thinkingEffort": "high",
         }
 
     def test_drops_unknown_tools(self):
@@ -199,6 +201,8 @@ class TestNormalizeAIConfig:
         assert _normalize_ai_config({"allowedTools": []}) == {
             "allowedTools": [],
             "allowGhApi": False,
+            "model": "claude-sonnet-4-6",
+            "thinkingEffort": "high",
         }
 
     def test_missing_key_uses_defaults(self):
@@ -233,6 +237,64 @@ class TestNormalizeAIConfig:
             {"allowedTools": ["Bash"], "allowGhApi": "yes"}
         )
         assert result["allowGhApi"] is True
+
+    def test_model_valid_full_ids_preserved(self):
+        for m in (
+            "claude-opus-4-7",
+            "claude-opus-4-7-1m",
+            "claude-sonnet-4-6",
+            "claude-haiku-4-5",
+        ):
+            result = _normalize_ai_config({"allowedTools": ["Bash"], "model": m})
+            assert result["model"] == m
+
+    def test_model_legacy_aliases_migrated(self):
+        # 旧 ai_config.json に残る "sonnet" / "opus" / "haiku" はフルIDへ移行する
+        assert (
+            _normalize_ai_config({"allowedTools": ["Bash"], "model": "sonnet"})["model"]
+            == "claude-sonnet-4-6"
+        )
+        assert (
+            _normalize_ai_config({"allowedTools": ["Bash"], "model": "opus"})["model"]
+            == "claude-opus-4-7"
+        )
+        assert (
+            _normalize_ai_config({"allowedTools": ["Bash"], "model": "haiku"})["model"]
+            == "claude-haiku-4-5"
+        )
+
+    def test_model_unknown_falls_back_to_default(self):
+        result = _normalize_ai_config(
+            {"allowedTools": ["Bash"], "model": "gpt-5"}
+        )
+        assert result["model"] == "claude-sonnet-4-6"
+
+    def test_model_missing_defaults_to_sonnet(self):
+        # model キーが欠けていても claude-sonnet-4-6 に倒す
+        default = "claude-sonnet-4-6"
+        assert _normalize_ai_config({"allowedTools": ["Bash"]})["model"] == default
+        assert _normalize_ai_config({})["model"] == default
+        assert _normalize_ai_config(None)["model"] == default
+
+    def test_thinking_effort_valid_values_preserved(self):
+        for e in ("low", "medium", "high", "veryHigh", "max"):
+            result = _normalize_ai_config(
+                {"allowedTools": ["Bash"], "thinkingEffort": e}
+            )
+            assert result["thinkingEffort"] == e
+
+    def test_thinking_effort_unknown_falls_back(self):
+        result = _normalize_ai_config(
+            {"allowedTools": ["Bash"], "thinkingEffort": "extreme"}
+        )
+        assert result["thinkingEffort"] == "high"
+
+    def test_thinking_effort_missing_defaults_to_high(self):
+        assert (
+            _normalize_ai_config({"allowedTools": ["Bash"]})["thinkingEffort"] == "high"
+        )
+        assert _normalize_ai_config({})["thinkingEffort"] == "high"
+        assert _normalize_ai_config(None)["thinkingEffort"] == "high"
 
 
 class TestIsBashCommandAllowed:

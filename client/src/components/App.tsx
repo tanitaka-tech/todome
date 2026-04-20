@@ -166,6 +166,8 @@ export function App() {
   const [aiConfig, setAIConfig] = useState<AIToolConfig>({
     allowedTools: ["TodoWrite", "Bash"],
     allowGhApi: false,
+    model: "claude-sonnet-4-6",
+    thinkingEffort: "high",
   });
   const [retros, setRetros] = useState<Retrospective[]>([]);
   const [activeRetro, setActiveRetro] = useState<Retrospective | null>(null);
@@ -522,6 +524,20 @@ export function App() {
       send({ type: "ai_config_update", config });
     },
     [send],
+  );
+
+  const handleModelChange = useCallback(
+    (model: AIToolConfig["model"]) => {
+      handleUpdateAIConfig({ ...aiConfig, model });
+    },
+    [aiConfig, handleUpdateAIConfig],
+  );
+
+  const handleThinkingEffortChange = useCallback(
+    (thinkingEffort: AIToolConfig["thinkingEffort"]) => {
+      handleUpdateAIConfig({ ...aiConfig, thinkingEffort });
+    },
+    [aiConfig, handleUpdateAIConfig],
   );
 
   const handleAskSubmit = useCallback(
@@ -1159,6 +1175,10 @@ export function App() {
         askRequests={askRequests}
         waiting={waiting}
         connected={connected}
+        model={aiConfig.model}
+        onModelChange={handleModelChange}
+        thinkingEffort={aiConfig.thinkingEffort}
+        onThinkingEffortChange={handleThinkingEffortChange}
         onSend={handleSendMessage}
         onAskSubmit={handleAskSubmit}
         onCancel={handleCancel}

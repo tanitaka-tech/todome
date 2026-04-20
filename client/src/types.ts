@@ -225,9 +225,41 @@ export interface CommitDiffEntry {
 
 // --- AI tool config ---
 
+export type AIModel =
+  | "claude-opus-4-7"
+  | "claude-opus-4-7-1m"
+  | "claude-sonnet-4-6"
+  | "claude-haiku-4-5";
+
+export const AI_MODELS: readonly AIModel[] = [
+  "claude-opus-4-7",
+  "claude-opus-4-7-1m",
+  "claude-sonnet-4-6",
+  "claude-haiku-4-5",
+];
+
+export const AI_MODEL_LABELS: Record<AIModel, string> = {
+  "claude-opus-4-7": "Opus 4.7",
+  "claude-opus-4-7-1m": "Opus 4.7 1M",
+  "claude-sonnet-4-6": "Sonnet 4.6",
+  "claude-haiku-4-5": "Haiku 4.5",
+};
+
+export type ThinkingEffort = "low" | "medium" | "high" | "veryHigh" | "max";
+
+export const THINKING_EFFORTS: readonly ThinkingEffort[] = [
+  "low",
+  "medium",
+  "high",
+  "veryHigh",
+  "max",
+];
+
 export interface AIToolConfig {
   allowedTools: string[];
   allowGhApi: boolean;
+  model: AIModel;
+  thinkingEffort: ThinkingEffort;
 }
 
 // --- Retrospective ---

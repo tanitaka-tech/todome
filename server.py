@@ -87,6 +87,37 @@ AI_TOOL_CATALOG: tuple[str, ...] = (
 )
 AI_DEFAULT_ALLOWED_TOOLS: tuple[str, ...] = ("TodoWrite", "Bash")
 
+# UIで切り替え可能なモデルID。claude-agent-sdk v0.1.63+ のフルIDまたはエイリアスを受ける。
+# 1M context 版は同じ base model ID に AI_1M_CONTEXT_MODELS 経由で beta フラグを付与する。
+AI_AVAILABLE_MODELS: tuple[str, ...] = (
+    "claude-opus-4-7",
+    "claude-opus-4-7-1m",
+    "claude-sonnet-4-6",
+    "claude-haiku-4-5",
+)
+AI_DEFAULT_MODEL: str = "claude-sonnet-4-6"
+# "1m" サフィックス付き疑似ID → 実モデルID への解決表。併せて 1M context beta を有効化する。
+AI_1M_CONTEXT_MODELS: dict[str, str] = {
+    "claude-opus-4-7-1m": "claude-opus-4-7",
+}
+# 旧エイリアスからの後方互換マイグレーション。load 時にのみ適用される。
+AI_MODEL_ALIASES: dict[str, str] = {
+    "sonnet": "claude-sonnet-4-6",
+    "opus": "claude-opus-4-7",
+    "haiku": "claude-haiku-4-5",
+}
+
+# 画像のUIに合わせた5段階の思考工数。`ClaudeAgentOptions.thinking` の budget_tokens にマップする。
+AI_THINKING_EFFORTS: tuple[str, ...] = ("low", "medium", "high", "veryHigh", "max")
+AI_THINKING_BUDGETS: dict[str, int] = {
+    "low": 1024,
+    "medium": 4000,
+    "high": 10000,
+    "veryHigh": 32000,
+    "max": 64000,
+}
+AI_DEFAULT_THINKING_EFFORT: str = "high"
+
 # Bash ツールが実行可能なコマンドの prefix allowlist。常時許可。
 AI_BASH_ALLOWED_PREFIXES: tuple[tuple[str, ...], ...] = (
     ("gh", "issue", "list"),
@@ -113,12 +144,24 @@ def _normalize_ai_config(cfg: Any) -> dict[str, Any]:
         return {
             "allowedTools": list(AI_DEFAULT_ALLOWED_TOOLS),
             "allowGhApi": False,
+            "model": AI_DEFAULT_MODEL,
+            "thinkingEffort": AI_DEFAULT_THINKING_EFFORT,
         }
+    model = cfg.get("model")
+    if isinstance(model, str) and model in AI_MODEL_ALIASES:
+        model = AI_MODEL_ALIASES[model]
+    if not isinstance(model, str) or model not in AI_AVAILABLE_MODELS:
+        model = AI_DEFAULT_MODEL
+    effort = cfg.get("thinkingEffort")
+    if not isinstance(effort, str) or effort not in AI_THINKING_EFFORTS:
+        effort = AI_DEFAULT_THINKING_EFFORT
     raw = cfg.get("allowedTools")
     if not isinstance(raw, list):
         return {
             "allowedTools": list(AI_DEFAULT_ALLOWED_TOOLS),
             "allowGhApi": bool(cfg.get("allowGhApi", False)),
+            "model": model,
+            "thinkingEffort": effort,
         }
     seen: set[str] = set()
     result: list[str] = []
@@ -126,7 +169,28 @@ def _normalize_ai_config(cfg: Any) -> dict[str, Any]:
         if isinstance(tool, str) and tool in AI_TOOL_CATALOG and tool not in seen:
             result.append(tool)
             seen.add(tool)
-    return {"allowedTools": result, "allowGhApi": bool(cfg.get("allowGhApi", False))}
+    return {
+        "allowedTools": result,
+        "allowGhApi": bool(cfg.get("allowGhApi", False)),
+        "model": model,
+        "thinkingEffort": effort,
+    }
+
+
+def _resolve_ai_model(cfg: dict[str, Any]) -> tuple[str, list[str]]:
+    """AI 設定の model を SDK 用の (モデルID, beta フラグ list) に解決する。"""
+    model = cfg.get("model", AI_DEFAULT_MODEL)
+    betas: list[str] = []
+    if model in AI_1M_CONTEXT_MODELS:
+        betas.append("context-1m-2025-08-07")
+        model = AI_1M_CONTEXT_MODELS[model]
+    return model, betas
+
+
+def _resolve_thinking_budget(cfg: dict[str, Any]) -> int:
+    """AI 設定の thinkingEffort を budget_tokens に解決する。"""
+    effort = cfg.get("thinkingEffort", AI_DEFAULT_THINKING_EFFORT)
+    return AI_THINKING_BUDGETS.get(effort, AI_THINKING_BUDGETS[AI_DEFAULT_THINKING_EFFORT])
 
 
 def _is_bash_command_allowed(command: Any, *, allow_gh_api: bool) -> bool:
@@ -1612,7 +1676,7 @@ async def run_retro_turn(
     transcript = _build_retro_transcript(retro, user_msg)
 
     options = ClaudeAgentOptions(
-        model="sonnet",
+        model=load_ai_config()["model"],
         cwd=str(Path(__file__).parent),
         system_prompt=system_prompt,
         include_partial_messages=True,
@@ -1716,7 +1780,7 @@ async def run_retro_reopen_greeting(
     )
 
     options = ClaudeAgentOptions(
-        model="sonnet",
+        model=load_ai_config()["model"],
         cwd=str(Path(__file__).parent),
         system_prompt=system_prompt,
         include_partial_messages=True,
@@ -1809,7 +1873,7 @@ async def _generate_retro_review_text(
     )
 
     options = ClaudeAgentOptions(
-        model="sonnet",
+        model=load_ai_config()["model"],
         cwd=str(Path(__file__).parent),
         system_prompt=system_prompt,
         include_partial_messages=True,
@@ -2742,8 +2806,11 @@ async def websocket_endpoint(ws: WebSocket):
                         profile_context=profile_ctx,
                         board_context=board_ctx,
                     )
+                    ai_cfg = load_ai_config()
+                    resolved_model, betas = _resolve_ai_model(ai_cfg)
                     options = ClaudeAgentOptions(
-                        model="sonnet",
+                        model=resolved_model,
+                        betas=betas,
                         cwd=str(Path(__file__).parent),
                         system_prompt={
                             "type": "preset",
@@ -2753,8 +2820,11 @@ async def websocket_endpoint(ws: WebSocket):
                         include_partial_messages=True,
                         can_use_tool=can_use_tool,
                         permission_mode="acceptEdits",
-                        thinking={"type": "enabled", "budget_tokens": 10000},
-                        allowed_tools=load_ai_config()["allowedTools"],
+                        thinking={
+                            "type": "enabled",
+                            "budget_tokens": _resolve_thinking_budget(ai_cfg),
+                        },
+                        allowed_tools=ai_cfg["allowedTools"],
                     )
                     client = ClaudeSDKClient(options=options)
                     await client.connect()

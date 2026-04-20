@@ -1,8 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { AskUserRequest, ChatMessage } from "../types";
+import type {
+  AIModel,
+  AskUserRequest,
+  ChatMessage,
+  ThinkingEffort,
+} from "../types";
+import { AI_MODELS, AI_MODEL_LABELS, THINKING_EFFORTS } from "../types";
 import { AskUserCard } from "./AskUserCard";
 import { useModalClose } from "../hooks/useModalClose";
 
@@ -13,12 +19,45 @@ interface Props {
   askRequests: AskUserRequest[];
   waiting: boolean;
   connected: boolean;
+  model: AIModel;
+  onModelChange: (model: AIModel) => void;
+  thinkingEffort: ThinkingEffort;
+  onThinkingEffortChange: (effort: ThinkingEffort) => void;
   onSend: (text: string) => void;
   onAskSubmit: (requestId: string, answers: Record<string, string>) => void;
   onCancel: () => void;
   onClearSession: () => void;
   onClose?: () => void;
   inputRef?: React.RefObject<HTMLInputElement | null>;
+}
+
+const EFFORT_LABEL_KEYS: Record<ThinkingEffort, string> = {
+  low: "effortLow",
+  medium: "effortMedium",
+  high: "effortHigh",
+  veryHigh: "effortVeryHigh",
+  max: "effortMax",
+};
+
+type RenderItem =
+  | { kind: "message"; msg: ChatMessage }
+  | { kind: "toolGroup"; id: string; tools: ChatMessage[] };
+
+function buildRenderItems(messages: ChatMessage[]): RenderItem[] {
+  const items: RenderItem[] = [];
+  for (const m of messages) {
+    if (m.role === "tool") {
+      const last = items[items.length - 1];
+      if (last && last.kind === "toolGroup") {
+        last.tools.push(m);
+      } else {
+        items.push({ kind: "toolGroup", id: `tg-${m.id}`, tools: [m] });
+      }
+    } else {
+      items.push({ kind: "message", msg: m });
+    }
+  }
+  return items;
 }
 
 function formatToolInput(input: unknown): string {
@@ -38,6 +77,10 @@ export function ChatPanel({
   askRequests,
   waiting,
   connected,
+  model,
+  onModelChange,
+  thinkingEffort,
+  onThinkingEffortChange,
   onSend,
   onAskSubmit,
   onCancel,
@@ -48,11 +91,46 @@ export function ChatPanel({
   const { t } = useTranslation("chat");
   const [input, setInput] = useState("");
   const [toolDetail, setToolDetail] = useState<ChatMessage | null>(null);
+  const [expandedToolGroups, setExpandedToolGroups] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [modelMenuOpen, setModelMenuOpen] = useState(false);
+  const modelMenuRef = useRef<HTMLDivElement>(null);
   const flowRef = useRef<HTMLDivElement>(null);
   const composing = useRef(false);
   const toolOverlayMouseDownRef = useRef(false);
   const clearToolDetail = useCallback(() => setToolDetail(null), []);
   const { closing: toolDetailClosing, close: closeToolDetail } = useModalClose(clearToolDetail);
+
+  const renderItems = useMemo(() => buildRenderItems(messages), [messages]);
+
+  const toggleToolGroup = useCallback((groupId: string) => {
+    setExpandedToolGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) next.delete(groupId);
+      else next.add(groupId);
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!modelMenuOpen) return;
+    const handlePointer = (e: MouseEvent) => {
+      if (!modelMenuRef.current) return;
+      if (!modelMenuRef.current.contains(e.target as Node)) {
+        setModelMenuOpen(false);
+      }
+    };
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setModelMenuOpen(false);
+    };
+    document.addEventListener("mousedown", handlePointer);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handlePointer);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [modelMenuOpen]);
 
   const suggestions = [
     t("suggestionProfile"),
@@ -129,21 +207,51 @@ export function ChatPanel({
           </div>
         )}
 
-        {messages.map((m) => {
-          if (m.role === "tool") {
+        {renderItems.map((item) => {
+          if (item.kind === "toolGroup") {
+            const expanded = expandedToolGroups.has(item.id);
+            const count = item.tools.length;
+            const last = item.tools[item.tools.length - 1];
             return (
-              <div key={m.id} className="chat-tool-event">
+              <div key={item.id} className="chat-tool-group">
                 <button
-                  className="chat-tool-label chat-tool-label--button"
-                  onClick={() => setToolDetail(m)}
-                  title={t("showDetails")}
+                  className={`chat-tool-group-header${expanded ? " is-expanded" : ""}`}
+                  onClick={() => toggleToolGroup(item.id)}
+                  title={expanded ? t("toolGroupCollapse") : t("toolGroupExpand")}
+                  aria-expanded={expanded}
                 >
-                  {m.text}
-                  <span className="chat-tool-label-icon">&#9432;</span>
+                  <span className="chat-tool-group-caret" aria-hidden="true">
+                    &#9656;
+                  </span>
+                  <span className="chat-tool-group-summary">
+                    {t("toolGroupSummary", { count })}
+                  </span>
+                  {!expanded && (
+                    <span className="chat-tool-group-preview">
+                      {last.text}
+                    </span>
+                  )}
                 </button>
+                {expanded && (
+                  <div className="chat-tool-group-list">
+                    {item.tools.map((tm) => (
+                      <div key={tm.id} className="chat-tool-event">
+                        <button
+                          className="chat-tool-label chat-tool-label--button"
+                          onClick={() => setToolDetail(tm)}
+                          title={t("showDetails")}
+                        >
+                          {tm.text}
+                          <span className="chat-tool-label-icon">&#9432;</span>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           }
+          const m = item.msg;
           if (m.role === "system") {
             return (
               <div key={m.id} className="chat-system">{m.text}</div>
@@ -206,45 +314,139 @@ export function ChatPanel({
       </div>
 
       <div className="chat-input-dock">
-        <input
-          ref={inputRef}
-          className="chat-input"
-          placeholder={
-            connected
-              ? waiting
-                ? t("inputPlaceholderResponding")
-                : t("inputPlaceholderReady")
-              : t("inputPlaceholderConnecting")
-          }
-          value={input}
-          disabled={!connected || waiting}
-          onChange={(e) => setInput(e.target.value)}
-          onCompositionStart={() => { composing.current = true; }}
-          onCompositionEnd={() => { composing.current = false; }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey && !composing.current) {
-              e.preventDefault();
-              handleSend();
+        <div className="chat-input-row">
+          <input
+            ref={inputRef}
+            className="chat-input"
+            placeholder={
+              connected
+                ? waiting
+                  ? t("inputPlaceholderResponding")
+                  : t("inputPlaceholderReady")
+                : t("inputPlaceholderConnecting")
             }
-          }}
-        />
-        {waiting ? (
-          <button
-            className="chat-send chat-send--cancel"
-            onClick={onCancel}
-            disabled={!connected}
+            value={input}
+            disabled={!connected || waiting}
+            onChange={(e) => setInput(e.target.value)}
+            onCompositionStart={() => { composing.current = true; }}
+            onCompositionEnd={() => { composing.current = false; }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey && !composing.current) {
+                e.preventDefault();
+                handleSend();
+              }
+            }}
+          />
+          {waiting ? (
+            <button
+              className="chat-send chat-send--cancel"
+              onClick={onCancel}
+              disabled={!connected}
+            >
+              {t("cancel")}
+            </button>
+          ) : (
+            <button
+              className="chat-send"
+              disabled={!connected || !input.trim()}
+              onClick={handleSend}
+            >
+              {t("send")}
+            </button>
+          )}
+        </div>
+        <div className="chat-input-toolbar">
+          <div
+            className="chat-model-popover-wrap"
+            ref={modelMenuRef}
           >
-            {t("cancel")}
-          </button>
-        ) : (
-          <button
-            className="chat-send"
-            disabled={!connected || !input.trim()}
-            onClick={handleSend}
-          >
-            {t("send")}
-          </button>
-        )}
+            <button
+              type="button"
+              className={`chat-model-trigger${modelMenuOpen ? " is-open" : ""}`}
+              disabled={!connected || waiting}
+              onClick={() => setModelMenuOpen((v) => !v)}
+              aria-haspopup="menu"
+              aria-expanded={modelMenuOpen}
+              title={t("modelChangeTitle")}
+            >
+              <span className="chat-model-trigger-name">
+                {AI_MODEL_LABELS[model]}
+              </span>
+              <span className="chat-model-trigger-sep">·</span>
+              <span className="chat-model-trigger-effort">
+                {t(EFFORT_LABEL_KEYS[thinkingEffort])}
+              </span>
+              <span className="chat-model-trigger-caret" aria-hidden="true">
+                &#9662;
+              </span>
+            </button>
+            {modelMenuOpen && (
+              <div className="chat-model-popover" role="menu">
+                <div className="chat-model-popover-section">
+                  <div className="chat-model-popover-header">
+                    {t("modelLabel")}
+                  </div>
+                  {AI_MODELS.map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={model === m}
+                      className={`chat-model-popover-item${model === m ? " is-selected" : ""}`}
+                      onClick={() => {
+                        onModelChange(m);
+                        setModelMenuOpen(false);
+                      }}
+                    >
+                      <span className="chat-model-popover-item-label">
+                        {AI_MODEL_LABELS[m]}
+                      </span>
+                      {model === m && (
+                        <span
+                          className="chat-model-popover-item-check"
+                          aria-hidden="true"
+                        >
+                          &#10003;
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+                <div className="chat-model-popover-divider" />
+                <div className="chat-model-popover-section">
+                  <div className="chat-model-popover-header">
+                    {t("effortLabel")}
+                  </div>
+                  {THINKING_EFFORTS.map((e) => (
+                    <button
+                      key={e}
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={thinkingEffort === e}
+                      className={`chat-model-popover-item${thinkingEffort === e ? " is-selected" : ""}`}
+                      onClick={() => {
+                        onThinkingEffortChange(e);
+                        setModelMenuOpen(false);
+                      }}
+                    >
+                      <span className="chat-model-popover-item-label">
+                        {t(EFFORT_LABEL_KEYS[e])}
+                      </span>
+                      {thinkingEffort === e && (
+                        <span
+                          className="chat-model-popover-item-check"
+                          aria-hidden="true"
+                        >
+                          &#10003;
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {toolDetail && (

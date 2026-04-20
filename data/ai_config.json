@@ -3,5 +3,7 @@
     "TodoWrite",
     "Bash"
   ],
-  "allowGhApi": false
+  "allowGhApi": false,
+  "model": "claude-opus-4-7",
+  "thinkingEffort": "high"
 }

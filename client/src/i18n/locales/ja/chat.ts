@@ -16,6 +16,19 @@ export const ja_chat: Record<string, string> = {
 
   // Tool event
   showDetails: "詳細を表示",
+  toolGroupSummary: "{{count}} 件のコマンド実行",
+  toolGroupExpand: "展開",
+  toolGroupCollapse: "折りたたむ",
+
+  // Model selector
+  modelLabel: "モデル",
+  modelChangeTitle: "モデルを変更するとセッションがリセットされます",
+  effortLabel: "工数",
+  effortLow: "低",
+  effortMedium: "中",
+  effortHigh: "高",
+  effortVeryHigh: "超高",
+  effortMax: "Max",
 
   // Input dock
   inputPlaceholderResponding: "AIが応答中...",
