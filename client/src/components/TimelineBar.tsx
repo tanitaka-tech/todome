@@ -13,6 +13,8 @@ interface Props {
   tick?: number;
   /** 現在時刻にスクロールするか。Overview では true、retro (過去日) では false。 */
   autoScrollToNow?: boolean;
+  /** 縦 (デフォルト) or 横。 */
+  orientation?: "vertical" | "horizontal";
 }
 
 interface Segment {
@@ -27,6 +29,7 @@ interface Segment {
 }
 
 const HOUR_HEIGHT_PX = 56;
+const HORIZONTAL_LANE_HEIGHT_PX = 44;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
@@ -54,6 +57,7 @@ export function TimelineBar({
   lifeActivities,
   tick: _tick,
   autoScrollToNow = false,
+  orientation = "vertical",
 }: Props) {
   const { t } = useTranslation("lifeLog");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -146,10 +150,12 @@ export function TimelineBar({
   const safeNow = clamp(nowMs, rangeStartMs, rangeEndMs);
   const nowIsInRange = nowMs > rangeStartMs && nowMs < rangeEndMs;
   const nowTop = ((safeNow - rangeStartMs) / totalMs) * totalHeight;
+  const nowLeftPct = ((safeNow - rangeStartMs) / totalMs) * 100;
 
   // 初回マウント時 + autoScrollToNow=true のときだけ現在時刻にスクロール。
   const didAutoScroll = useRef(false);
   useEffect(() => {
+    if (orientation !== "vertical") return;
     if (didAutoScroll.current) return;
     if (!autoScrollToNow) return;
     if (!scrollRef.current) return;
@@ -158,9 +164,74 @@ export function TimelineBar({
     // 現在時刻を上から 1/3 ぐらいの位置に持ってくる。
     const container = scrollRef.current;
     container.scrollTop = Math.max(0, nowTop - container.clientHeight / 3);
-  }, [autoScrollToNow, nowIsInRange, nowTop]);
+  }, [autoScrollToNow, nowIsInRange, nowTop, orientation]);
 
   const hasAny = segments.length > 0;
+
+  if (orientation === "horizontal") {
+    return (
+      <div className="timeline-h">
+        <div className="timeline-h-axis">
+          {hourMarkers.map((m, i) => (
+            <span
+              key={`${m.hour}-${i}`}
+              className="timeline-h-axis-label"
+              style={{ left: `${(i / totalHours) * 100}%` }}
+            >
+              {String(m.hour).padStart(2, "0")}
+            </span>
+          ))}
+        </div>
+        <div
+          className="timeline-h-lane"
+          style={{ height: `${HORIZONTAL_LANE_HEIGHT_PX}px` }}
+        >
+          {hourMarkers.map((_m, i) => (
+            <div
+              key={`g-${i}`}
+              className="timeline-h-grid-line"
+              style={{ left: `${(i / totalHours) * 100}%` }}
+            />
+          ))}
+          {segments.map((s) => {
+            const leftPct = ((s.startMs - rangeStartMs) / totalMs) * 100;
+            const widthPct = Math.max(
+              0.2,
+              ((s.endMs - s.startMs) / totalMs) * 100,
+            );
+            return (
+              <div
+                key={s.key}
+                className={`timeline-h-seg timeline-h-seg--${s.kind}`}
+                style={{
+                  left: `${leftPct}%`,
+                  width: `${widthPct}%`,
+                  background: s.color,
+                }}
+                title={s.tooltip}
+              >
+                <div className="timeline-h-seg-label">{s.label}</div>
+              </div>
+            );
+          })}
+          {nowIsInRange && (
+            <div
+              className="timeline-h-now"
+              style={{ left: `${nowLeftPct}%` }}
+              title={t("timelineNow", "現在")}
+            >
+              <span className="timeline-h-now-dot" />
+            </div>
+          )}
+        </div>
+        {!hasAny && (
+          <div className="timeline-v-empty">
+            {t("timelineEmpty", "この日はまだ計測がありません。")}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="timeline-v">

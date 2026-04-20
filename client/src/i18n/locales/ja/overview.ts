@@ -17,4 +17,6 @@ export const ja_overview: Record<string, string> = {
   sectionRecentDoneCount: "last {{count}}",
   emptyRecentDone: "完了したタスクはまだありません",
   sectionTimeline: "今日のタイムスケジュール",
+  timelineOrientVertical: "縦",
+  timelineOrientHorizontal: "横",
 };

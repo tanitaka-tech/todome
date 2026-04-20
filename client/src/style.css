@@ -5281,6 +5281,16 @@ body {
   color: var(--fg);
   margin: 0 0 8px;
 }
+.retro-doc-section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.retro-doc-section-title-row .retro-doc-section-title {
+  margin: 0;
+}
 .retro-doc-section-body {
   font-size: 13px;
   line-height: 1.6;
@@ -5913,5 +5923,81 @@ body {
   color: var(--fg-muted);
   text-align: center;
   padding: 4px 0;
+}
+
+/* --- Timeline (horizontal variant) --- */
+.timeline-h {
+  position: relative;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 12px 8px;
+}
+.timeline-h-axis {
+  position: relative;
+  height: 14px;
+  margin-bottom: 2px;
+}
+.timeline-h-axis-label {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  font-size: 10px;
+  color: var(--fg-dim);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  white-space: nowrap;
+}
+.timeline-h-lane {
+  position: relative;
+  border-top: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.timeline-h-grid-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 1px dashed var(--border);
+  pointer-events: none;
+}
+.timeline-h-seg {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  min-width: 2px;
+  border-radius: 3px;
+  padding: 2px 4px;
+  color: #fff;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+  cursor: default;
+}
+.timeline-h-seg-label {
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.timeline-h-now {
+  position: absolute;
+  top: -4px;
+  bottom: 0;
+  width: 0;
+  border-left: 2px solid var(--danger);
+  box-shadow: 0 0 4px rgba(239, 68, 68, 0.5);
+  pointer-events: none;
+  z-index: 2;
+}
+.timeline-h-now-dot {
+  position: absolute;
+  left: -4px;
+  top: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger);
 }
 

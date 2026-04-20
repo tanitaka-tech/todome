@@ -17,4 +17,6 @@ export const en_overview: Record<string, string> = {
   sectionRecentDoneCount: "last {{count}}",
   emptyRecentDone: "No completed tasks yet",
   sectionTimeline: "Today's schedule",
+  timelineOrientVertical: "Vertical",
+  timelineOrientHorizontal: "Horizontal",
 };
