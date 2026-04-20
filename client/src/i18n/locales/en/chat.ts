@@ -16,6 +16,19 @@ export const en_chat: Record<string, string> = {
 
   // Tool event
   showDetails: "Show details",
+  toolGroupSummary: "{{count}} tool calls",
+  toolGroupExpand: "Expand",
+  toolGroupCollapse: "Collapse",
+
+  // Model selector
+  modelLabel: "Model",
+  modelChangeTitle: "Changing the model resets the session",
+  effortLabel: "Effort",
+  effortLow: "Low",
+  effortMedium: "Medium",
+  effortHigh: "High",
+  effortVeryHigh: "Very high",
+  effortMax: "Max",
 
   // Input dock
   inputPlaceholderResponding: "AI is responding...",
