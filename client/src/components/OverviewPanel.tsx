@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { formatDate, formatDateTime } from "../i18n/format";
 import type { Goal, KanbanTask, LifeActivity, LifeLog } from "../types";
@@ -57,6 +57,16 @@ export function OverviewPanel({
   dayBoundaryHour,
 }: Props) {
   const { t } = useTranslation("overview");
+  const [timelineOrientation, setTimelineOrientation] = useState<
+    "vertical" | "horizontal"
+  >(() => {
+    const saved = localStorage.getItem("timeline:orientation");
+    return saved === "horizontal" ? "horizontal" : "vertical";
+  });
+  const setOrientation = (o: "vertical" | "horizontal") => {
+    setTimelineOrientation(o);
+    localStorage.setItem("timeline:orientation", o);
+  };
   const todayRange = useMemo(
     () => getTodayDayRange(dayBoundaryHour),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -200,6 +210,22 @@ export function OverviewPanel({
               <span className="widget-title">
                 {t("sectionTimeline", "今日のタイムスケジュール")}
               </span>
+              <div className="retro-view-toggle" role="group">
+                <button
+                  type="button"
+                  className={`retro-view-toggle-btn${timelineOrientation === "vertical" ? " retro-view-toggle-btn--active" : ""}`}
+                  onClick={() => setOrientation("vertical")}
+                >
+                  {t("timelineOrientVertical", "縦")}
+                </button>
+                <button
+                  type="button"
+                  className={`retro-view-toggle-btn${timelineOrientation === "horizontal" ? " retro-view-toggle-btn--active" : ""}`}
+                  onClick={() => setOrientation("horizontal")}
+                >
+                  {t("timelineOrientHorizontal", "横")}
+                </button>
+              </div>
             </div>
             <div className="widget-body">
               <TimelineBar
@@ -210,6 +236,7 @@ export function OverviewPanel({
                 lifeActivities={lifeActivities}
                 tick={_tick}
                 autoScrollToNow
+                orientation={timelineOrientation}
               />
             </div>
           </div>

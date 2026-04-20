@@ -73,6 +73,8 @@ export const en_retro: Record<string, string> = {
   docSectionRating: "Day rating",
   docSectionSleep: "Sleep",
   docSectionTimeline: "Timeline",
+  timelineOrientVertical: "Vertical",
+  timelineOrientHorizontal: "Horizontal",
   docSectionDid: "What I did",
   docSectionLearned: "What I learned",
   docSectionNext: "Next actions",
