@@ -43,6 +43,10 @@ app = FastAPI()
 
 pending_approvals: dict[str, asyncio.Future] = {}
 active_sockets: set[WebSocket] = set()
+# Git 同期 (pull/restore/link/unlink) で DB が差し替わった際、各 WS 接続が保持する
+# kanban_tasks/goals/profile のローカル変数は自動では更新されない。次ループ頭で
+# reload するためのフラグ。
+_ws_needs_reload: dict[WebSocket, bool] = {}
 
 
 # --- Types ---
@@ -711,11 +715,17 @@ async def _do_pull() -> None:
 
 
 async def _broadcast_db_state() -> None:
-    """現在の DB からロードして全クライアントへ同期 push。"""
+    """現在の DB からロードして全クライアントへ同期 push。
+
+    DB が外部要因 (git pull/restore/link/unlink) で差し替わったタイミングで呼ばれるため、
+    各 WS 接続のローカルキャッシュも次のループ頭で再ロードさせるフラグを立てる。
+    """
     tasks = load_tasks()
     goals = load_goals()
     profile = load_profile()
     retros = load_retros()
+    for ws in active_sockets:
+        _ws_needs_reload[ws] = True
     await broadcast({"type": "kanban_sync", "tasks": tasks})
     await broadcast({"type": "goal_sync", "goals": goals})
     await broadcast({"type": "profile_sync", "profile": profile})
@@ -2016,6 +2026,20 @@ async def websocket_endpoint(ws: WebSocket):
             if data is None:
                 break
 
+            if _ws_needs_reload.pop(ws, False):
+                # Git 同期で DB が差し替わったので、in-memory 状態を破棄して再ロード。
+                # Claude SDK client も会話履歴に古いスナップショットを抱えたままなので
+                # 次メッセージで再生成されるよう落とす。
+                kanban_tasks = load_tasks()
+                goals = load_goals()
+                profile = load_profile()
+                if client is not None:
+                    try:
+                        await client.disconnect()
+                    except Exception:
+                        pass
+                    client = None
+
             # --- カンバン操作 ---
             if data["type"] == "kanban_move":
                 for t in kanban_tasks:
@@ -2860,6 +2884,7 @@ async def websocket_endpoint(ws: WebSocket):
         pass
     finally:
         active_sockets.discard(ws)
+        _ws_needs_reload.pop(ws, None)
         reader_task.cancel()
         if client:
             await client.disconnect()
