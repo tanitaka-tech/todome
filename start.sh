@@ -37,7 +37,15 @@ case "$MODE" in
       --reload-include 'github_sync.py' &
     pids+=($!)
 
-    wait -n "${pids[@]}"
+    # macOS デフォルトの bash 3.2 は `wait -n` 未対応なのでポーリングで代替
+    while :; do
+      for pid in "${pids[@]}"; do
+        if ! kill -0 "$pid" 2>/dev/null; then
+          break 2
+        fi
+      done
+      sleep 1
+    done
     ;;
 
   prod)
