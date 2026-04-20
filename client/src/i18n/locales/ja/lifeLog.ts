@@ -35,4 +35,8 @@ export const ja_lifeLog: Record<string, string> = {
   memoPlaceholder: "メモ（任意）",
   close: "閉じる",
   stopNow: "停止",
+  timelineTasks: "タスク",
+  timelineLife: "ライフログ",
+  timelineNow: "現在",
+  timelineEmpty: "この日はまだ計測がありません。",
 };

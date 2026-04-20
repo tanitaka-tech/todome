@@ -72,6 +72,7 @@ export const ja_retro: Record<string, string> = {
 
   docSectionRating: "今日の評価",
   docSectionSleep: "睡眠",
+  docSectionTimeline: "タイムスケジュール",
   docSectionDid: "やったこと",
   docSectionLearned: "わかったこと",
   docSectionNext: "次やること",

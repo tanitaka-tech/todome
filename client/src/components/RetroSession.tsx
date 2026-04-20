@@ -4,6 +4,8 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type {
   KanbanTask,
+  LifeActivity,
+  LifeLog,
   RetroMessage,
   Retrospective,
 } from "../types";
@@ -15,6 +17,9 @@ interface Props {
   typeLabel: string;
   streamText: string;
   waiting: boolean;
+  lifeActivities: LifeActivity[];
+  lifeLogsForPeriod: LifeLog[];
+  dayBoundaryHour: number;
   onSend: (text: string) => void;
   onComplete: () => void;
   onReopen: () => void;
@@ -38,6 +43,9 @@ export function RetroSession({
   typeLabel,
   streamText,
   waiting,
+  lifeActivities,
+  lifeLogsForPeriod,
+  dayBoundaryHour,
   onSend,
   onComplete,
   onReopen,
@@ -213,6 +221,9 @@ export function RetroSession({
             periodStart={retro.periodStart}
             periodEnd={retro.periodEnd}
             typeLabel={typeLabel}
+            lifeActivities={lifeActivities}
+            lifeLogsForPeriod={lifeLogsForPeriod}
+            dayBoundaryHour={dayBoundaryHour}
             onEditField={(key, value) => onEditField(retro.id, key, value)}
             onEditDayRating={(v) => onEditDayRating(retro.id, v)}
             onEditSleep={(key, value) => onEditSleep(retro.id, key, value)}

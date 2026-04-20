@@ -5820,3 +5820,98 @@ body {
   background: var(--danger-light);
 }
 
+/* --- Timeline (Google Calendar style, vertical) --- */
+.timeline-v {
+  position: relative;
+}
+.timeline-v-scroll {
+  max-height: 480px;
+  overflow-y: auto;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.timeline-v-canvas {
+  position: relative;
+  display: grid;
+  grid-template-columns: 56px 1fr;
+}
+.timeline-v-axis {
+  position: relative;
+  border-right: 1px solid var(--border);
+}
+.timeline-v-axis-row {
+  position: absolute;
+  right: 6px;
+  transform: translateY(-7px);
+  font-size: 10px;
+  color: var(--fg-dim);
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+.timeline-v-axis-label {
+  display: inline-block;
+}
+.timeline-v-lane {
+  position: relative;
+}
+.timeline-v-grid-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 1px dashed var(--border);
+  pointer-events: none;
+}
+.timeline-v-seg {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  border-radius: 4px;
+  padding: 3px 6px;
+  color: #fff;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+  cursor: default;
+}
+.timeline-v-seg-label {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.timeline-v-seg-sub {
+  font-size: 10px;
+  opacity: 0.85;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.timeline-v-now {
+  position: absolute;
+  left: -8px;
+  right: 0;
+  height: 0;
+  border-top: 2px solid var(--danger);
+  box-shadow: 0 0 4px rgba(239, 68, 68, 0.5);
+  pointer-events: none;
+  z-index: 2;
+}
+.timeline-v-now-dot {
+  position: absolute;
+  left: -5px;
+  top: -5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger);
+}
+.timeline-v-empty {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--fg-muted);
+  text-align: center;
+  padding: 4px 0;
+}
+
