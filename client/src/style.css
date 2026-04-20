@@ -5536,3 +5536,287 @@ body {
   text-align: right;
 }
 
+/* --- Life log --- */
+.life-log-section {
+  margin: 20px 12px 32px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.life-log-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.life-log-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg);
+}
+.life-log-header-actions {
+  display: flex;
+  gap: 6px;
+}
+.life-log-header-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--fg-muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.life-log-header-btn:hover {
+  color: var(--fg);
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+}
+.life-log-empty {
+  padding: 14px 6px;
+  font-size: 13px;
+  color: var(--fg-muted);
+  text-align: center;
+}
+.life-log-buttons {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 10px;
+}
+.life-log-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 6px 8px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--fg);
+  cursor: pointer;
+  transition: transform 0.12s, background 0.12s, border-color 0.12s;
+}
+.life-log-btn:hover {
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
+}
+.life-log-btn--active {
+  background: var(--accent-light);
+  border-color: var(--accent-border);
+  animation: life-log-btn-pulse 1.6s ease-in-out infinite;
+}
+@keyframes life-log-btn-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--accent-light); }
+  50% { box-shadow: 0 0 0 4px var(--accent-light); }
+}
+.life-log-btn--soft {
+  background: var(--warning-light);
+  border-color: var(--warning-border);
+}
+.life-log-btn--hard {
+  background: var(--danger-light);
+  border-color: var(--danger-border);
+  animation: life-log-btn-pulse-hard 0.8s ease-in-out infinite;
+}
+@keyframes life-log-btn-pulse-hard {
+  0%, 100% { box-shadow: 0 0 0 0 var(--danger-border); }
+  50% { box-shadow: 0 0 0 4px var(--danger-border); }
+}
+.life-log-btn-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+.life-log-btn-name {
+  font-size: 12px;
+  font-weight: 500;
+}
+.life-log-btn-time {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+.life-log-btn--active .life-log-btn-time {
+  color: var(--accent);
+  font-weight: 600;
+}
+.life-log-btn-alert {
+  color: var(--danger);
+}
+.life-log-btn-alert--soft {
+  color: var(--warning);
+}
+.life-log-btn-limit {
+  color: var(--fg-dim);
+  font-weight: 400;
+}
+.timer-popup--lifelog {
+  border-color: var(--accent-border);
+}
+.timer-popup--lifelog.timer-popup--soft {
+  border-color: var(--warning-border);
+}
+.timer-popup--lifelog.timer-popup--hard {
+  border-color: var(--danger-border);
+}
+.timer-popup--lifelog .timer-popup-pulse {
+  background: var(--accent);
+  animation: pulse-accent 1.5s infinite;
+}
+.timer-popup--lifelog.timer-popup--soft .timer-popup-pulse {
+  background: var(--warning);
+  animation: pulse-warn 1.5s infinite;
+}
+@keyframes pulse-accent {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(138, 95, 240, 0.5); }
+  50%      { box-shadow: 0 0 0 6px rgba(138, 95, 240, 0); }
+}
+@keyframes pulse-warn {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.5); }
+  50%      { box-shadow: 0 0 0 6px rgba(245, 158, 11, 0); }
+}
+.timer-popup-lifelog-icon {
+  margin-right: 6px;
+  font-size: 15px;
+}
+.timer-popup-status-badge--warn {
+  color: var(--warning);
+  background: var(--warning-light);
+  border-color: var(--warning-border);
+}
+.timer-popup-status-badge--danger {
+  color: var(--danger);
+  background: var(--danger-light);
+  border-color: var(--danger-border);
+}
+
+.modal-content--life-activity,
+.modal-content--life-manager {
+  width: min(440px, 92vw);
+}
+.detail-topbar-title {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg);
+}
+.detail-prop-input {
+  padding: 6px 10px;
+  font-size: 13px;
+  color: var(--fg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  width: 100%;
+}
+.detail-prop-input--num {
+  width: 90px;
+}
+.life-activity-icon-input {
+  padding: 4px 8px;
+  font-size: 22px;
+  text-align: center;
+  width: 60px;
+  color: var(--fg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.life-activity-scope-group {
+  display: flex;
+  gap: 6px;
+}
+.life-activity-scope-chip {
+  padding: 4px 12px;
+  font-size: 12px;
+  background: transparent;
+  color: var(--fg-muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.life-activity-scope-chip.is-active {
+  background: var(--accent-light);
+  color: var(--accent);
+  border-color: var(--accent-border);
+}
+.life-activity-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+.life-manager-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+.life-manager-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.life-manager-row.is-archived {
+  opacity: 0.55;
+}
+.life-manager-row-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.life-manager-icon {
+  font-size: 18px;
+}
+.life-manager-name {
+  font-size: 13px;
+  color: var(--fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.life-manager-archived-label {
+  color: var(--fg-muted);
+  font-size: 11px;
+}
+.life-manager-row-actions {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.life-manager-btn {
+  padding: 3px 8px;
+  font-size: 12px;
+  background: transparent;
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  cursor: pointer;
+}
+.life-manager-btn:hover:not(:disabled) {
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
+}
+.life-manager-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.life-manager-btn--danger {
+  color: var(--danger);
+  border-color: var(--danger-border);
+}
+.life-manager-btn--danger:hover:not(:disabled) {
+  background: var(--danger-light);
+}
+

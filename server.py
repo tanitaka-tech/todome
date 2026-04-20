@@ -313,6 +313,20 @@ def init_db() -> None:
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS life_activities (
+                id TEXT PRIMARY KEY,
+                sort_order INTEGER NOT NULL,
+                data TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS life_logs (
+                id TEXT PRIMARY KEY,
+                activity_id TEXT NOT NULL,
+                started_at TEXT NOT NULL,
+                ended_at TEXT NOT NULL DEFAULT '',
+                memo TEXT NOT NULL DEFAULT '',
+                alert_triggered TEXT NOT NULL DEFAULT ''
+            );
+            CREATE INDEX IF NOT EXISTS idx_life_logs_started ON life_logs(started_at);
             """
         )
 
@@ -376,6 +390,195 @@ def save_profile(profile: ProfileData) -> None:
             "ON CONFLICT(id) DO UPDATE SET data = excluded.data",
             (json.dumps(profile, ensure_ascii=False),),
         )
+
+
+# --- Life log storage ---
+LifeActivity = dict[str, Any]
+LifeLog = dict[str, Any]
+
+LIFE_ACTIVITY_CATEGORIES = ("rest", "play", "routine", "other")
+LIFE_LIMIT_SCOPES = ("per_session", "per_day")
+
+_DEFAULT_LIFE_ACTIVITIES: list[dict[str, Any]] = [
+    {"name": "食事", "icon": "🍚", "category": "routine", "softLimitMinutes": 45, "hardLimitMinutes": 90, "limitScope": "per_session"},
+    {"name": "風呂", "icon": "🛁", "category": "routine", "softLimitMinutes": 30, "hardLimitMinutes": 60, "limitScope": "per_session"},
+    {"name": "遊び", "icon": "🎮", "category": "play", "softLimitMinutes": 60, "hardLimitMinutes": 180, "limitScope": "per_day"},
+    {"name": "SNS", "icon": "📱", "category": "play", "softLimitMinutes": 30, "hardLimitMinutes": 90, "limitScope": "per_day"},
+    {"name": "動画視聴", "icon": "📺", "category": "play", "softLimitMinutes": 60, "hardLimitMinutes": 180, "limitScope": "per_day"},
+    {"name": "仮眠", "icon": "💤", "category": "rest", "softLimitMinutes": 20, "hardLimitMinutes": 45, "limitScope": "per_session"},
+]
+
+
+def _normalize_life_activity(activity: dict[str, Any]) -> LifeActivity:
+    """ユーザー入力をバリデーション・既定値補完した LifeActivity に正規化する。"""
+    category = activity.get("category")
+    if category not in LIFE_ACTIVITY_CATEGORIES:
+        category = "other"
+    scope = activity.get("limitScope")
+    if scope not in LIFE_LIMIT_SCOPES:
+        scope = "per_session"
+    try:
+        soft = max(0, int(activity.get("softLimitMinutes", 0) or 0))
+    except (TypeError, ValueError):
+        soft = 0
+    try:
+        hard = max(0, int(activity.get("hardLimitMinutes", 0) or 0))
+    except (TypeError, ValueError):
+        hard = 0
+    name = str(activity.get("name", "")).strip() or "未命名"
+    icon = str(activity.get("icon", "")).strip() or "⏱"
+    return {
+        "id": activity.get("id") or _short_id(),
+        "name": name,
+        "icon": icon,
+        "category": category,
+        "softLimitMinutes": soft,
+        "hardLimitMinutes": hard,
+        "limitScope": scope,
+        "archived": bool(activity.get("archived", False)),
+    }
+
+
+def load_life_activities() -> list[LifeActivity]:
+    with _db() as conn:
+        rows = conn.execute(
+            "SELECT data FROM life_activities ORDER BY sort_order"
+        ).fetchall()
+    if not rows:
+        activities = [_normalize_life_activity(a) for a in _DEFAULT_LIFE_ACTIVITIES]
+        save_life_activities(activities)
+        return activities
+    return [_normalize_life_activity(json.loads(r["data"])) for r in rows]
+
+
+def save_life_activities(activities: list[LifeActivity]) -> None:
+    with _db() as conn:
+        conn.execute("DELETE FROM life_activities")
+        conn.executemany(
+            "INSERT INTO life_activities (id, sort_order, data) VALUES (?, ?, ?)",
+            [
+                (a["id"], i, json.dumps(a, ensure_ascii=False))
+                for i, a in enumerate(activities)
+            ],
+        )
+
+
+def _life_log_row_to_dict(row: sqlite3.Row) -> LifeLog:
+    return {
+        "id": row["id"],
+        "activityId": row["activity_id"],
+        "startedAt": row["started_at"],
+        "endedAt": row["ended_at"] or "",
+        "memo": row["memo"] or "",
+        "alertTriggered": row["alert_triggered"] or "",
+    }
+
+
+def load_today_life_logs(today_iso: str | None = None) -> list[LifeLog]:
+    """当日分 (指定日) のライフログを開始時刻昇順で返す。"""
+    if today_iso is None:
+        today_iso = datetime.date.today().isoformat()
+    with _db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM life_logs WHERE substr(started_at, 1, 10) = ? "
+            "ORDER BY started_at ASC",
+            (today_iso,),
+        ).fetchall()
+    return [_life_log_row_to_dict(r) for r in rows]
+
+
+def _stop_all_active_life_logs(now_iso: str) -> None:
+    with _db() as conn:
+        conn.execute(
+            "UPDATE life_logs SET ended_at = ? WHERE ended_at = ''",
+            (now_iso,),
+        )
+
+
+def start_life_log(activity_id: str) -> LifeLog:
+    """ライフログ計測を開始する。既存の active ログは自動停止する。"""
+    now_iso = datetime.datetime.now().isoformat(timespec="seconds")
+    _stop_all_active_life_logs(now_iso)
+    log_id = _short_id()
+    with _db() as conn:
+        conn.execute(
+            "INSERT INTO life_logs (id, activity_id, started_at) VALUES (?, ?, ?)",
+            (log_id, activity_id, now_iso),
+        )
+        row = conn.execute(
+            "SELECT * FROM life_logs WHERE id = ?", (log_id,)
+        ).fetchone()
+    return _life_log_row_to_dict(row)
+
+
+def stop_life_log(log_id: str, memo: str | None = None) -> LifeLog | None:
+    now_iso = datetime.datetime.now().isoformat(timespec="seconds")
+    with _db() as conn:
+        if memo is None:
+            conn.execute(
+                "UPDATE life_logs SET ended_at = ? WHERE id = ? AND ended_at = ''",
+                (now_iso, log_id),
+            )
+        else:
+            conn.execute(
+                "UPDATE life_logs SET ended_at = ?, memo = ? "
+                "WHERE id = ? AND ended_at = ''",
+                (now_iso, memo, log_id),
+            )
+        row = conn.execute(
+            "SELECT * FROM life_logs WHERE id = ?", (log_id,)
+        ).fetchone()
+    return _life_log_row_to_dict(row) if row else None
+
+
+def delete_life_log(log_id: str) -> None:
+    with _db() as conn:
+        conn.execute("DELETE FROM life_logs WHERE id = ?", (log_id,))
+
+
+def _stop_task_timers_if_running(tasks: list[dict[str, Any]]) -> list[str]:
+    """計測中のタスクタイマーを全て停止し、停止したタスクIDを返す。"""
+    stopped_ids: list[str] = []
+    now_naive = datetime.datetime.now()
+    now_aware = datetime.datetime.now(datetime.timezone.utc)
+    now_iso = now_naive.isoformat(timespec="seconds")
+    for t in tasks:
+        started = t.get("timerStartedAt") or ""
+        if not started:
+            continue
+        try:
+            # クライアントは ISO with 'Z' (tz-aware) を送ってくる場合があるため
+            # fromisoformat にかけた上で、tz に応じて比較相手を切り替える。
+            normalized = started.replace("Z", "+00:00")
+            start_dt = datetime.datetime.fromisoformat(normalized)
+        except ValueError:
+            t["timerStartedAt"] = ""
+            continue
+        now = now_aware if start_dt.tzinfo else now_naive
+        elapsed = max(0, int((now - start_dt).total_seconds()))
+        t["timeSpent"] = int(t.get("timeSpent", 0) or 0) + elapsed
+        logs = list(t.get("timeLogs") or [])
+        logs.append({"start": started, "end": now_iso, "duration": elapsed})
+        t["timeLogs"] = logs
+        t["timerStartedAt"] = ""
+        stopped_ids.append(t["id"])
+    return stopped_ids
+
+
+def _stop_active_life_log_if_any() -> str:
+    """計測中のライフログを全て停止し、停止したログIDを返す（なければ "")。"""
+    now_iso = datetime.datetime.now().isoformat(timespec="seconds")
+    with _db() as conn:
+        row = conn.execute(
+            "SELECT id FROM life_logs WHERE ended_at = '' LIMIT 1"
+        ).fetchone()
+        if not row:
+            return ""
+        conn.execute(
+            "UPDATE life_logs SET ended_at = ? WHERE ended_at = ''",
+            (now_iso,),
+        )
+    return row["id"]
 
 
 # --- Retrospective storage ---
@@ -788,12 +991,16 @@ async def _broadcast_db_state() -> None:
     goals = load_goals()
     profile = load_profile()
     retros = load_retros()
+    activities = load_life_activities()
+    life_logs = load_today_life_logs()
     for ws in active_sockets:
         _ws_needs_reload[ws] = True
     await broadcast({"type": "kanban_sync", "tasks": tasks})
     await broadcast({"type": "goal_sync", "goals": goals})
     await broadcast({"type": "profile_sync", "profile": profile})
     await broadcast({"type": "retro_list_sync", "retros": retros})
+    await broadcast({"type": "life_activity_sync", "activities": activities})
+    await broadcast({"type": "life_log_sync", "logs": life_logs})
 
 
 async def _do_link(
@@ -2051,6 +2258,12 @@ async def websocket_endpoint(ws: WebSocket):
     )
     await ws.send_json(await _build_github_status())
     await ws.send_json({"type": "ai_config_sync", "config": load_ai_config()})
+    await ws.send_json(
+        {"type": "life_activity_sync", "activities": load_life_activities()}
+    )
+    await ws.send_json(
+        {"type": "life_log_sync", "logs": load_today_life_logs()}
+    )
 
     msg_queue: asyncio.Queue = asyncio.Queue()
 
@@ -2106,6 +2319,7 @@ async def websocket_endpoint(ws: WebSocket):
 
             # --- カンバン操作 ---
             if data["type"] == "kanban_move":
+                starting_timer = bool(data.get("timerStartedAt"))
                 for t in kanban_tasks:
                     if t["id"] == data["taskId"]:
                         before = {
@@ -2127,6 +2341,8 @@ async def websocket_endpoint(ws: WebSocket):
                                 t[key] = data[key]
                         _rebalance_kpi_contribution(t, before, goals)
                         break
+                if starting_timer:
+                    _stop_active_life_log_if_any()
                 save_tasks(kanban_tasks)
                 save_goals(goals)
                 schedule_autosync()
@@ -2134,6 +2350,13 @@ async def websocket_endpoint(ws: WebSocket):
                     {"type": "kanban_sync", "tasks": kanban_tasks}
                 )
                 await ws.send_json({"type": "goal_sync", "goals": goals})
+                if starting_timer:
+                    await broadcast(
+                        {
+                            "type": "life_log_sync",
+                            "logs": load_today_life_logs(),
+                        }
+                    )
                 continue
 
             if data["type"] == "kanban_add":
@@ -2204,6 +2427,7 @@ async def websocket_endpoint(ws: WebSocket):
 
             if data["type"] == "kanban_edit":
                 task_id = data["taskId"]
+                starting_timer = bool(data.get("timerStartedAt"))
                 for t in kanban_tasks:
                     if t["id"] == task_id:
                         before = {
@@ -2234,6 +2458,8 @@ async def websocket_endpoint(ws: WebSocket):
                             t["kpiId"] = ""
                         _rebalance_kpi_contribution(t, before, goals)
                         break
+                if starting_timer:
+                    _stop_active_life_log_if_any()
                 save_tasks(kanban_tasks)
                 save_goals(goals)
                 schedule_autosync()
@@ -2241,6 +2467,13 @@ async def websocket_endpoint(ws: WebSocket):
                     {"type": "kanban_sync", "tasks": kanban_tasks}
                 )
                 await ws.send_json({"type": "goal_sync", "goals": goals})
+                if starting_timer:
+                    await broadcast(
+                        {
+                            "type": "life_log_sync",
+                            "logs": load_today_life_logs(),
+                        }
+                    )
                 continue
 
             # --- 目標操作 (クライアント直接) ---
@@ -2438,6 +2671,131 @@ async def websocket_endpoint(ws: WebSocket):
                 await broadcast(
                     {"type": "ai_config_sync", "config": normalized}
                 )
+                continue
+
+            # --- ライフログ ---
+            if data["type"] == "life_activity_upsert":
+                incoming = data.get("activity", {}) or {}
+                activities = load_life_activities()
+                normalized = _normalize_life_activity(incoming)
+                replaced = False
+                for i, a in enumerate(activities):
+                    if a["id"] == normalized["id"]:
+                        activities[i] = normalized
+                        replaced = True
+                        break
+                if not replaced:
+                    activities.append(normalized)
+                save_life_activities(activities)
+                schedule_autosync()
+                await broadcast(
+                    {"type": "life_activity_sync", "activities": activities}
+                )
+                continue
+
+            if data["type"] == "life_activity_archive":
+                aid = data.get("id", "")
+                if aid:
+                    activities = load_life_activities()
+                    for a in activities:
+                        if a["id"] == aid:
+                            a["archived"] = True
+                            break
+                    save_life_activities(activities)
+                    schedule_autosync()
+                    await broadcast(
+                        {
+                            "type": "life_activity_sync",
+                            "activities": activities,
+                        }
+                    )
+                continue
+
+            if data["type"] == "life_activity_delete":
+                aid = data.get("id", "")
+                if aid:
+                    activities = [
+                        a for a in load_life_activities() if a["id"] != aid
+                    ]
+                    save_life_activities(activities)
+                    schedule_autosync()
+                    await broadcast(
+                        {
+                            "type": "life_activity_sync",
+                            "activities": activities,
+                        }
+                    )
+                continue
+
+            if data["type"] == "life_activity_reorder":
+                ids = data.get("ids", []) or []
+                activities = load_life_activities()
+                amap = {a["id"]: a for a in activities}
+                seen: set[str] = set()
+                ordered: list[LifeActivity] = []
+                for aid in ids:
+                    if aid in amap and aid not in seen:
+                        ordered.append(amap[aid])
+                        seen.add(aid)
+                for a in activities:
+                    if a["id"] not in seen:
+                        ordered.append(a)
+                save_life_activities(ordered)
+                schedule_autosync()
+                await broadcast(
+                    {"type": "life_activity_sync", "activities": ordered}
+                )
+                continue
+
+            if data["type"] == "life_log_start":
+                activity_id = data.get("activity_id") or data.get(
+                    "activityId", ""
+                )
+                if not activity_id:
+                    continue
+                # タスク計測中なら自動停止（全体排他）
+                _stop_task_timers_if_running(kanban_tasks)
+                save_tasks(kanban_tasks)
+                log = start_life_log(activity_id)
+                schedule_autosync()
+                await broadcast(
+                    {"type": "kanban_sync", "tasks": kanban_tasks}
+                )
+                await broadcast(
+                    {"type": "life_log_sync", "logs": load_today_life_logs()}
+                )
+                await broadcast({"type": "life_log_started", "log": log})
+                continue
+
+            if data["type"] == "life_log_stop":
+                log_id = data.get("log_id") or data.get("logId", "")
+                memo = data.get("memo")
+                if log_id:
+                    stopped = stop_life_log(log_id, memo)
+                    schedule_autosync()
+                    await broadcast(
+                        {
+                            "type": "life_log_sync",
+                            "logs": load_today_life_logs(),
+                        }
+                    )
+                    if stopped:
+                        await broadcast(
+                            {"type": "life_log_stopped", "log": stopped}
+                        )
+                continue
+
+            if data["type"] == "life_log_delete":
+                log_id = data.get("log_id") or data.get("logId", "")
+                if log_id:
+                    delete_life_log(log_id)
+                    schedule_autosync()
+                    await broadcast(
+                        {
+                            "type": "life_log_sync",
+                            "logs": load_today_life_logs(),
+                        }
+                    )
                 continue
 
             # --- 振り返り操作 ---
