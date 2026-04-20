@@ -23,12 +23,21 @@ export const en_chat: Record<string, string> = {
   // Model selector
   modelLabel: "Model",
   modelChangeTitle: "Changing the model resets the session",
+  modelOpus47Desc: "Strongest reasoning. Best for hard problems and large-scale design. Slow and costly",
+  modelOpus471mDesc: "Opus 4.7 with 1M-token extra-long context (beta)",
+  modelSonnet46Desc: "Balanced. The default pick for everyday tasks",
+  modelHaiku45Desc: "Fastest and cheapest. Best for simple questions and light work",
   effortLabel: "Effort",
   effortLow: "Low",
   effortMedium: "Medium",
   effortHigh: "High",
   effortVeryHigh: "Very high",
   effortMax: "Max",
+  effortLowDesc: "~1K thinking tokens. Near-instant. Best for simple questions",
+  effortMediumDesc: "~4K thinking tokens. Normal chat and light reasoning",
+  effortHighDesc: "~10K thinking tokens. Default. Good for planning tasks",
+  effortVeryHighDesc: "~32K thinking tokens. Complex design decisions or large refactors",
+  effortMaxDesc: "~64K thinking tokens. Hardest problems only — slow and costly",
 
   // Input dock
   inputPlaceholderResponding: "AI is responding...",

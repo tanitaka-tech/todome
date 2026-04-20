@@ -39,6 +39,21 @@ const EFFORT_LABEL_KEYS: Record<ThinkingEffort, string> = {
   max: "effortMax",
 };
 
+const EFFORT_DESC_KEYS: Record<ThinkingEffort, string> = {
+  low: "effortLowDesc",
+  medium: "effortMediumDesc",
+  high: "effortHighDesc",
+  veryHigh: "effortVeryHighDesc",
+  max: "effortMaxDesc",
+};
+
+const MODEL_DESC_KEYS: Record<AIModel, string> = {
+  "claude-opus-4-7": "modelOpus47Desc",
+  "claude-opus-4-7-1m": "modelOpus471mDesc",
+  "claude-sonnet-4-6": "modelSonnet46Desc",
+  "claude-haiku-4-5": "modelHaiku45Desc",
+};
+
 type RenderItem =
   | { kind: "message"; msg: ChatMessage }
   | { kind: "toolGroup"; id: string; tools: ChatMessage[] };
@@ -95,6 +110,7 @@ export function ChatPanel({
     () => new Set(),
   );
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
+  const [hoveredDescKey, setHoveredDescKey] = useState<string | null>(null);
   const modelMenuRef = useRef<HTMLDivElement>(null);
   const flowRef = useRef<HTMLDivElement>(null);
   const composing = useRef(false);
@@ -113,16 +129,21 @@ export function ChatPanel({
     });
   }, []);
 
+  const closeModelMenu = useCallback(() => {
+    setModelMenuOpen(false);
+    setHoveredDescKey(null);
+  }, []);
+
   useEffect(() => {
     if (!modelMenuOpen) return;
     const handlePointer = (e: MouseEvent) => {
       if (!modelMenuRef.current) return;
       if (!modelMenuRef.current.contains(e.target as Node)) {
-        setModelMenuOpen(false);
+        closeModelMenu();
       }
     };
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setModelMenuOpen(false);
+      if (e.key === "Escape") closeModelMenu();
     };
     document.addEventListener("mousedown", handlePointer);
     document.addEventListener("keydown", handleKey);
@@ -130,7 +151,7 @@ export function ChatPanel({
       document.removeEventListener("mousedown", handlePointer);
       document.removeEventListener("keydown", handleKey);
     };
-  }, [modelMenuOpen]);
+  }, [modelMenuOpen, closeModelMenu]);
 
   const suggestions = [
     t("suggestionProfile"),
@@ -393,9 +414,13 @@ export function ChatPanel({
                       role="menuitemradio"
                       aria-checked={model === m}
                       className={`chat-model-popover-item${model === m ? " is-selected" : ""}`}
+                      onMouseEnter={() => setHoveredDescKey(MODEL_DESC_KEYS[m])}
+                      onFocus={() => setHoveredDescKey(MODEL_DESC_KEYS[m])}
+                      onMouseLeave={() => setHoveredDescKey(null)}
+                      onBlur={() => setHoveredDescKey(null)}
                       onClick={() => {
                         onModelChange(m);
-                        setModelMenuOpen(false);
+                        closeModelMenu();
                       }}
                     >
                       <span className="chat-model-popover-item-label">
@@ -424,9 +449,13 @@ export function ChatPanel({
                       role="menuitemradio"
                       aria-checked={thinkingEffort === e}
                       className={`chat-model-popover-item${thinkingEffort === e ? " is-selected" : ""}`}
+                      onMouseEnter={() => setHoveredDescKey(EFFORT_DESC_KEYS[e])}
+                      onFocus={() => setHoveredDescKey(EFFORT_DESC_KEYS[e])}
+                      onMouseLeave={() => setHoveredDescKey(null)}
+                      onBlur={() => setHoveredDescKey(null)}
                       onClick={() => {
                         onThinkingEffortChange(e);
-                        setModelMenuOpen(false);
+                        closeModelMenu();
                       }}
                     >
                       <span className="chat-model-popover-item-label">
@@ -443,6 +472,11 @@ export function ChatPanel({
                     </button>
                   ))}
                 </div>
+                {hoveredDescKey && (
+                  <div className="chat-model-popover-tooltip" role="tooltip">
+                    {t(hoveredDescKey)}
+                  </div>
+                )}
               </div>
             )}
           </div>
