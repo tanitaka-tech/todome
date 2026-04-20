@@ -293,7 +293,7 @@ export interface Retrospective {
   updatedAt: string;
 }
 
-// --- Life log ---
+// --- Timebox ---
 
 export type LifeCategory = "rest" | "play" | "routine" | "other";
 export type LifeLimitScope = "per_session" | "per_day";

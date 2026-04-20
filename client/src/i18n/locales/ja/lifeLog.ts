@@ -1,5 +1,5 @@
 export const ja_lifeLog: Record<string, string> = {
-  sectionTitle: "ライフログ",
+  sectionTitle: "タイムボックス",
   addActivity: "＋項目追加",
   manage: "⚙編集",
   todayTotal: "今日の合計",
@@ -36,7 +36,7 @@ export const ja_lifeLog: Record<string, string> = {
   close: "閉じる",
   stopNow: "停止",
   timelineTasks: "タスク",
-  timelineLife: "ライフログ",
+  timelineLife: "タイムボックス",
   timelineNow: "現在",
   timelineEmpty: "この日はまだ計測がありません。",
 };
