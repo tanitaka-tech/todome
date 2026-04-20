@@ -293,6 +293,83 @@ export interface Retrospective {
   updatedAt: string;
 }
 
+// --- Life log ---
+
+export type LifeCategory = "rest" | "play" | "routine" | "other";
+export type LifeLimitScope = "per_session" | "per_day";
+
+export interface LifeActivity {
+  id: string;
+  name: string;
+  icon: string;
+  category: LifeCategory;
+  softLimitMinutes: number; // 0 = 無効
+  hardLimitMinutes: number; // 0 = 無効
+  limitScope: LifeLimitScope;
+  archived: boolean;
+}
+
+export interface LifeLog {
+  id: string;
+  activityId: string;
+  startedAt: string; // ISO datetime
+  endedAt: string;   // ISO datetime or ""
+  memo: string;
+  alertTriggered: "" | "soft" | "hard";
+}
+
+export const LIFE_CATEGORIES: readonly LifeCategory[] = [
+  "rest",
+  "play",
+  "routine",
+  "other",
+];
+
+export const LIFE_CATEGORY_LABELS: Record<LifeCategory, string> = {
+  rest: "休息",
+  play: "遊び",
+  routine: "ルーティン",
+  other: "その他",
+};
+
+export const LIFE_LIMIT_SCOPE_LABELS: Record<LifeLimitScope, string> = {
+  per_session: "1回ごと",
+  per_day: "1日合計",
+};
+
+export function lifeLogDurationSeconds(log: LifeLog, nowMs: number = Date.now()): number {
+  if (!log.startedAt) return 0;
+  const start = new Date(log.startedAt).getTime();
+  if (Number.isNaN(start)) return 0;
+  const end = log.endedAt ? new Date(log.endedAt).getTime() : nowMs;
+  return Math.max(0, Math.floor((end - start) / 1000));
+}
+
+export function isLifeLogActive(log: LifeLog): boolean {
+  return !log.endedAt;
+}
+
+export function lifeActivityTodayTotalSeconds(
+  activityId: string,
+  logs: LifeLog[],
+  nowMs: number = Date.now(),
+): number {
+  return logs
+    .filter((l) => l.activityId === activityId)
+    .reduce((sum, l) => sum + lifeLogDurationSeconds(l, nowMs), 0);
+}
+
+export function lifeLogAlertLevel(
+  activity: LifeActivity,
+  totalSeconds: number,
+): "" | "soft" | "hard" {
+  const hard = activity.hardLimitMinutes * 60;
+  if (hard > 0 && totalSeconds >= hard) return "hard";
+  const soft = activity.softLimitMinutes * 60;
+  if (soft > 0 && totalSeconds >= soft) return "soft";
+  return "";
+}
+
 export type WSMessage =
   | { type: "stream_delta"; text: string }
   | { type: "thinking_delta"; text: string }
@@ -324,4 +401,8 @@ export type WSMessage =
   | { type: "retro_completed"; retro: Retrospective }
   | { type: "retro_session_closed" }
   | { type: "retro_session_waiting"; waiting: boolean }
-  | { type: "retro_error"; message: string };
+  | { type: "retro_error"; message: string }
+  | { type: "life_activity_sync"; activities: LifeActivity[] }
+  | { type: "life_log_sync"; logs: LifeLog[] }
+  | { type: "life_log_started"; log: LifeLog }
+  | { type: "life_log_stopped"; log: LifeLog };

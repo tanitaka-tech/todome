@@ -10,13 +10,15 @@ import type {
   GitHubStatus,
   Goal,
   KanbanTask,
+  LifeActivity,
+  LifeLog,
   RepoInfo,
   Retrospective,
   RetroType,
   UserProfile,
   WSMessage,
 } from "../types";
-import { formatDuration, totalSeconds } from "../types";
+import { formatDuration, isLifeLogActive, totalSeconds } from "../types";
 import { applyTheme, getInitialTheme, type ThemeName } from "../theme";
 import {
   applyLanguage,
@@ -47,6 +49,7 @@ import { SettingsPanel } from "./SettingsPanel";
 import { RetroPanel, type RetroViewMode } from "./RetroPanel";
 import { GitHubSyncTab } from "./GitHubSyncTab";
 import { ShortcutsHelpModal } from "./ShortcutsHelpModal";
+import { LifeLogTimer } from "./LifeLogTimer";
 
 let msgId = 0;
 const nextId = () => String(++msgId);
@@ -169,6 +172,11 @@ export function App() {
     model: "claude-sonnet-4-6",
     thinkingEffort: "high",
   });
+  const [lifeActivities, setLifeActivities] = useState<LifeActivity[]>([]);
+  const [lifeLogs, setLifeLogs] = useState<LifeLog[]>([]);
+  const [lifeLogPopupDismissedId, setLifeLogPopupDismissedId] = useState<
+    string | null
+  >(null);
   const [retros, setRetros] = useState<Retrospective[]>([]);
   const [activeRetro, setActiveRetro] = useState<Retrospective | null>(null);
   const [retroStreamText, setRetroStreamText] = useState("");
@@ -429,6 +437,15 @@ export function App() {
         console.error("retro error:", msg.message);
         break;
       case "retro_thinking_delta":
+        break;
+      case "life_activity_sync":
+        setLifeActivities(msg.activities);
+        break;
+      case "life_log_sync":
+        setLifeLogs(msg.logs);
+        break;
+      case "life_log_started":
+      case "life_log_stopped":
         break;
     }
   }, []);
@@ -964,6 +981,28 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [popupTaskId, tasks, tick]);
 
+  const activeLifeLog = useMemo(
+    () => lifeLogs.find((l) => isLifeLogActive(l)) ?? null,
+    [lifeLogs],
+  );
+  const activeLifeActivity = useMemo(
+    () =>
+      activeLifeLog
+        ? (lifeActivities.find((a) => a.id === activeLifeLog.activityId) ??
+          null)
+        : null,
+    [activeLifeLog, lifeActivities],
+  );
+  const showLifeLogPopup =
+    !!activeLifeLog &&
+    !!activeLifeActivity &&
+    activeLifeLog.id !== lifeLogPopupDismissedId;
+
+  const handleLifeLogStop = useCallback(() => {
+    if (!activeLifeLog) return;
+    send({ type: "life_log_stop", log_id: activeLifeLog.id });
+  }, [activeLifeLog, send]);
+
   const popupGoalName = useMemo(() => {
     if (!popupTask?.goalId) return undefined;
     return goals.find((g) => g.id === popupTask.goalId)?.name;
@@ -1110,6 +1149,8 @@ export function App() {
             setGoalFilter={setBoardGoalFilter}
             recentDays={boardRecentDays}
             setRecentDays={setBoardRecentDays}
+            lifeActivities={lifeActivities}
+            lifeLogs={lifeLogs}
           />
         ) : activeView === "goals" ? (
           <GoalPanel
@@ -1200,7 +1241,7 @@ export function App() {
         />
       )}
 
-      {popupTask && (
+      {popupTask && !showLifeLogPopup && (
         <div
           className={`timer-popup ${isPopupRunning ? "" : "timer-popup--paused"}`}
         >
@@ -1264,6 +1305,16 @@ export function App() {
             </button>
           </div>
         </div>
+      )}
+
+      {showLifeLogPopup && activeLifeLog && activeLifeActivity && (
+        <LifeLogTimer
+          activity={activeLifeActivity}
+          log={activeLifeLog}
+          tick={tick}
+          onStop={handleLifeLogStop}
+          onClose={() => setLifeLogPopupDismissedId(activeLifeLog.id)}
+        />
       )}
 
       {celebrations.map((c) => (

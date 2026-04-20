@@ -1,8 +1,9 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { ColumnId, Goal, KanbanTask } from "../types";
+import type { ColumnId, Goal, KanbanTask, LifeActivity, LifeLog } from "../types";
 import { formatDuration, totalSeconds } from "../types";
 import { formatDateTime } from "../i18n/format";
+import { LifeLogSection } from "./LifeLogSection";
 
 interface Props {
   tasks: KanbanTask[];
@@ -17,6 +18,8 @@ interface Props {
   setGoalFilter: (value: string) => void;
   recentDays: number;
   setRecentDays: (value: number) => void;
+  lifeActivities: LifeActivity[];
+  lifeLogs: LifeLog[];
 }
 
 export const KANBAN_GOAL_FILTER_NONE = "__none__";
@@ -52,11 +55,13 @@ export function KanbanBoard({
   onCardClick,
   onTimerToggle,
   onMoveColumn,
-  tick: _tick,
+  tick,
   goalFilter,
   setGoalFilter,
   recentDays,
   setRecentDays,
+  lifeActivities,
+  lifeLogs,
 }: Props) {
   const { t } = useTranslation("kanban");
   const [dragId, setDragId] = useState<string | null>(null);
@@ -680,6 +685,14 @@ export function KanbanBoard({
         );
       })}
       </div>
+      <LifeLogSection
+        activities={lifeActivities}
+        logs={lifeLogs}
+        tasks={tasks}
+        tick={tick}
+        send={send}
+        onStopTaskTimer={onTimerToggle}
+      />
     </div>
   );
 }
