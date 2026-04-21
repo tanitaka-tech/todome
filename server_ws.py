@@ -397,7 +397,7 @@ async def _handle_github_list_commits(
     ws: WebSocket, session: SessionState, data: dict[str, Any]
 ) -> None:
     try:
-        commits = await asyncio.to_thread(core.github_sync.git_log, core.REPO_DIR, 30)
+        commits = await asyncio.to_thread(github_sync.git_log, core.REPO_DIR, 30)
         await ws.send_json({"type": "github_commit_list", "commits": commits})
     except github_sync.GitHubSyncError as e:
         core.github_state["lastError"] = str(e)

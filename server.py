@@ -10,7 +10,6 @@ import json
 import os
 import re
 import shlex
-import shutil
 import sqlite3
 import uuid
 from pathlib import Path
@@ -22,13 +21,11 @@ from fastapi.staticfiles import StaticFiles
 
 from claude_agent_sdk.types import PermissionResultAllow
 
-import github_sync
 from server_state import (
     GoalData,
     KanbanTask,
     ProfileData,
     RetrospectiveData,
-    _ws_needs_reload,
     active_sockets,
     github_state,
     pending_approvals,
@@ -1020,128 +1017,6 @@ def delete_retro(retro_id: str) -> None:
 init_db()
 
 
-# --- GitHub diff helpers ---
-
-
-def _pick_label(entity: dict[str, Any], label_keys: tuple[str, ...], fallback: str) -> str:
-    for k in label_keys:
-        val = entity.get(k)
-        if isinstance(val, str) and val.strip():
-            return val.strip()
-        if isinstance(val, (int, float)) and val:
-            return str(val)
-    return fallback
-
-
-def _diff_entities_by_id(
-    current: list[dict[str, Any]],
-    target: list[dict[str, Any]],
-    id_key: str,
-    label_keys: tuple[str, ...],
-) -> dict[str, list[dict[str, str]]]:
-    """current (HEAD) が target (過去コミット) に戻ったら何が増減/変更されるかを返す。
-
-    added   : target にあって current に無い (= 復元すると復活する)
-    removed : current にあって target に無い (= 復元すると消える)
-    modified: 両方にあるが内容が異なる
-    """
-    by_current = {e.get(id_key): e for e in current if e.get(id_key)}
-    by_target = {e.get(id_key): e for e in target if e.get(id_key)}
-
-    added: list[dict[str, str]] = []
-    removed: list[dict[str, str]] = []
-    modified: list[dict[str, str]] = []
-
-    for tid, tval in by_target.items():
-        if tid not in by_current:
-            added.append({"id": tid, "label": _pick_label(tval, label_keys, tid)})
-    for cid, cval in by_current.items():
-        if cid not in by_target:
-            removed.append({"id": cid, "label": _pick_label(cval, label_keys, cid)})
-    for tid, tval in by_target.items():
-        cval = by_current.get(tid)
-        if cval is None:
-            continue
-        if cval != tval:
-            modified.append({"id": tid, "label": _pick_label(tval, label_keys, tid)})
-
-    return {"added": added, "removed": removed, "modified": modified}
-
-
-def _diff_profile(current: dict[str, Any], target: dict[str, Any]) -> bool:
-    return current != target
-
-
-def _summarize_diff(details: dict[str, Any]) -> dict[str, Any]:
-    def counts(section: dict[str, list[Any]]) -> dict[str, int]:
-        return {
-            "added": len(section.get("added", [])),
-            "removed": len(section.get("removed", [])),
-            "modified": len(section.get("modified", [])),
-        }
-
-    return {
-        "tasks": counts(details.get("tasks", {})),
-        "goals": counts(details.get("goals", {})),
-        "retros": counts(details.get("retros", {})),
-        "profileChanged": bool(details.get("profileChanged", False)),
-    }
-
-
-def _load_entities_from_db(db_path: Path) -> dict[str, Any]:
-    """任意の sqlite ファイルから tasks/goals/retros/profile を読み出す。
-
-    スキーマが無い/部分的にしか無いコミットの DB でも空配列で返す (KeyError を出さない)。
-    """
-    with sqlite3.connect(db_path) as conn:
-        conn.row_factory = sqlite3.Row
-        cur = conn.cursor()
-
-        def _table_exists(name: str) -> bool:
-            row = cur.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
-                (name,),
-            ).fetchone()
-            return row is not None
-
-        tasks: list[KanbanTask] = []
-        if _table_exists("kanban_tasks"):
-            rows = cur.execute(
-                "SELECT data FROM kanban_tasks ORDER BY sort_order"
-            ).fetchall()
-            for r in rows:
-                t = json.loads(r["data"])
-                t.setdefault("kpiId", "")
-                t["kpiContributed"] = bool(t.get("kpiContributed", False))
-                tasks.append(t)
-
-        goals: list[GoalData] = []
-        if _table_exists("goals"):
-            rows = cur.execute(
-                "SELECT data FROM goals ORDER BY sort_order"
-            ).fetchall()
-            goals = [json.loads(r["data"]) for r in rows]
-
-        profile: ProfileData = dict(DEFAULT_PROFILE)
-        if _table_exists("profile"):
-            row = cur.execute("SELECT data FROM profile WHERE id = 1").fetchone()
-            if row is not None:
-                profile = json.loads(row["data"])
-
-        retros: list[RetrospectiveData] = []
-        if _table_exists("retrospectives"):
-            rows = cur.execute(
-                "SELECT * FROM retrospectives ORDER BY created_at DESC"
-            ).fetchall()
-            retros = [_retro_row_to_dict(r) for r in rows]
-
-    return {"tasks": tasks, "goals": goals, "retros": retros, "profile": profile}
-
-
-# --- GitHub sync state ---
-DEBOUNCE_SEC = 20
-
-
 async def broadcast(msg: dict[str, Any]) -> None:
     dead: list[WebSocket] = []
     for ws in list(active_sockets):
@@ -1160,347 +1035,30 @@ async def send_to(ws: WebSocket, msg: dict[str, Any]) -> None:
         active_sockets.discard(ws)
 
 
-async def _build_github_status() -> dict[str, Any]:
-    cfg = _load_github_config()
-    auth = await asyncio.to_thread(github_sync.gh_auth_status)
-    return {
-        "type": "github_status",
-        "status": {
-            "authUser": auth.get("username"),
-            "authOk": bool(auth.get("ok")),
-            "authError": auth.get("error"),
-            "linked": bool(cfg.get("linked")),
-            "owner": cfg.get("owner"),
-            "repo": cfg.get("repo"),
-            "autoSync": bool(cfg.get("autoSync", True)),
-            "syncing": github_state["syncing"],
-            "lastSyncAt": github_state["lastSyncAt"] or cfg.get("lastSyncAt"),
-            "lastError": github_state["lastError"],
-            "pendingSync": bool(github_state.get("pendingSync", False)),
-        },
-    }
-
-
-async def _broadcast_github_status() -> None:
-    await broadcast(await _build_github_status())
-
-
-def _get_sync_lock() -> asyncio.Lock:
-    lock = github_state["sync_lock"]
-    if lock is None:
-        lock = asyncio.Lock()
-        github_state["sync_lock"] = lock
-    return lock
-
-
-def schedule_autosync() -> None:
-    cfg = _load_github_config()
-    if not cfg.get("linked"):
-        return
-    if not github_state.get("pendingSync"):
-        github_state["pendingSync"] = True
-        asyncio.create_task(_broadcast_github_status())
-    if not cfg.get("autoSync", True):
-        return
-    t: asyncio.Task | None = github_state.get("debounce_task")
-    if t and not t.done():
-        t.cancel()
-    github_state["debounce_task"] = asyncio.create_task(_autosync_after_delay())
-
-
-async def _autosync_after_delay() -> None:
-    try:
-        await asyncio.sleep(DEBOUNCE_SEC)
-    except asyncio.CancelledError:
-        return
-    await _do_push("auto sync")
-
-
-def _wal_checkpoint() -> None:
-    """push 直前に WAL をマージ (サイズが 0 かつ journal_mode が delete の場合は no-op)。"""
-    try:
-        with _db() as conn:
-            conn.execute("PRAGMA wal_checkpoint(FULL)")
-    except sqlite3.Error:
-        pass
-
-
-async def _do_push(message: str) -> None:
-    cfg = _load_github_config()
-    if not cfg.get("linked"):
-        return
-    async with _get_sync_lock():
-        github_state["syncing"] = True
-        github_state["lastError"] = None
-        await broadcast(await _build_github_status())
-        try:
-            await asyncio.to_thread(_wal_checkpoint)
-            now_iso = datetime.datetime.now().isoformat(timespec="seconds")
-            commit_msg = f"todome {message}: {now_iso}"
-            pushed = await asyncio.to_thread(
-                github_sync.git_add_commit_push, REPO_DIR, commit_msg
-            )
-            if pushed:
-                github_state["lastSyncAt"] = now_iso
-                cfg["lastSyncAt"] = now_iso
-                _save_github_config(cfg)
-            github_state["pendingSync"] = False
-        except github_sync.GitHubSyncError as e:
-            github_state["lastError"] = str(e)
-        except Exception as e:
-            github_state["lastError"] = f"unexpected: {e}"
-        finally:
-            github_state["syncing"] = False
-            await broadcast(await _build_github_status())
-
-
-async def _do_pull() -> None:
-    cfg = _load_github_config()
-    if not cfg.get("linked"):
-        return
-    async with _get_sync_lock():
-        github_state["syncing"] = True
-        github_state["lastError"] = None
-        await broadcast(await _build_github_status())
-        try:
-            await asyncio.to_thread(github_sync.git_pull, REPO_DIR)
-            init_db()
-            github_state["diff_cache"] = {}
-            await _broadcast_db_state()
-            github_state["lastSyncAt"] = datetime.datetime.now().isoformat(
-                timespec="seconds"
-            )
-            cfg["lastSyncAt"] = github_state["lastSyncAt"]
-            _save_github_config(cfg)
-        except github_sync.GitHubSyncError as e:
-            github_state["lastError"] = str(e)
-        except Exception as e:
-            github_state["lastError"] = f"unexpected: {e}"
-        finally:
-            github_state["syncing"] = False
-            await broadcast(await _build_github_status())
-
-
-async def _broadcast_db_state() -> None:
-    """現在の DB からロードして全クライアントへ同期 push。
-
-    DB が外部要因 (git pull/restore/link/unlink) で差し替わったタイミングで呼ばれるため、
-    各 WS 接続のローカルキャッシュも次のループ頭で再ロードさせるフラグを立てる。
-    """
-    tasks = load_tasks()
-    goals = load_goals()
-    profile = load_profile()
-    retros = load_retros()
-    activities = load_life_activities()
-    life_logs = load_today_life_logs()
-    quotas = load_quotas()
-    quota_logs = load_today_quota_logs()
-    all_quota_logs = load_all_quota_logs()
-    for ws in active_sockets:
-        _ws_needs_reload[ws] = True
-    await broadcast({"type": "kanban_sync", "tasks": tasks})
-    await broadcast({"type": "goal_sync", "goals": goals})
-    await broadcast({"type": "profile_sync", "profile": profile})
-    await broadcast({"type": "retro_list_sync", "retros": retros})
-    await broadcast({"type": "life_activity_sync", "activities": activities})
-    await broadcast({"type": "life_log_sync", "logs": life_logs})
-    await broadcast({"type": "quota_sync", "quotas": quotas})
-    await broadcast({"type": "quota_log_sync", "logs": quota_logs})
-    await broadcast(
-        {
-            "type": "quota_streak_sync",
-            "streaks": compute_all_quota_streaks(quotas, all_quota_logs),
-        }
-    )
-
-
-async def _do_link(
-    owner: str | None,
-    name: str,
-    create: bool,
-    private: bool,
-) -> None:
-    async with _get_sync_lock():
-        github_state["syncing"] = True
-        github_state["lastError"] = None
-        await broadcast(await _build_github_status())
-        try:
-            auth = await asyncio.to_thread(github_sync.gh_auth_status)
-            if not auth.get("ok"):
-                raise github_sync.GitHubSyncError(
-                    auth.get("error") or "gh 認証が必要です"
-                )
-
-            if create:
-                created = await asyncio.to_thread(
-                    github_sync.gh_create_repo, name, private
-                )
-                owner = created["owner"]
-                name = created["name"]
-            if not owner:
-                owner = auth["username"]
-
-            remote_has_db = await asyncio.to_thread(
-                github_sync.gh_repo_has_db, owner, name
-            )
-
-            if REPO_DIR.exists():
-                await asyncio.to_thread(shutil.rmtree, REPO_DIR)
-
-            await asyncio.to_thread(
-                github_sync.git_clone, owner, name, REPO_DIR
-            )
-            await asyncio.to_thread(github_sync.ensure_git_identity, REPO_DIR)
-            await asyncio.to_thread(github_sync.write_gitattributes, REPO_DIR)
-
-            cloned_db = REPO_DIR / "todome.db"
-            if not remote_has_db and not cloned_db.exists():
-                # ローカル DB を初回 push 用にコピー
-                if DEFAULT_DB.exists():
-                    await asyncio.to_thread(shutil.copy2, DEFAULT_DB, cloned_db)
-                else:
-                    # 空の DB を作る: get_db_path 経由で新しい path を使うため config を先に書く
-                    _save_github_config(
-                        {
-                            "linked": True,
-                            "owner": owner,
-                            "repo": name,
-                            "autoSync": True,
-                            "lastSyncAt": None,
-                        }
-                    )
-                    init_db()
-
-            # config 確定 (上で既に書いていれば上書き)
-            _save_github_config(
-                {
-                    "linked": True,
-                    "owner": owner,
-                    "repo": name,
-                    "autoSync": True,
-                    "lastSyncAt": _load_github_config().get("lastSyncAt"),
-                }
-            )
-
-            # スキーマを念のため確認
-            init_db()
-
-            if not remote_has_db:
-                # 初回 push (todome.db と .gitattributes)
-                now_iso = datetime.datetime.now().isoformat(timespec="seconds")
-                commit_msg = f"todome initial sync: {now_iso}"
-                pushed = await asyncio.to_thread(
-                    github_sync.git_add_commit_push, REPO_DIR, commit_msg
-                )
-                if pushed:
-                    github_state["lastSyncAt"] = now_iso
-                    cfg = _load_github_config()
-                    cfg["lastSyncAt"] = now_iso
-                    _save_github_config(cfg)
-
-            await _broadcast_db_state()
-        except github_sync.GitHubSyncError as e:
-            github_state["lastError"] = str(e)
-        except Exception as e:
-            github_state["lastError"] = f"unexpected: {e}"
-        finally:
-            github_state["syncing"] = False
-            await broadcast(await _build_github_status())
-
-
-def _compute_commit_diff(commit_hash: str) -> dict[str, Any]:
-    """現在の DB と commit_hash 時点の DB を比較して {summary, details} を返す。
-
-    結果は github_state['diff_cache'] にキャッシュする。
-    """
-    cache: dict[str, Any] = github_state["diff_cache"]
-    if commit_hash in cache:
-        return cache[commit_hash]
-
-    current_db = get_db_path()
-    if not current_db.exists():
-        raise github_sync.GitHubSyncError("ローカル DB が見つかりません")
-
-    import tempfile
-
-    with tempfile.TemporaryDirectory() as tmp:
-        target_db = Path(tmp) / f"{commit_hash}.db"
-        github_sync.extract_db_at_commit(REPO_DIR, commit_hash, target_db)
-        current = _load_entities_from_db(current_db)
-        target = _load_entities_from_db(target_db)
-
-    details = {
-        "tasks": _diff_entities_by_id(
-            current["tasks"], target["tasks"], "id", ("title",)
-        ),
-        "goals": _diff_entities_by_id(
-            current["goals"], target["goals"], "id", ("name",)
-        ),
-        "retros": _diff_entities_by_id(
-            current["retros"], target["retros"], "id", ("periodEnd", "type")
-        ),
-        "profileChanged": _diff_profile(current["profile"], target["profile"]),
-    }
-    result = {"summary": _summarize_diff(details), "details": details}
-    cache[commit_hash] = result
-    return result
-
-
-async def _do_restore(commit_hash: str) -> None:
-    cfg = _load_github_config()
-    if not cfg.get("linked"):
-        return
-    async with _get_sync_lock():
-        github_state["syncing"] = True
-        github_state["lastError"] = None
-        await broadcast(await _build_github_status())
-        try:
-            await asyncio.to_thread(_wal_checkpoint)
-            short = commit_hash[:7]
-            now_iso = datetime.datetime.now().isoformat(timespec="seconds")
-            commit_msg = f"todome restore to {short}: {now_iso}"
-            pushed = await asyncio.to_thread(
-                github_sync.restore_db_to_commit, REPO_DIR, commit_hash, commit_msg
-            )
-            init_db()
-            github_state["diff_cache"] = {}
-            await _broadcast_db_state()
-            if pushed:
-                github_state["lastSyncAt"] = now_iso
-                cfg["lastSyncAt"] = now_iso
-                _save_github_config(cfg)
-            github_state["pendingSync"] = False
-        except github_sync.GitHubSyncError as e:
-            github_state["lastError"] = str(e)
-        except Exception as e:
-            github_state["lastError"] = f"unexpected: {e}"
-        finally:
-            github_state["syncing"] = False
-            await broadcast(await _build_github_status())
-
-
-async def _do_unlink() -> None:
-    async with _get_sync_lock():
-        github_state["syncing"] = True
-        github_state["lastError"] = None
-        await broadcast(await _build_github_status())
-        try:
-            t: asyncio.Task | None = github_state.get("debounce_task")
-            if t and not t.done():
-                t.cancel()
-            github_state["debounce_task"] = None
-
-            _clear_github_config()
-            if REPO_DIR.exists():
-                await asyncio.to_thread(shutil.rmtree, REPO_DIR)
-            init_db()
-            github_state["diff_cache"] = {}
-            await _broadcast_db_state()
-        except Exception as e:
-            github_state["lastError"] = f"unexpected: {e}"
-        finally:
-            github_state["syncing"] = False
-            await broadcast(await _build_github_status())
+# GitHub sync 関連 (push / pull / link / restore / diff) は server_github.py に集約。
+# 既存呼び出し元 (server_ws, server_retro, tests) は `core.X` / `from server import X`
+# でアクセスするため、ここで再エクスポートして後方互換を保つ。
+from server_github import (
+    DEBOUNCE_SEC,
+    _autosync_after_delay,
+    _broadcast_db_state,
+    _broadcast_github_status,
+    _build_github_status,
+    _compute_commit_diff,
+    _diff_entities_by_id,
+    _diff_profile,
+    _do_link,
+    _do_pull,
+    _do_push,
+    _do_restore,
+    _do_unlink,
+    _get_sync_lock,
+    _load_entities_from_db,
+    _pick_label,
+    _summarize_diff,
+    _wal_checkpoint,
+    schedule_autosync,
+)
 
 
 def _short_id() -> str:
