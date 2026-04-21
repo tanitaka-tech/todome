@@ -9,7 +9,12 @@ import type {
   Quota,
   QuotaLog,
 } from "../types";
-import { formatDuration, getTodayDayRange, totalSeconds } from "../types";
+import {
+  formatDuration,
+  getTodayDayRange,
+  logSecondsInRange,
+  totalSeconds,
+} from "../types";
 import { TimelineBar } from "./TimelineBar";
 
 interface Props {
@@ -31,25 +36,49 @@ const COLUMN_COLORS: Record<string, string> = {
   done: "var(--success)",
 };
 
-function isToday(iso: string): boolean {
+function isoInRange(iso: string, startMs: number, endMs: number): boolean {
   if (!iso) return false;
-  const d = new Date(iso);
-  const n = new Date();
-  return (
-    d.getFullYear() === n.getFullYear() &&
-    d.getMonth() === n.getMonth() &&
-    d.getDate() === n.getDate()
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return false;
+  return t >= startMs && t < endMs;
+}
+
+function computeTodaySeconds(
+  tasks: KanbanTask[],
+  rangeStartMs: number,
+  rangeEndMs: number,
+): number {
+  const nowMs = Date.now();
+  return tasks.reduce(
+    (s, t) => s + todaySecondsOfTask(t, rangeStartMs, rangeEndMs, nowMs),
+    0,
   );
 }
 
-function todaySecondsOfTask(task: KanbanTask): number {
+function todaySecondsOfTask(
+  task: KanbanTask,
+  rangeStartMs: number,
+  rangeEndMs: number,
+  nowMs: number,
+): number {
   let sum = 0;
   for (const log of task.timeLogs) {
-    if (isToday(log.start)) sum += log.duration;
+    const start = new Date(log.start).getTime();
+    if (Number.isNaN(start)) continue;
+    const end = start + log.duration * 1000;
+    const clippedStart = Math.max(start, rangeStartMs);
+    const clippedEnd = Math.min(end, rangeEndMs);
+    if (clippedEnd > clippedStart) {
+      sum += Math.floor((clippedEnd - clippedStart) / 1000);
+    }
   }
-  if (task.timerStartedAt && isToday(task.timerStartedAt)) {
-    sum += Math.floor(
-      (Date.now() - new Date(task.timerStartedAt).getTime()) / 1000,
+  if (task.timerStartedAt) {
+    sum += logSecondsInRange(
+      task.timerStartedAt,
+      "",
+      rangeStartMs,
+      rangeEndMs,
+      nowMs,
     );
   }
   return sum;
@@ -190,17 +219,20 @@ export function OverviewPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [dayBoundaryHour, _tick],
   );
-  const todaySeconds = useMemo(() => {
-    return tasks.reduce((s, t) => s + todaySecondsOfTask(t), 0);
+  const todaySeconds = useMemo(
+    () => computeTodaySeconds(tasks, todayRange.startMs, todayRange.endMs),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tasks, _tick]);
+    [tasks, todayRange, _tick],
+  );
 
   const totalTimeSeconds = useMemo(() => {
     return tasks.reduce((s, t) => s + totalSeconds(t), 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tasks, _tick]);
 
-  const completedToday = tasks.filter((t) => isToday(t.completedAt)).length;
+  const completedToday = tasks.filter((t) =>
+    isoInRange(t.completedAt, todayRange.startMs, todayRange.endMs),
+  ).length;
   const inProgress = tasks.filter((t) => t.column === "in_progress").length;
   const todoCount = tasks.filter((t) => t.column === "todo").length;
 
