@@ -1,9 +1,19 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { ColumnId, Goal, KanbanTask, LifeActivity, LifeLog } from "../types";
+import type {
+  ColumnId,
+  Goal,
+  KanbanTask,
+  LifeActivity,
+  LifeLog,
+  Quota,
+  QuotaLog,
+  QuotaStreak,
+} from "../types";
 import { formatDuration, totalSeconds } from "../types";
 import { formatDateTime } from "../i18n/format";
 import { LifeLogSection } from "./LifeLogSection";
+import { QuotaSection } from "./QuotaSection";
 
 interface Props {
   tasks: KanbanTask[];
@@ -20,6 +30,10 @@ interface Props {
   setRecentDays: (value: number) => void;
   lifeActivities: LifeActivity[];
   lifeLogs: LifeLog[];
+  quotas: Quota[];
+  quotaLogs: QuotaLog[];
+  quotaStreaks: QuotaStreak[];
+  dayBoundaryHour: number;
 }
 
 export const KANBAN_GOAL_FILTER_NONE = "__none__";
@@ -62,6 +76,10 @@ export function KanbanBoard({
   setRecentDays,
   lifeActivities,
   lifeLogs,
+  quotas,
+  quotaLogs,
+  quotaStreaks,
+  dayBoundaryHour,
 }: Props) {
   const { t } = useTranslation("kanban");
   const [dragId, setDragId] = useState<string | null>(null);
@@ -685,14 +703,27 @@ export function KanbanBoard({
         );
       })}
       </div>
-      <LifeLogSection
-        activities={lifeActivities}
-        logs={lifeLogs}
-        tasks={tasks}
-        tick={tick}
-        send={send}
-        onStopTaskTimer={onTimerToggle}
-      />
+      <div className="board-bottom-row">
+        <QuotaSection
+          quotas={quotas}
+          logs={quotaLogs}
+          streaks={quotaStreaks}
+          tasks={tasks}
+          tick={tick}
+          send={send}
+          onStopTaskTimer={onTimerToggle}
+          dayBoundaryHour={dayBoundaryHour}
+        />
+        <LifeLogSection
+          activities={lifeActivities}
+          logs={lifeLogs}
+          tasks={tasks}
+          tick={tick}
+          send={send}
+          onStopTaskTimer={onTimerToggle}
+          dayBoundaryHour={dayBoundaryHour}
+        />
+      </div>
     </div>
   );
 }

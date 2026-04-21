@@ -21,6 +21,7 @@ from server import (
     _migrate_retro_document,
     _normalize_ai_config,
     _normalize_goal_repository,
+    _normalize_quota,
     _pick_label,
     _rebalance_kpi_contribution,
     _short_id,
@@ -28,6 +29,8 @@ from server import (
     _summarize_diff,
     _sync_goal_achievement,
     apply_profile_update,
+    compute_quota_day_totals,
+    compute_quota_streak,
     process_todos,
 )
 
@@ -936,3 +939,159 @@ class TestProcessTodosProfileUpdate:
         ]
         _, _, profile = process_todos(todos, [], [], self._base_profile())
         assert profile == self._base_profile()
+
+
+class TestNormalizeQuota:
+    def test_fills_defaults(self):
+        q = _normalize_quota({})
+        assert q["name"] == "未命名ノルマ"
+        assert q["icon"] == "🎯"
+        assert q["targetMinutes"] == 0
+        assert q["archived"] is False
+        assert q["id"]
+        assert q["createdAt"]
+
+    def test_keeps_provided_fields(self):
+        q = _normalize_quota(
+            {
+                "id": "abc",
+                "name": "読書",
+                "icon": "📖",
+                "targetMinutes": 30,
+                "archived": True,
+                "createdAt": "2026-01-01T00:00:00",
+            }
+        )
+        assert q["id"] == "abc"
+        assert q["name"] == "読書"
+        assert q["icon"] == "📖"
+        assert q["targetMinutes"] == 30
+        assert q["archived"] is True
+        assert q["createdAt"] == "2026-01-01T00:00:00"
+
+    def test_rejects_bad_target_minutes(self):
+        # 異常系: 負の値・非数値は 0 に丸める
+        q = _normalize_quota({"targetMinutes": -5})
+        assert q["targetMinutes"] == 0
+        q2 = _normalize_quota({"targetMinutes": "abc"})
+        assert q2["targetMinutes"] == 0
+
+
+class TestComputeQuotaDayTotals:
+    def test_single_log_within_one_day(self):
+        logs = [
+            {
+                "id": "l1",
+                "quotaId": "q1",
+                "startedAt": "2026-04-21T09:00:00",
+                "endedAt": "2026-04-21T09:30:00",
+                "memo": "",
+            }
+        ]
+        totals = compute_quota_day_totals(logs, now_iso="2026-04-21T10:00:00")
+        assert totals == {"q1": {"2026-04-21": 30 * 60}}
+
+    def test_multiple_logs_same_day_sum(self):
+        # 境界値: 同じ quota の複数ログが合算される
+        logs = [
+            {
+                "id": "l1",
+                "quotaId": "q1",
+                "startedAt": "2026-04-21T09:00:00",
+                "endedAt": "2026-04-21T09:20:00",
+                "memo": "",
+            },
+            {
+                "id": "l2",
+                "quotaId": "q1",
+                "startedAt": "2026-04-21T15:00:00",
+                "endedAt": "2026-04-21T15:10:00",
+                "memo": "",
+            },
+        ]
+        totals = compute_quota_day_totals(logs, now_iso="2026-04-21T20:00:00")
+        assert totals["q1"]["2026-04-21"] == 30 * 60
+
+    def test_active_log_uses_now(self):
+        logs = [
+            {
+                "id": "l1",
+                "quotaId": "q1",
+                "startedAt": "2026-04-21T09:00:00",
+                "endedAt": "",
+                "memo": "",
+            }
+        ]
+        totals = compute_quota_day_totals(logs, now_iso="2026-04-21T09:15:00")
+        assert totals["q1"]["2026-04-21"] == 15 * 60
+
+    def test_log_spanning_midnight_splits(self):
+        # 異常系相当: 日をまたぐログは日別に分割される
+        logs = [
+            {
+                "id": "l1",
+                "quotaId": "q1",
+                "startedAt": "2026-04-21T23:30:00",
+                "endedAt": "2026-04-22T00:15:00",
+                "memo": "",
+            }
+        ]
+        totals = compute_quota_day_totals(logs, now_iso="2026-04-22T01:00:00")
+        assert totals["q1"]["2026-04-21"] == 30 * 60
+        assert totals["q1"]["2026-04-22"] == 15 * 60
+
+
+class TestComputeQuotaStreak:
+    def test_today_achieved_extends_streak(self):
+        day_totals = {
+            "2026-04-19": 3600,
+            "2026-04-20": 3600,
+            "2026-04-21": 3600,
+        }
+        current, best, last = compute_quota_streak(
+            day_totals, target_seconds=3600, today_iso="2026-04-21"
+        )
+        assert current == 3
+        assert best == 3
+        assert last == "2026-04-21"
+
+    def test_today_unachieved_but_yesterday_kept(self):
+        # 境界値: 今日まだ未達でも昨日までの連続は残る
+        day_totals = {
+            "2026-04-19": 3600,
+            "2026-04-20": 3600,
+        }
+        current, best, _ = compute_quota_streak(
+            day_totals, target_seconds=3600, today_iso="2026-04-21"
+        )
+        assert current == 2
+        assert best == 2
+
+    def test_gap_breaks_streak(self):
+        day_totals = {
+            "2026-04-15": 3600,
+            "2026-04-16": 3600,
+            "2026-04-20": 3600,
+        }
+        current, best, _ = compute_quota_streak(
+            day_totals, target_seconds=3600, today_iso="2026-04-21"
+        )
+        assert current == 1  # 4-20 のみ継続（gap=1 = 昨日）
+        assert best == 2  # 4-15, 4-16 が過去最高
+
+    def test_unachieved_all_days(self):
+        day_totals = {"2026-04-20": 1800}  # target 未達
+        current, best, last = compute_quota_streak(
+            day_totals, target_seconds=3600, today_iso="2026-04-21"
+        )
+        assert current == 0
+        assert best == 0
+        assert last == ""
+
+    def test_zero_target_returns_zero(self):
+        # 異常系: target=0 (ノルマ未設定) は常に 0
+        current, best, _ = compute_quota_streak(
+            {"2026-04-21": 3600}, target_seconds=0, today_iso="2026-04-21"
+        )
+        assert current == 0
+        assert best == 0

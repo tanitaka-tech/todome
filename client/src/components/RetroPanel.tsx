@@ -4,6 +4,8 @@ import type {
   KanbanTask,
   LifeActivity,
   LifeLog,
+  Quota,
+  QuotaLog,
   RetroDocument,
   RetroType,
   Retrospective,
@@ -27,6 +29,8 @@ interface Props {
   setViewMode: (mode: RetroViewMode) => void;
   lifeActivities: LifeActivity[];
   lifeLogsForActiveRetro: LifeLog[];
+  quotas: Quota[];
+  quotaLogsForActiveRetro: QuotaLog[];
   dayBoundaryHour: number;
   onStart: (type: RetroType, anchorDate?: string, resumeDraftId?: string) => void;
   onSend: (text: string) => void;
@@ -154,6 +158,8 @@ export function RetroPanel({
   setViewMode,
   lifeActivities,
   lifeLogsForActiveRetro,
+  quotas,
+  quotaLogsForActiveRetro,
   dayBoundaryHour,
   onStart,
   onSend,
@@ -237,6 +243,8 @@ export function RetroPanel({
         waiting={waiting}
         lifeActivities={lifeActivities}
         lifeLogsForPeriod={lifeLogsForActiveRetro}
+        quotas={quotas}
+        quotaLogsForPeriod={quotaLogsForActiveRetro}
         dayBoundaryHour={dayBoundaryHour}
         onSend={onSend}
         onComplete={onComplete}

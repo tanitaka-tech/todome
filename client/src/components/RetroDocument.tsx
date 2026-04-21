@@ -6,6 +6,8 @@ import type {
   KanbanTask,
   LifeActivity,
   LifeLog,
+  Quota,
+  QuotaLog,
   RetroDocument as RetroDocumentT,
   RetroType,
 } from "../types";
@@ -27,6 +29,8 @@ interface Props {
   typeLabel: string;
   lifeActivities: LifeActivity[];
   lifeLogsForPeriod: LifeLog[];
+  quotas: Quota[];
+  quotaLogsForPeriod: QuotaLog[];
   dayBoundaryHour: number;
   onEditField?: (key: EditableKey, value: string) => void;
   onEditDayRating?: (value: number) => void;
@@ -264,6 +268,8 @@ export function RetroDocumentView({
   typeLabel,
   lifeActivities,
   lifeLogsForPeriod,
+  quotas,
+  quotaLogsForPeriod,
   dayBoundaryHour,
   onEditField,
   onEditDayRating,
@@ -352,6 +358,8 @@ export function RetroDocumentView({
               tasks={tasks}
               lifeLogs={lifeLogsForPeriod}
               lifeActivities={lifeActivities}
+              quotas={quotas}
+              quotaLogs={quotaLogsForPeriod}
               orientation={timelineOrientation}
             />
           </div>

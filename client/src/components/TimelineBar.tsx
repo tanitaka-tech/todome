@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { KanbanTask, LifeActivity, LifeLog } from "../types";
+import type {
+  KanbanTask,
+  LifeActivity,
+  LifeLog,
+  Quota,
+  QuotaLog,
+} from "../types";
 import { LIFE_CATEGORY_COLORS, formatDuration } from "../types";
 
 interface Props {
@@ -9,6 +15,8 @@ interface Props {
   tasks: KanbanTask[];
   lifeLogs: LifeLog[];
   lifeActivities: LifeActivity[];
+  quotas?: Quota[];
+  quotaLogs?: QuotaLog[];
   /** live update用。値が変われば再描画。 */
   tick?: number;
   /** 現在時刻にスクロールするか。Overview では true、retro (過去日) では false。 */
@@ -19,7 +27,7 @@ interface Props {
 
 interface Segment {
   key: string;
-  kind: "task" | "life";
+  kind: "task" | "life" | "quota";
   startMs: number;
   endMs: number;
   label: string;
@@ -27,6 +35,8 @@ interface Segment {
   color: string;
   tooltip: string;
 }
+
+const QUOTA_SEG_COLOR = "#8b5cf6";
 
 const HOUR_HEIGHT_PX = 56;
 const HOUR_WIDTH_PX = 80;
@@ -56,6 +66,8 @@ export function TimelineBar({
   tasks,
   lifeLogs,
   lifeActivities,
+  quotas,
+  quotaLogs,
   tick: _tick,
   autoScrollToNow = false,
   orientation = "vertical",
@@ -140,8 +152,37 @@ export function TimelineBar({
       });
     }
 
+    const quotaMap = new Map((quotas ?? []).map((q) => [q.id, q]));
+    for (const log of quotaLogs ?? []) {
+      const start = Date.parse(log.startedAt);
+      const end = log.endedAt ? Date.parse(log.endedAt) : nowMs;
+      if (Number.isNaN(start) || Number.isNaN(end)) continue;
+      if (!overlaps(start, end, rangeStartMs, rangeEndMs)) continue;
+      const quota = quotaMap.get(log.quotaId);
+      const name = quota ? `${quota.icon} ${quota.name}` : log.quotaId;
+      out.push({
+        key: `q-${log.id}`,
+        kind: "quota",
+        startMs: Math.max(start, rangeStartMs),
+        endMs: Math.min(end, rangeEndMs),
+        label: name,
+        sublabel: `${formatTimeOfDay(start)}–${formatTimeOfDay(end)}`,
+        color: QUOTA_SEG_COLOR,
+        tooltip: `${name}\n${formatTimeOfDay(start)}–${formatTimeOfDay(end)} (${formatDuration(Math.max(0, Math.floor((end - start) / 1000)))})`,
+      });
+    }
+
     return out;
-  }, [tasks, lifeLogs, lifeActivities, rangeStartMs, rangeEndMs, nowMs]);
+  }, [
+    tasks,
+    lifeLogs,
+    lifeActivities,
+    quotas,
+    quotaLogs,
+    rangeStartMs,
+    rangeEndMs,
+    nowMs,
+  ]);
 
   const hourMarkers = useMemo(() => {
     const markers: { hour: number; top: number }[] = [];
