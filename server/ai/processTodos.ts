@@ -36,6 +36,14 @@ function parseJsonSafe(s: string): unknown {
   }
 }
 
+function isSpecialEntry(content: string): boolean {
+  return (
+    content.startsWith(GOAL_ADD_PREFIX) ||
+    content.startsWith(GOAL_UPDATE_PREFIX) ||
+    content.startsWith(PROFILE_UPDATE_PREFIX)
+  );
+}
+
 export function processTodos(
   todos: unknown,
   existingTasks: KanbanTask[],
@@ -45,6 +53,14 @@ export function processTodos(
   const todoList = Array.isArray(todos) ? (todos as TodoEntry[]) : [];
   const existingTaskMap = new Map(existingTasks.map((t) => [t.title, t]));
   const existingGoalMap = new Map(existingGoals.map((g) => [g.name, g]));
+
+  // AIが目標/プロフィールの特殊エントリだけをTodoWriteに渡した場合、
+  // kanbanタスクを空で上書きせず既存を温存する。AIは「既存タスクも全て含めて渡せ」
+  // とpromptで指示されているが、目標追加単独の要求では忘れがちでタスクが全消えする。
+  const hasTaskEntry = todoList.some((todo) => {
+    const c = typeof todo.content === "string" ? todo.content : "";
+    return c !== "" && !isSpecialEntry(c);
+  });
 
   const tasks: KanbanTask[] = [];
   const goals = [...existingGoals];
@@ -149,5 +165,9 @@ export function processTodos(
     }
   }
 
-  return { tasks, goals, profile };
+  return {
+    tasks: hasTaskEntry ? tasks : [...existingTasks],
+    goals,
+    profile,
+  };
 }
