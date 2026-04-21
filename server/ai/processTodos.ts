@@ -165,6 +165,18 @@ export function processTodos(
     }
   }
 
+  // AIがtodosに再掲した「完了済み (done) タスク」を落としがちなので補填する。
+  // pending/in_progress は AI が作業中リストとして常に持つため落ちないが、completed は
+  // Claude の TodoWrite 慣習で作業リストから外されやすく、全置換すると done 列が空になる。
+  if (hasTaskEntry) {
+    const referencedTitles = new Set(tasks.map((t) => t.title));
+    for (const existing of existingTasks) {
+      if (existing.column === "done" && !referencedTitles.has(existing.title)) {
+        tasks.push(existing);
+      }
+    }
+  }
+
   return {
     tasks: hasTaskEntry ? tasks : [...existingTasks],
     goals,
