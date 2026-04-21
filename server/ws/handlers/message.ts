@@ -120,17 +120,24 @@ export const message: Handler = async (ws, session, data) => {
 
   session.cancelRequested = false;
   let resultSent = false;
+  let interruptRequested = false;
 
+  // 手動イテレーションで Query ジェネレータを閉じずにターン単位で抜ける。
+  // for-await-of は break/return 時に iterator.return() を呼んでしまい、
+  // streaming input mode の Query が使い回せなくなる。
   try {
-    for await (const msg of client.query) {
-      if (session.cancelRequested) {
+    while (true) {
+      if (session.cancelRequested && !interruptRequested) {
+        interruptRequested = true;
         try {
           await client.query.interrupt();
         } catch {
           // ignore
         }
-        break;
       }
+      const next = await client.query.next();
+      if (next.done) break;
+      const msg = next.value;
       if (msg.type === "stream_event") {
         const ev = msg.event as { type?: string; delta?: Record<string, unknown> };
         if (ev.type === "content_block_delta") {
@@ -180,7 +187,7 @@ export const message: Handler = async (ws, session, data) => {
           turns: msg.num_turns ?? 0,
           sessionId: msg.session_id ?? "",
         });
-        break;
+        return;
       }
     }
   } catch (err) {
