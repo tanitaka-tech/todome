@@ -4005,6 +4005,19 @@ body {
   text-overflow: ellipsis;
   min-width: 0;
 }
+.timer-popup-title .wave-char {
+  display: inline-block;
+  animation: wave-char 1.6s ease-in-out infinite;
+  animation-delay: calc(var(--wave-i) * 0.06s);
+  will-change: transform;
+}
+.timer-popup--paused .timer-popup-title .wave-char {
+  animation: none;
+}
+@keyframes wave-char {
+  0%, 60%, 100% { transform: translateY(0); }
+  30%           { transform: translateY(-3px); }
+}
 .timer-popup-meta {
   display: flex;
   align-items: center;

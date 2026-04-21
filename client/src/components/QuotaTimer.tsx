@@ -6,6 +6,7 @@ import {
   quotaLogDurationSeconds,
   quotaTodayTotalSeconds,
 } from "../types";
+import { WaveText } from "./WaveText";
 
 interface Props {
   quota: Quota;
@@ -49,7 +50,7 @@ export function QuotaTimer({
       <div className="timer-popup-body">
         <div className="timer-popup-title">
           <span className="timer-popup-lifelog-icon">{quota.icon}</span>
-          {quota.name}
+          <WaveText text={quota.name} />
         </div>
         <div className="timer-popup-meta">
           {achieved && (
