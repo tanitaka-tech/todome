@@ -327,6 +327,19 @@ def init_db() -> None:
                 alert_triggered TEXT NOT NULL DEFAULT ''
             );
             CREATE INDEX IF NOT EXISTS idx_life_logs_started ON life_logs(started_at);
+            CREATE TABLE IF NOT EXISTS quotas (
+                id TEXT PRIMARY KEY,
+                sort_order INTEGER NOT NULL,
+                data TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS quota_logs (
+                id TEXT PRIMARY KEY,
+                quota_id TEXT NOT NULL,
+                started_at TEXT NOT NULL,
+                ended_at TEXT NOT NULL DEFAULT '',
+                memo TEXT NOT NULL DEFAULT ''
+            );
+            CREATE INDEX IF NOT EXISTS idx_quota_logs_started ON quota_logs(started_at);
             """
         )
 
@@ -592,6 +605,307 @@ def _stop_active_life_log_if_any() -> str:
             (now_iso,),
         )
     return row["id"]
+
+
+# --- Quota storage ---
+Quota = dict[str, Any]
+QuotaLog = dict[str, Any]
+
+
+_DEFAULT_QUOTAS: list[dict[str, Any]] = [
+    {"name": "掃除", "icon": "🧹", "targetMinutes": 15},
+    {"name": "運動", "icon": "🏃", "targetMinutes": 30},
+    {"name": "料理", "icon": "🍳", "targetMinutes": 30},
+]
+
+
+def _normalize_quota(quota: dict[str, Any]) -> Quota:
+    try:
+        target = max(0, int(quota.get("targetMinutes", 0) or 0))
+    except (TypeError, ValueError):
+        target = 0
+    name = str(quota.get("name", "")).strip() or "未命名ノルマ"
+    icon = str(quota.get("icon", "")).strip() or "🎯"
+    created = str(quota.get("createdAt", "")) or datetime.datetime.now().isoformat(
+        timespec="seconds"
+    )
+    return {
+        "id": quota.get("id") or _short_id(),
+        "name": name,
+        "icon": icon,
+        "targetMinutes": target,
+        "archived": bool(quota.get("archived", False)),
+        "createdAt": created,
+    }
+
+
+def load_quotas() -> list[Quota]:
+    with _db() as conn:
+        rows = conn.execute(
+            "SELECT data FROM quotas ORDER BY sort_order"
+        ).fetchall()
+    if not rows:
+        quotas = [_normalize_quota(q) for q in _DEFAULT_QUOTAS]
+        save_quotas(quotas)
+        return quotas
+    return [_normalize_quota(json.loads(r["data"])) for r in rows]
+
+
+def save_quotas(quotas: list[Quota]) -> None:
+    with _db() as conn:
+        conn.execute("DELETE FROM quotas")
+        conn.executemany(
+            "INSERT INTO quotas (id, sort_order, data) VALUES (?, ?, ?)",
+            [
+                (q["id"], i, json.dumps(q, ensure_ascii=False))
+                for i, q in enumerate(quotas)
+            ],
+        )
+
+
+def _quota_log_row_to_dict(row: sqlite3.Row) -> QuotaLog:
+    return {
+        "id": row["id"],
+        "quotaId": row["quota_id"],
+        "startedAt": row["started_at"],
+        "endedAt": row["ended_at"] or "",
+        "memo": row["memo"] or "",
+    }
+
+
+def load_today_quota_logs(today_iso: str | None = None) -> list[QuotaLog]:
+    if today_iso is None:
+        today_iso = datetime.date.today().isoformat()
+    with _db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM quota_logs WHERE substr(started_at, 1, 10) = ? "
+            "ORDER BY started_at ASC",
+            (today_iso,),
+        ).fetchall()
+    return [_quota_log_row_to_dict(r) for r in rows]
+
+
+def load_all_quota_logs() -> list[QuotaLog]:
+    with _db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM quota_logs ORDER BY started_at ASC"
+        ).fetchall()
+    return [_quota_log_row_to_dict(r) for r in rows]
+
+
+def load_quota_logs_in_range(start_iso: str, end_iso: str) -> list[QuotaLog]:
+    """[start_iso, end_iso) に重なるノルマログを開始昇順で返す。"""
+    with _db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM quota_logs "
+            "WHERE started_at < ? "
+            "AND (ended_at = '' OR ended_at > ?) "
+            "ORDER BY started_at ASC",
+            (end_iso, start_iso),
+        ).fetchall()
+    return [_quota_log_row_to_dict(r) for r in rows]
+
+
+def _stop_active_quota_log_if_any() -> str:
+    now_iso = datetime.datetime.now().isoformat(timespec="seconds")
+    with _db() as conn:
+        row = conn.execute(
+            "SELECT id FROM quota_logs WHERE ended_at = '' LIMIT 1"
+        ).fetchone()
+        if not row:
+            return ""
+        conn.execute(
+            "UPDATE quota_logs SET ended_at = ? WHERE ended_at = ''",
+            (now_iso,),
+        )
+    return row["id"]
+
+
+def start_quota_log(quota_id: str) -> QuotaLog:
+    """ノルマ計測を開始する。既存の active ログは自動停止する。"""
+    now_iso = datetime.datetime.now().isoformat(timespec="seconds")
+    with _db() as conn:
+        conn.execute(
+            "UPDATE quota_logs SET ended_at = ? WHERE ended_at = ''",
+            (now_iso,),
+        )
+    log_id = _short_id()
+    with _db() as conn:
+        conn.execute(
+            "INSERT INTO quota_logs (id, quota_id, started_at) VALUES (?, ?, ?)",
+            (log_id, quota_id, now_iso),
+        )
+        row = conn.execute(
+            "SELECT * FROM quota_logs WHERE id = ?", (log_id,)
+        ).fetchone()
+    return _quota_log_row_to_dict(row)
+
+
+def stop_quota_log(log_id: str, memo: str | None = None) -> QuotaLog | None:
+    now_iso = datetime.datetime.now().isoformat(timespec="seconds")
+    with _db() as conn:
+        if memo is None:
+            conn.execute(
+                "UPDATE quota_logs SET ended_at = ? WHERE id = ? AND ended_at = ''",
+                (now_iso, log_id),
+            )
+        else:
+            conn.execute(
+                "UPDATE quota_logs SET ended_at = ?, memo = ? "
+                "WHERE id = ? AND ended_at = ''",
+                (now_iso, memo, log_id),
+            )
+        row = conn.execute(
+            "SELECT * FROM quota_logs WHERE id = ?", (log_id,)
+        ).fetchone()
+    return _quota_log_row_to_dict(row) if row else None
+
+
+def compute_quota_day_totals(
+    logs: list[QuotaLog],
+    now_iso: str | None = None,
+) -> dict[str, dict[str, int]]:
+    """ノルマごとに日別合計秒数を返す。active ログ (endedAt="") は now までを含める。
+
+    戻り値: { quotaId: { "YYYY-MM-DD": seconds } }
+    """
+    if now_iso is None:
+        now_iso = datetime.datetime.now().isoformat(timespec="seconds")
+    try:
+        now_dt = datetime.datetime.fromisoformat(now_iso.replace("Z", "+00:00"))
+        if now_dt.tzinfo is not None:
+            now_dt = now_dt.replace(tzinfo=None)
+    except ValueError:
+        now_dt = datetime.datetime.now()
+
+    totals: dict[str, dict[str, int]] = {}
+    for log in logs:
+        qid = log.get("quotaId", "")
+        started = log.get("startedAt", "")
+        if not qid or not started:
+            continue
+        try:
+            start_dt = datetime.datetime.fromisoformat(
+                started.replace("Z", "+00:00")
+            )
+            if start_dt.tzinfo is not None:
+                start_dt = start_dt.replace(tzinfo=None)
+        except ValueError:
+            continue
+        ended = log.get("endedAt", "")
+        if ended:
+            try:
+                end_dt = datetime.datetime.fromisoformat(
+                    ended.replace("Z", "+00:00")
+                )
+                if end_dt.tzinfo is not None:
+                    end_dt = end_dt.replace(tzinfo=None)
+            except ValueError:
+                end_dt = now_dt
+        else:
+            end_dt = now_dt
+        if end_dt <= start_dt:
+            continue
+        # 日をまたぐログは日別に分割
+        cursor = start_dt
+        while cursor < end_dt:
+            day_end = datetime.datetime.combine(
+                cursor.date() + datetime.timedelta(days=1),
+                datetime.time(0, 0, 0),
+            )
+            segment_end = min(day_end, end_dt)
+            seconds = int((segment_end - cursor).total_seconds())
+            if seconds > 0:
+                key = cursor.date().isoformat()
+                totals.setdefault(qid, {})
+                totals[qid][key] = totals[qid].get(key, 0) + seconds
+            cursor = segment_end
+    return totals
+
+
+def compute_quota_streak(
+    day_totals: dict[str, int],
+    target_seconds: int,
+    today_iso: str,
+) -> tuple[int, int, str]:
+    """指定ノルマ1件の日別合計から (current, best, lastAchievedDate) を返す。
+
+    - target_seconds <= 0 の場合は current/best ともに 0 を返す。
+    - 今日未達でも、昨日まで連続達成していれば current は昨日までの連続数を保つ。
+    - 今日達成済みなら今日を含めた連続数。
+    - best は全期間で一度でも伸びた最大連続達成日数。
+    """
+    if target_seconds <= 0:
+        return (0, 0, "")
+    achieved_dates = sorted(
+        d for d, s in day_totals.items() if s >= target_seconds
+    )
+    if not achieved_dates:
+        return (0, 0, "")
+
+    # best: 連続達成の最大長
+    best = 1
+    run = 1
+    for i in range(1, len(achieved_dates)):
+        prev = datetime.date.fromisoformat(achieved_dates[i - 1])
+        cur = datetime.date.fromisoformat(achieved_dates[i])
+        if (cur - prev).days == 1:
+            run += 1
+            best = max(best, run)
+        else:
+            run = 1
+
+    last = achieved_dates[-1]
+    try:
+        today = datetime.date.fromisoformat(today_iso)
+        last_date = datetime.date.fromisoformat(last)
+    except ValueError:
+        return (0, best, last)
+
+    # current: today または today-1 が最終達成日なら、そこから遡って連続数を数える
+    gap = (today - last_date).days
+    if gap > 1:
+        return (0, best, last)
+    # 今日未達 (gap == 1) でも継続扱い。gap == 0 は今日達成済み。
+    current = 1
+    cursor = last_date
+    i = len(achieved_dates) - 2
+    while i >= 0:
+        prev = datetime.date.fromisoformat(achieved_dates[i])
+        if (cursor - prev).days == 1:
+            current += 1
+            cursor = prev
+            i -= 1
+        else:
+            break
+    return (current, max(best, current), last)
+
+
+def compute_all_quota_streaks(
+    quotas: list[Quota],
+    logs: list[QuotaLog],
+    today_iso: str | None = None,
+    now_iso: str | None = None,
+) -> list[dict[str, Any]]:
+    if today_iso is None:
+        today_iso = datetime.date.today().isoformat()
+    totals = compute_quota_day_totals(logs, now_iso=now_iso)
+    result: list[dict[str, Any]] = []
+    for q in quotas:
+        qid = q["id"]
+        target_sec = int(q.get("targetMinutes", 0) or 0) * 60
+        cur, best, last = compute_quota_streak(
+            totals.get(qid, {}), target_sec, today_iso
+        )
+        result.append(
+            {
+                "quotaId": qid,
+                "current": cur,
+                "best": best,
+                "lastAchievedDate": last,
+            }
+        )
+    return result
 
 
 # --- Retrospective storage ---
@@ -1006,6 +1320,9 @@ async def _broadcast_db_state() -> None:
     retros = load_retros()
     activities = load_life_activities()
     life_logs = load_today_life_logs()
+    quotas = load_quotas()
+    quota_logs = load_today_quota_logs()
+    all_quota_logs = load_all_quota_logs()
     for ws in active_sockets:
         _ws_needs_reload[ws] = True
     await broadcast({"type": "kanban_sync", "tasks": tasks})
@@ -1014,6 +1331,14 @@ async def _broadcast_db_state() -> None:
     await broadcast({"type": "retro_list_sync", "retros": retros})
     await broadcast({"type": "life_activity_sync", "activities": activities})
     await broadcast({"type": "life_log_sync", "logs": life_logs})
+    await broadcast({"type": "quota_sync", "quotas": quotas})
+    await broadcast({"type": "quota_log_sync", "logs": quota_logs})
+    await broadcast(
+        {
+            "type": "quota_streak_sync",
+            "streaks": compute_all_quota_streaks(quotas, all_quota_logs),
+        }
+    )
 
 
 async def _do_link(
@@ -2277,6 +2602,20 @@ async def websocket_endpoint(ws: WebSocket):
     await ws.send_json(
         {"type": "life_log_sync", "logs": load_today_life_logs()}
     )
+    _initial_quotas = load_quotas()
+    _initial_all_quota_logs = load_all_quota_logs()
+    await ws.send_json({"type": "quota_sync", "quotas": _initial_quotas})
+    await ws.send_json(
+        {"type": "quota_log_sync", "logs": load_today_quota_logs()}
+    )
+    await ws.send_json(
+        {
+            "type": "quota_streak_sync",
+            "streaks": compute_all_quota_streaks(
+                _initial_quotas, _initial_all_quota_logs
+            ),
+        }
+    )
 
     msg_queue: asyncio.Queue = asyncio.Queue()
 
@@ -2356,6 +2695,7 @@ async def websocket_endpoint(ws: WebSocket):
                         break
                 if starting_timer:
                     _stop_active_life_log_if_any()
+                    _stop_active_quota_log_if_any()
                 save_tasks(kanban_tasks)
                 save_goals(goals)
                 schedule_autosync()
@@ -2368,6 +2708,20 @@ async def websocket_endpoint(ws: WebSocket):
                         {
                             "type": "life_log_sync",
                             "logs": load_today_life_logs(),
+                        }
+                    )
+                    await broadcast(
+                        {
+                            "type": "quota_log_sync",
+                            "logs": load_today_quota_logs(),
+                        }
+                    )
+                    await broadcast(
+                        {
+                            "type": "quota_streak_sync",
+                            "streaks": compute_all_quota_streaks(
+                                load_quotas(), load_all_quota_logs()
+                            ),
                         }
                     )
                 continue
@@ -2473,6 +2827,7 @@ async def websocket_endpoint(ws: WebSocket):
                         break
                 if starting_timer:
                     _stop_active_life_log_if_any()
+                    _stop_active_quota_log_if_any()
                 save_tasks(kanban_tasks)
                 save_goals(goals)
                 schedule_autosync()
@@ -2485,6 +2840,20 @@ async def websocket_endpoint(ws: WebSocket):
                         {
                             "type": "life_log_sync",
                             "logs": load_today_life_logs(),
+                        }
+                    )
+                    await broadcast(
+                        {
+                            "type": "quota_log_sync",
+                            "logs": load_today_quota_logs(),
+                        }
+                    )
+                    await broadcast(
+                        {
+                            "type": "quota_streak_sync",
+                            "streaks": compute_all_quota_streaks(
+                                load_quotas(), load_all_quota_logs()
+                            ),
                         }
                     )
                 continue
@@ -2769,6 +3138,7 @@ async def websocket_endpoint(ws: WebSocket):
                 # タスク計測中なら自動停止（全体排他）
                 _stop_task_timers_if_running(kanban_tasks)
                 save_tasks(kanban_tasks)
+                quota_stopped = _stop_active_quota_log_if_any()
                 log = start_life_log(activity_id)
                 schedule_autosync()
                 await broadcast(
@@ -2778,6 +3148,21 @@ async def websocket_endpoint(ws: WebSocket):
                     {"type": "life_log_sync", "logs": load_today_life_logs()}
                 )
                 await broadcast({"type": "life_log_started", "log": log})
+                if quota_stopped:
+                    await broadcast(
+                        {
+                            "type": "quota_log_sync",
+                            "logs": load_today_quota_logs(),
+                        }
+                    )
+                    await broadcast(
+                        {
+                            "type": "quota_streak_sync",
+                            "streaks": compute_all_quota_streaks(
+                                load_quotas(), load_all_quota_logs()
+                            ),
+                        }
+                    )
                 continue
 
             if data["type"] == "life_log_stop":
@@ -2827,6 +3212,157 @@ async def websocket_endpoint(ws: WebSocket):
                         "logs": logs,
                     }
                 )
+                continue
+
+            if data["type"] == "quota_log_range_request":
+                request_id = str(data.get("requestId", ""))
+                start_iso = str(data.get("startIso", ""))
+                end_iso = str(data.get("endIso", ""))
+                logs = (
+                    load_quota_logs_in_range(start_iso, end_iso)
+                    if start_iso and end_iso
+                    else []
+                )
+                await ws.send_json(
+                    {
+                        "type": "quota_log_range_sync",
+                        "requestId": request_id,
+                        "logs": logs,
+                    }
+                )
+                continue
+
+            # --- ノルマ操作 ---
+            if data["type"] == "quota_upsert":
+                incoming = data.get("quota", {}) or {}
+                normalized = _normalize_quota(incoming)
+                quotas = load_quotas()
+                found = False
+                for i, q in enumerate(quotas):
+                    if q["id"] == normalized["id"]:
+                        quotas[i] = normalized
+                        found = True
+                        break
+                if not found:
+                    quotas.append(normalized)
+                save_quotas(quotas)
+                schedule_autosync()
+                await broadcast({"type": "quota_sync", "quotas": quotas})
+                await broadcast(
+                    {
+                        "type": "quota_streak_sync",
+                        "streaks": compute_all_quota_streaks(
+                            quotas, load_all_quota_logs()
+                        ),
+                    }
+                )
+                continue
+
+            if data["type"] == "quota_delete":
+                qid = data.get("id", "")
+                if qid:
+                    quotas = [q for q in load_quotas() if q["id"] != qid]
+                    save_quotas(quotas)
+                    with _db() as conn:
+                        conn.execute(
+                            "DELETE FROM quota_logs WHERE quota_id = ?", (qid,)
+                        )
+                    schedule_autosync()
+                    await broadcast({"type": "quota_sync", "quotas": quotas})
+                    await broadcast(
+                        {
+                            "type": "quota_log_sync",
+                            "logs": load_today_quota_logs(),
+                        }
+                    )
+                    await broadcast(
+                        {
+                            "type": "quota_streak_sync",
+                            "streaks": compute_all_quota_streaks(
+                                quotas, load_all_quota_logs()
+                            ),
+                        }
+                    )
+                continue
+
+            if data["type"] == "quota_reorder":
+                ids = data.get("ids", []) or []
+                quotas = load_quotas()
+                qmap = {q["id"]: q for q in quotas}
+                seen: set[str] = set()
+                ordered: list[Quota] = []
+                for qid in ids:
+                    if qid in qmap and qid not in seen:
+                        ordered.append(qmap[qid])
+                        seen.add(qid)
+                for q in quotas:
+                    if q["id"] not in seen:
+                        ordered.append(q)
+                save_quotas(ordered)
+                schedule_autosync()
+                await broadcast({"type": "quota_sync", "quotas": ordered})
+                continue
+
+            if data["type"] == "quota_log_start":
+                quota_id = data.get("quota_id") or data.get("quotaId", "")
+                if not quota_id:
+                    continue
+                _stop_task_timers_if_running(kanban_tasks)
+                save_tasks(kanban_tasks)
+                life_stopped = _stop_active_life_log_if_any()
+                log = start_quota_log(quota_id)
+                schedule_autosync()
+                await broadcast(
+                    {"type": "kanban_sync", "tasks": kanban_tasks}
+                )
+                if life_stopped:
+                    await broadcast(
+                        {
+                            "type": "life_log_sync",
+                            "logs": load_today_life_logs(),
+                        }
+                    )
+                await broadcast(
+                    {
+                        "type": "quota_log_sync",
+                        "logs": load_today_quota_logs(),
+                    }
+                )
+                await broadcast({"type": "quota_log_started", "log": log})
+                await broadcast(
+                    {
+                        "type": "quota_streak_sync",
+                        "streaks": compute_all_quota_streaks(
+                            load_quotas(), load_all_quota_logs()
+                        ),
+                    }
+                )
+                continue
+
+            if data["type"] == "quota_log_stop":
+                log_id = data.get("log_id") or data.get("logId", "")
+                memo = data.get("memo")
+                if log_id:
+                    stopped = stop_quota_log(log_id, memo)
+                    schedule_autosync()
+                    await broadcast(
+                        {
+                            "type": "quota_log_sync",
+                            "logs": load_today_quota_logs(),
+                        }
+                    )
+                    if stopped:
+                        await broadcast(
+                            {"type": "quota_log_stopped", "log": stopped}
+                        )
+                    await broadcast(
+                        {
+                            "type": "quota_streak_sync",
+                            "streaks": compute_all_quota_streaks(
+                                load_quotas(), load_all_quota_logs()
+                            ),
+                        }
+                    )
                 continue
 
             # --- 振り返り操作 ---

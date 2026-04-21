@@ -12,6 +12,9 @@ import type {
   KanbanTask,
   LifeActivity,
   LifeLog,
+  Quota,
+  QuotaLog,
+  QuotaStreak,
   RepoInfo,
   Retrospective,
   RetroType,
@@ -22,6 +25,7 @@ import {
   formatDuration,
   getDayRangeForDate,
   isLifeLogActive,
+  isQuotaLogActive,
   totalSeconds,
 } from "../types";
 import { applyTheme, getInitialTheme, type ThemeName } from "../theme";
@@ -57,6 +61,7 @@ import { RetroPanel, type RetroViewMode } from "./RetroPanel";
 import { GitHubSyncTab } from "./GitHubSyncTab";
 import { ShortcutsHelpModal } from "./ShortcutsHelpModal";
 import { LifeLogTimer } from "./LifeLogTimer";
+import { QuotaTimer } from "./QuotaTimer";
 
 let msgId = 0;
 const nextId = () => String(++msgId);
@@ -181,7 +186,13 @@ export function App() {
   });
   const [lifeActivities, setLifeActivities] = useState<LifeActivity[]>([]);
   const [lifeLogs, setLifeLogs] = useState<LifeLog[]>([]);
+  const [quotas, setQuotas] = useState<Quota[]>([]);
+  const [quotaLogs, setQuotaLogs] = useState<QuotaLog[]>([]);
+  const [quotaStreaks, setQuotaStreaks] = useState<QuotaStreak[]>([]);
   const [lifeLogPopupDismissedId, setLifeLogPopupDismissedId] = useState<
+    string | null
+  >(null);
+  const [quotaLogPopupDismissedId, setQuotaLogPopupDismissedId] = useState<
     string | null
   >(null);
   const [retros, setRetros] = useState<Retrospective[]>([]);
@@ -200,6 +211,9 @@ export function App() {
   );
   const [lifeLogsByRetroId, setLifeLogsByRetroId] = useState<
     Record<string, LifeLog[]>
+  >({});
+  const [quotaLogsByRetroId, setQuotaLogsByRetroId] = useState<
+    Record<string, QuotaLog[]>
   >({});
   const [retroTab, setRetroTabState] = useState<RetroType>(() => loadRetroTab());
   const [retroViewMode, setRetroViewModeState] = useState<RetroViewMode>(() =>
@@ -467,6 +481,24 @@ export function App() {
         break;
       case "life_log_range_sync":
         setLifeLogsByRetroId((prev) => ({
+          ...prev,
+          [msg.requestId]: msg.logs,
+        }));
+        break;
+      case "quota_sync":
+        setQuotas(msg.quotas);
+        break;
+      case "quota_log_sync":
+        setQuotaLogs(msg.logs);
+        break;
+      case "quota_streak_sync":
+        setQuotaStreaks(msg.streaks);
+        break;
+      case "quota_log_started":
+      case "quota_log_stopped":
+        break;
+      case "quota_log_range_sync":
+        setQuotaLogsByRetroId((prev) => ({
           ...prev,
           [msg.requestId]: msg.logs,
         }));
@@ -1027,6 +1059,27 @@ export function App() {
     send({ type: "life_log_stop", log_id: activeLifeLog.id });
   }, [activeLifeLog, send]);
 
+  const activeQuotaLog = useMemo(
+    () => quotaLogs.find((l) => isQuotaLogActive(l)) ?? null,
+    [quotaLogs],
+  );
+  const activeQuota = useMemo(
+    () =>
+      activeQuotaLog
+        ? (quotas.find((q) => q.id === activeQuotaLog.quotaId) ?? null)
+        : null,
+    [activeQuotaLog, quotas],
+  );
+  const showQuotaPopup =
+    !!activeQuotaLog &&
+    !!activeQuota &&
+    activeQuotaLog.id !== quotaLogPopupDismissedId;
+
+  const handleQuotaLogStop = useCallback(() => {
+    if (!activeQuotaLog) return;
+    send({ type: "quota_log_stop", log_id: activeQuotaLog.id });
+  }, [activeQuotaLog, send]);
+
   // daily retro が開かれたらその日のタイムボックスを範囲取得。
   useEffect(() => {
     if (!activeRetro || activeRetro.type !== "daily") return;
@@ -1053,10 +1106,39 @@ export function App() {
     });
   }, [activeRetro, connected, dayBoundaryHour, lifeLogsByRetroId, send]);
 
+  useEffect(() => {
+    if (!activeRetro || activeRetro.type !== "daily") return;
+    if (quotaLogsByRetroId[activeRetro.id] !== undefined) return;
+    if (!connected) return;
+    const range = getDayRangeForDate(
+      activeRetro.periodStart,
+      dayBoundaryHour,
+    );
+    const toLocalIso = (ms: number): string => {
+      const d = new Date(ms);
+      const pad = (n: number) => String(n).padStart(2, "0");
+      return (
+        `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+        `T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+      );
+    };
+    send({
+      type: "quota_log_range_request",
+      requestId: activeRetro.id,
+      startIso: toLocalIso(range.startMs),
+      endIso: toLocalIso(range.endMs),
+    });
+  }, [activeRetro, connected, dayBoundaryHour, quotaLogsByRetroId, send]);
+
   const lifeLogsForActiveRetro = useMemo(() => {
     if (!activeRetro) return [];
     return lifeLogsByRetroId[activeRetro.id] ?? [];
   }, [activeRetro, lifeLogsByRetroId]);
+
+  const quotaLogsForActiveRetro = useMemo(() => {
+    if (!activeRetro) return [];
+    return quotaLogsByRetroId[activeRetro.id] ?? [];
+  }, [activeRetro, quotaLogsByRetroId]);
 
   const popupGoalName = useMemo(() => {
     if (!popupTask?.goalId) return undefined;
@@ -1191,6 +1273,8 @@ export function App() {
             onCardClick={setSelectedTask}
             lifeActivities={lifeActivities}
             lifeLogs={lifeLogs}
+            quotas={quotas}
+            quotaLogs={quotaLogs}
             dayBoundaryHour={dayBoundaryHour}
           />
         ) : activeView === "board" ? (
@@ -1209,6 +1293,10 @@ export function App() {
             setRecentDays={setBoardRecentDays}
             lifeActivities={lifeActivities}
             lifeLogs={lifeLogs}
+            quotas={quotas}
+            quotaLogs={quotaLogs}
+            quotaStreaks={quotaStreaks}
+            dayBoundaryHour={dayBoundaryHour}
           />
         ) : activeView === "goals" ? (
           <GoalPanel
@@ -1232,6 +1320,8 @@ export function App() {
             setViewMode={setRetroViewMode}
             lifeActivities={lifeActivities}
             lifeLogsForActiveRetro={lifeLogsForActiveRetro}
+            quotas={quotas}
+            quotaLogsForActiveRetro={quotaLogsForActiveRetro}
             dayBoundaryHour={dayBoundaryHour}
             onStart={handleRetroStart}
             onSend={handleRetroSend}
@@ -1304,7 +1394,7 @@ export function App() {
         />
       )}
 
-      {popupTask && !showLifeLogPopup && (
+      {popupTask && !showLifeLogPopup && !showQuotaPopup && (
         <div
           className={`timer-popup ${isPopupRunning ? "" : "timer-popup--paused"}`}
         >
@@ -1377,6 +1467,18 @@ export function App() {
           tick={tick}
           onStop={handleLifeLogStop}
           onClose={() => setLifeLogPopupDismissedId(activeLifeLog.id)}
+        />
+      )}
+
+      {showQuotaPopup && activeQuotaLog && activeQuota && (
+        <QuotaTimer
+          quota={activeQuota}
+          log={activeQuotaLog}
+          allLogs={quotaLogs}
+          tick={tick}
+          dayBoundaryHour={dayBoundaryHour}
+          onStop={handleQuotaLogStop}
+          onClose={() => setQuotaLogPopupDismissedId(activeQuotaLog.id)}
         />
       )}
 

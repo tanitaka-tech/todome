@@ -356,14 +356,36 @@ export function isLifeLogActive(log: LifeLog): boolean {
   return !log.endedAt;
 }
 
+function logSecondsInRange(
+  startedAt: string,
+  endedAt: string,
+  rangeStartMs: number,
+  rangeEndMs: number,
+  nowMs: number,
+): number {
+  if (!startedAt) return 0;
+  const start = new Date(startedAt).getTime();
+  if (Number.isNaN(start)) return 0;
+  const end = endedAt ? new Date(endedAt).getTime() : nowMs;
+  const clippedStart = Math.max(start, rangeStartMs);
+  const clippedEnd = Math.min(end, rangeEndMs);
+  return Math.max(0, Math.floor((clippedEnd - clippedStart) / 1000));
+}
+
 export function lifeActivityTodayTotalSeconds(
   activityId: string,
   logs: LifeLog[],
+  dayBoundaryHour: number = 0,
   nowMs: number = Date.now(),
 ): number {
+  const range = getTodayDayRange(dayBoundaryHour, new Date(nowMs));
   return logs
     .filter((l) => l.activityId === activityId)
-    .reduce((sum, l) => sum + lifeLogDurationSeconds(l, nowMs), 0);
+    .reduce(
+      (sum, l) =>
+        sum + logSecondsInRange(l.startedAt, l.endedAt, range.startMs, range.endMs, nowMs),
+      0,
+    );
 }
 
 export interface DayRange {
@@ -409,6 +431,76 @@ export function lifeLogAlertLevel(
   return "";
 }
 
+// --- Quota (ノルマ) ---
+
+export interface Quota {
+  id: string;
+  name: string;
+  icon: string;
+  targetMinutes: number;
+  archived: boolean;
+  createdAt: string;
+}
+
+export interface QuotaLog {
+  id: string;
+  quotaId: string;
+  startedAt: string;
+  endedAt: string;
+  memo: string;
+}
+
+export interface QuotaStreak {
+  quotaId: string;
+  current: number;
+  best: number;
+  lastAchievedDate: string;
+}
+
+export function quotaLogDurationSeconds(
+  log: QuotaLog,
+  nowMs: number = Date.now(),
+): number {
+  if (!log.startedAt) return 0;
+  const start = new Date(log.startedAt).getTime();
+  if (Number.isNaN(start)) return 0;
+  const end = log.endedAt ? new Date(log.endedAt).getTime() : nowMs;
+  return Math.max(0, Math.floor((end - start) / 1000));
+}
+
+export function isQuotaLogActive(log: QuotaLog): boolean {
+  return !log.endedAt;
+}
+
+export function quotaTodayTotalSeconds(
+  quotaId: string,
+  logs: QuotaLog[],
+  dayBoundaryHour: number = 0,
+  nowMs: number = Date.now(),
+): number {
+  const range = getTodayDayRange(dayBoundaryHour, new Date(nowMs));
+  return logs
+    .filter((l) => l.quotaId === quotaId)
+    .reduce(
+      (sum, l) =>
+        sum + logSecondsInRange(l.startedAt, l.endedAt, range.startMs, range.endMs, nowMs),
+      0,
+    );
+}
+
+export function quotaIsAchieved(quota: Quota, todaySeconds: number): boolean {
+  if (quota.targetMinutes <= 0) return false;
+  return todaySeconds >= quota.targetMinutes * 60;
+}
+
+export function streakRank(days: number): 0 | 1 | 2 | 3 | 4 {
+  if (days >= 14) return 4;
+  if (days >= 7) return 3;
+  if (days >= 3) return 2;
+  if (days >= 1) return 1;
+  return 0;
+}
+
 export type WSMessage =
   | { type: "stream_delta"; text: string }
   | { type: "thinking_delta"; text: string }
@@ -445,4 +537,10 @@ export type WSMessage =
   | { type: "life_log_sync"; logs: LifeLog[] }
   | { type: "life_log_started"; log: LifeLog }
   | { type: "life_log_stopped"; log: LifeLog }
-  | { type: "life_log_range_sync"; requestId: string; logs: LifeLog[] };
+  | { type: "life_log_range_sync"; requestId: string; logs: LifeLog[] }
+  | { type: "quota_sync"; quotas: Quota[] }
+  | { type: "quota_log_sync"; logs: QuotaLog[] }
+  | { type: "quota_log_started"; log: QuotaLog }
+  | { type: "quota_log_stopped"; log: QuotaLog }
+  | { type: "quota_streak_sync"; streaks: QuotaStreak[] }
+  | { type: "quota_log_range_sync"; requestId: string; logs: QuotaLog[] };
