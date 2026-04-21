@@ -8,6 +8,10 @@ const RETRO_VIEW_MODE_KEY = "todome.retro.viewMode";
 const POPUP_TASK_ID_KEY = "todome.board.popupTaskId";
 const DAY_BOUNDARY_HOUR_KEY = "todome.dayBoundaryHour";
 const DEFAULT_DAY_BOUNDARY_HOUR = 4;
+const BOARD_BOTTOM_HEIGHT_KEY = "todome.board.bottomHeight";
+const BOARD_QUOTA_WIDTH_KEY = "todome.board.quotaWidth";
+const DEFAULT_BOARD_BOTTOM_HEIGHT = 300;
+const DEFAULT_BOARD_QUOTA_WIDTH = 440;
 
 const RETRO_TYPES: RetroType[] = ["daily", "weekly", "monthly", "yearly"];
 const VALID_RECENT_DAYS = new Set([0, 1, 3, 7, 30]);
@@ -104,6 +108,42 @@ export function saveDayBoundaryHour(value: number): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(DAY_BOUNDARY_HOUR_KEY, String(value));
+  } catch {
+    /* ignore quota errors */
+  }
+}
+
+export function loadBoardBottomHeight(): number {
+  if (typeof window === "undefined") return DEFAULT_BOARD_BOTTOM_HEIGHT;
+  const raw = window.localStorage.getItem(BOARD_BOTTOM_HEIGHT_KEY);
+  if (raw === null) return DEFAULT_BOARD_BOTTOM_HEIGHT;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 120 || n > 2000) return DEFAULT_BOARD_BOTTOM_HEIGHT;
+  return n;
+}
+
+export function saveBoardBottomHeight(value: number): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(BOARD_BOTTOM_HEIGHT_KEY, String(Math.round(value)));
+  } catch {
+    /* ignore quota errors */
+  }
+}
+
+export function loadBoardQuotaWidth(): number {
+  if (typeof window === "undefined") return DEFAULT_BOARD_QUOTA_WIDTH;
+  const raw = window.localStorage.getItem(BOARD_QUOTA_WIDTH_KEY);
+  if (raw === null) return DEFAULT_BOARD_QUOTA_WIDTH;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 240 || n > 4000) return DEFAULT_BOARD_QUOTA_WIDTH;
+  return n;
+}
+
+export function saveBoardQuotaWidth(value: number): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(BOARD_QUOTA_WIDTH_KEY, String(Math.round(value)));
   } catch {
     /* ignore quota errors */
   }
