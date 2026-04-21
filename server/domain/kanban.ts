@@ -1,4 +1,5 @@
 import type { KanbanTask } from "../types.ts";
+import { formatLocalIso } from "../utils/time.ts";
 
 function parseIsoFlexible(iso: string): Date | null {
   if (!iso) return null;
@@ -9,7 +10,7 @@ function parseIsoFlexible(iso: string): Date | null {
 export function stopTaskTimersIfRunning(tasks: KanbanTask[]): string[] {
   const stopped: string[] = [];
   const now = new Date();
-  const nowIso = now.toISOString().slice(0, 19);
+  const nowIso = formatLocalIso(now);
   for (const t of tasks) {
     const started = t.timerStartedAt || "";
     if (!started) continue;

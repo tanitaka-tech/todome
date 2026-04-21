@@ -19,13 +19,10 @@ import {
   saveRetro,
 } from "../../storage/retro.ts";
 import { shortId } from "../../utils/shortId.ts";
+import { nowLocalIso as nowIso } from "../../utils/time.ts";
 import type { Retrospective, RetroDocument, RetroType } from "../../types.ts";
 import { broadcast, sendTo } from "../broadcast.ts";
 import type { Handler } from "../dispatch.ts";
-
-function nowIso(): string {
-  return new Date().toISOString().slice(0, 19);
-}
 
 export const retroStart: Handler = async (ws, session, data) => {
   let retroType = (data.retroType as string) || "weekly";

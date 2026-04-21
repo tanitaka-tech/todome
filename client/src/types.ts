@@ -81,6 +81,20 @@ export interface UserProfile {
 
 // --- Helpers ---
 
+// 保存文字列は "YYYY-MM-DDTHH:mm:ss" 形式 (Z なし) のローカル時刻。
+// 新しい時刻を書き込むときは必ずこれを使う。`new Date().toISOString()` は UTC+Z を返すので禁止。
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+export function formatLocalIso(d: Date): string {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+}
+
+export function nowLocalIso(): string {
+  return formatLocalIso(new Date());
+}
+
 export function formatDuration(seconds: number): string {
   if (seconds < 60) return `${seconds}s`;
   const h = Math.floor(seconds / 3600);
@@ -124,7 +138,7 @@ export function isTaskCompletedInPeriod(
   periodEnd: string,
 ): boolean {
   if (task.column !== "done") return false;
-  const ca = (task.completedAt || "").replace("Z", "").slice(0, 19);
+  const ca = (task.completedAt || "").slice(0, 19);
   if (!ca) return false;
   return ca >= `${periodStart}T00:00:00` && ca <= `${periodEnd}T23:59:59`;
 }
