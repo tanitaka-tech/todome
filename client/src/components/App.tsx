@@ -26,6 +26,7 @@ import {
   getDayRangeForDate,
   isLifeLogActive,
   isQuotaLogActive,
+  nowLocalIso,
   totalSeconds,
 } from "../types";
 import { applyTheme, getInitialTheme, type ThemeName } from "../theme";
@@ -668,7 +669,7 @@ export function App() {
       setTasks((prev) => {
         const task = prev.find((t) => t.id === taskId);
         if (!task) return prev;
-        const now = new Date().toISOString();
+        const now = nowLocalIso();
 
         if (task.timerStartedAt) {
           const stopped = stopTask(task, now);
@@ -717,7 +718,7 @@ export function App() {
       setTasks((prev) => {
         const task = prev.find((t) => t.id === taskId);
         if (!task) return prev;
-        const now = new Date().toISOString();
+        const now = nowLocalIso();
         let updated = { ...task, column: column as KanbanTask["column"] };
         if (task.timerStartedAt && column === "done") {
           const elapsed = Math.floor(

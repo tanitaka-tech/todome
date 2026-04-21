@@ -10,6 +10,7 @@ import type {
   Retrospective,
   UserProfile,
 } from "../types.ts";
+import { nowLocalIso as nowIso } from "../utils/time.ts";
 import { sendTo } from "../ws/broadcast.ts";
 import { buildProfileContext } from "./context.ts";
 import {
@@ -27,10 +28,6 @@ interface ContentBlock {
   type: string;
   text?: string;
   thinking?: string;
-}
-
-function nowIso(): string {
-  return new Date().toISOString().slice(0, 19);
 }
 
 function hasContent(retro: Retrospective): boolean {

@@ -24,6 +24,7 @@ import {
 } from "../storage/quota.ts";
 import { loadRetros } from "../storage/retro.ts";
 import type { GitHubStatus } from "../types.ts";
+import { nowLocalIso } from "../utils/time.ts";
 import { broadcast } from "../ws/broadcast.ts";
 import {
   ensureGitIdentity,
@@ -38,9 +39,7 @@ import {
   writeGitattributes,
 } from "./cli.ts";
 
-function nowIso(): string {
-  return new Date().toISOString().slice(0, 19);
-}
+const nowIso = nowLocalIso;
 
 async function withSyncLock<T>(fn: () => Promise<T>): Promise<T> {
   const prev = githubState.syncChain;

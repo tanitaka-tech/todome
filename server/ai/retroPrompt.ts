@@ -68,7 +68,7 @@ export function completedTaskIdsInPeriod(
     if (t.column !== "done") continue;
     const completedAt = t.completedAt;
     if (!completedAt) continue;
-    const cleaned = completedAt.replace("Z", "").slice(0, 19);
+    const cleaned = completedAt.slice(0, 19);
     const cdt = new Date(cleaned);
     if (Number.isNaN(cdt.getTime())) continue;
     if (cdt >= startDt && cdt <= endDt) result.push(t.id);

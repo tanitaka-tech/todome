@@ -1,5 +1,6 @@
 import { getDb } from "../db.ts";
 import { shortId } from "../utils/shortId.ts";
+import { nowLocalIso as nowIso } from "../utils/time.ts";
 import type { Quota, QuotaLog, QuotaStreak } from "../types.ts";
 
 const DEFAULT_QUOTAS: Omit<Quota, "id" | "archived" | "createdAt">[] = [
@@ -7,14 +8,6 @@ const DEFAULT_QUOTAS: Omit<Quota, "id" | "archived" | "createdAt">[] = [
   { name: "運動", icon: "🏃", targetMinutes: 30 },
   { name: "料理", icon: "🍳", targetMinutes: 30 },
 ];
-
-function nowIso(): string {
-  // toISOString() は UTC を返すが、保存文字列は Z なし = クライアント/サーバーとも
-  // ローカル時刻として parse される。時差分ズレるため、ローカル時刻で組み立てる。
-  const d = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-}
 
 export function normalizeQuota(raw: Partial<Quota> & Record<string, unknown>): Quota {
   const target = Math.max(0, Math.trunc(Number(raw.targetMinutes) || 0));

@@ -1,5 +1,6 @@
 import type { Goal, KPI, KanbanTask } from "../types.ts";
 import { shortId } from "../utils/shortId.ts";
+import { nowLocalIso } from "../utils/time.ts";
 
 const REPO_NAME_WITH_OWNER_RE = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
 
@@ -49,7 +50,7 @@ export function syncGoalAchievement(goal: Goal): Goal {
   const allDone = isGoalAllKpisAchieved(goal);
   if (allDone && !goal.achieved) {
     goal.achieved = true;
-    goal.achievedAt = new Date().toISOString();
+    goal.achievedAt = nowLocalIso();
   } else if (!allDone && goal.achieved) {
     goal.achieved = false;
     goal.achievedAt = "";

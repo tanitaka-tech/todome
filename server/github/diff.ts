@@ -138,8 +138,14 @@ function tableExists(db: Database, name: string): boolean {
   return row !== null && row !== undefined;
 }
 
-function loadEntitiesFromDb(dbPath: string): EntitySnapshot {
-  const db = new Database(dbPath, { readonly: true });
+function loadEntitiesFromDb(dbPath: string, isSnapshot: boolean): EntitySnapshot {
+  // readonly + WAL journal モードの DB を -wal/-shm 無しで開こうとすると
+  // SQLITE_CANTOPEN になる (git show で抽出した snapshot には wal/shm が付かない)。
+  // snapshot は immutable=1 を付けて「変更されない」と明示することで付随ファイルを
+  // 要求させない。本番 DB (現在も書き込み中) には付けないこと: 付けると writer の
+  // 更新が読めなくなる。
+  const dbArg = isSnapshot ? `file:${dbPath}?immutable=1` : dbPath;
+  const db = new Database(dbArg, { readonly: true });
   try {
     const tasks: KanbanTask[] = [];
     if (tableExists(db, "kanban_tasks")) {
@@ -224,8 +230,8 @@ export async function computeCommitDiff(
   try {
     const targetDb = join(tmp, `${commitHash}.db`);
     await extractDbAtCommit(REPO_DIR, commitHash, targetDb);
-    const current = loadEntitiesFromDb(currentDb);
-    const target = loadEntitiesFromDb(targetDb);
+    const current = loadEntitiesFromDb(currentDb, false);
+    const target = loadEntitiesFromDb(targetDb, true);
     const details: DiffDetails = {
       tasks: diffEntitiesById(current.tasks, target.tasks, ["title"]),
       goals: diffEntitiesById(current.goals, target.goals, ["name"]),

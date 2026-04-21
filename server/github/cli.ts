@@ -1,5 +1,6 @@
 import { existsSync, rmSync, writeFileSync, readFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
+import { formatLocalIso } from "../utils/time.ts";
 
 export class GitHubSyncError extends Error {
   constructor(message: string) {
@@ -227,9 +228,12 @@ export async function gitPull(dest: string): Promise<void> {
   }
 }
 
-export async function gitHasChanges(dest: string): Promise<boolean> {
-  const r = await run(["git", "-C", dest, "status", "--porcelain"], { env: gitEnv() });
-  return r.stdout.trim().length > 0;
+async function gitHasStagedChanges(dest: string): Promise<boolean> {
+  const r = await run(
+    ["git", "-C", dest, "diff", "--cached", "--quiet"],
+    { env: gitEnv(), check: false }
+  );
+  return r.code !== 0;
 }
 
 export async function gitAddCommitPush(
@@ -243,7 +247,9 @@ export async function gitAddCommitPush(
       await run(["git", "-C", dest, "add", p], { env: gitEnv() });
     }
   }
-  if (!(await gitHasChanges(dest))) return false;
+  // WAL/SHM 等の untracked が残っていると status --porcelain では「変更あり」になるが、
+  // add したのは todome.db と .gitattributes だけなので staged のみで判定する。
+  if (!(await gitHasStagedChanges(dest))) return false;
   await run(["git", "-C", dest, "commit", "-m", message], { env: gitEnv() });
   try {
     await run(["git", "-C", dest, ...authArgs(), "push"], { env: gitEnv() });
@@ -331,7 +337,7 @@ export async function gitLog(
     let iso = "";
     const n = Number(ts);
     if (Number.isFinite(n)) {
-      iso = new Date(n * 1000).toISOString().slice(0, 19);
+      iso = formatLocalIso(new Date(n * 1000));
     }
     out.push({ hash: full, shortHash: short, date: iso, author, message });
   }

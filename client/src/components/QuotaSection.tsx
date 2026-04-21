@@ -72,6 +72,7 @@ export function QuotaSection({
   const [showManager, setShowManager] = useState(false);
   const [celebrating, setCelebrating] = useState<Record<string, number>>({});
   const prevAchievedRef = useRef<Set<string>>(new Set());
+  const achievedInitializedRef = useRef(false);
 
   const nowMs = useMemo(
     // eslint-disable-next-line react-hooks/purity
@@ -113,6 +114,10 @@ export function QuotaSection({
       if (!prevAchievedRef.current.has(id)) newly.push(id);
     }
     prevAchievedRef.current = nowAchieved;
+    if (!achievedInitializedRef.current) {
+      achievedInitializedRef.current = true;
+      return;
+    }
     if (newly.length === 0) return;
     const ts = Date.now();
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -264,31 +269,27 @@ export function QuotaSection({
                     <div className="quota-card-progress-fill" />
                   </div>
                 )}
-                <div className={`quota-card-streak quota-card-streak--rank${rank}`}>
-                  {streak && streak.current > 0 ? (
-                    <>
-                      <span className="quota-card-streak-fire">
-                        {rank >= 4
-                          ? "🌟"
-                          : rank >= 3
-                            ? "💥"
-                            : rank >= 2
-                              ? "🔥"
-                              : "✨"}
+                {streak && streak.current > 0 && (
+                  <div className={`quota-card-streak quota-card-streak--rank${rank}`}>
+                    <span className="quota-card-streak-fire">
+                      {rank >= 4
+                        ? "🌟"
+                        : rank >= 3
+                          ? "💥"
+                          : rank >= 2
+                            ? "🔥"
+                            : "✨"}
+                    </span>
+                    <span className="quota-card-streak-text">
+                      {t("streakDays", { count: streak.current })}
+                    </span>
+                    {streak.best > streak.current && (
+                      <span className="quota-card-streak-best">
+                        ({t("bestDays", { count: streak.best })})
                       </span>
-                      <span className="quota-card-streak-text">
-                        {t("streakDays", { count: streak.current })}
-                      </span>
-                      {streak.best > streak.current && (
-                        <span className="quota-card-streak-best">
-                          ({t("bestDays", { count: streak.best })})
-                        </span>
-                      )}
-                    </>
-                  ) : (
-                    <span className="quota-card-streak-idle">—</span>
-                  )}
-                </div>
+                    )}
+                  </div>
+                )}
               </button>
             );
           })}

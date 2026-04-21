@@ -1,5 +1,6 @@
 import { getDb } from "../db.ts";
 import { shortId } from "../utils/shortId.ts";
+import { nowLocalIso as nowIso } from "../utils/time.ts";
 import type { LifeActivity, LifeCategory, LifeLimitScope, LifeLog } from "../types.ts";
 
 export const LIFE_ACTIVITY_CATEGORIES: readonly LifeCategory[] = [
@@ -89,14 +90,6 @@ function logRowToDict(row: LogRow): LifeLog {
     memo: row.memo ?? "",
     alertTriggered: (row.alert_triggered ?? "") as LifeLog["alertTriggered"],
   };
-}
-
-function nowIso(): string {
-  // toISOString() は UTC を返すが、保存文字列は Z なし = クライアント/サーバーとも
-  // ローカル時刻として parse される。時差分ズレるため、ローカル時刻で組み立てる。
-  const d = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
 function todayIsoDate(): string {

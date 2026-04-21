@@ -8,6 +8,7 @@ import {
   hmToSeconds,
   isKpiAchieved,
   kpiProgress,
+  nowLocalIso,
   secondsToHM,
   type Goal,
   type KPI,
@@ -212,7 +213,7 @@ export function GoalPanel({
       achievedAt: nowAchieved
         ? wasAchieved && editingGoal.achievedAt
           ? editingGoal.achievedAt
-          : new Date().toISOString()
+          : nowLocalIso()
         : "",
     };
 
@@ -258,7 +259,7 @@ export function GoalPanel({
       achievedAt: nowAchieved
         ? goal.achieved && goal.achievedAt
           ? goal.achievedAt
-          : new Date().toISOString()
+          : nowLocalIso()
         : "",
     };
     setGoals((prev) => prev.map((g) => (g.id === goalId ? updated : g)));
