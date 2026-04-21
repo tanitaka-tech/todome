@@ -12,6 +12,7 @@ import {
   runRetroReopenGreeting,
   runRetroTurn,
 } from "../../ai/retroRunner.ts";
+import { getDayBoundaryHour } from "../../storage/appConfig.ts";
 import {
   deleteRetroById,
   getRetro,
@@ -42,7 +43,11 @@ export const retroStart: Handler = async (ws, session, data) => {
     if (found && !found.completedAt) retroEntry = found;
   }
   if (!retroEntry) {
-    const { start, end } = computeRetroPeriod(retroType as RetroType, anchorDate);
+    const { start, end } = computeRetroPeriod(
+      retroType as RetroType,
+      anchorDate,
+      getDayBoundaryHour(),
+    );
     const now = nowIso();
     const welcome = retroWelcomeText(retroType as RetroType, start, end);
     retroEntry = {

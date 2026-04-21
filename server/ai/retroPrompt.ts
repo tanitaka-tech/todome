@@ -25,9 +25,13 @@ function isoDate(d: Date): string {
 
 export function computeRetroPeriod(
   retroType: RetroType,
-  today?: Date
+  today?: Date,
+  boundaryHour: number = 0
 ): { start: string; end: string } {
   const d = today ? new Date(today) : new Date();
+  if (!today && boundaryHour > 0 && d.getHours() < boundaryHour) {
+    d.setDate(d.getDate() - 1);
+  }
   d.setHours(0, 0, 0, 0);
   if (retroType === "daily") {
     return { start: isoDate(d), end: isoDate(d) };

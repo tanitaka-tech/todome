@@ -1,5 +1,6 @@
 import { buildGitHubStatus } from "../github/sync.ts";
 import { loadAIConfig } from "../storage/aiConfig.ts";
+import { loadAppConfig } from "../storage/appConfig.ts";
 import { loadGoals } from "../storage/goals.ts";
 import { loadTasks } from "../storage/kanban.ts";
 import {
@@ -32,6 +33,7 @@ export async function sendInitialState(
   sendTo(ws, { type: "profile_sync", profile: session.profile });
   sendTo(ws, { type: "retro_list_sync", retros: loadRetros() });
   sendTo(ws, { type: "ai_config_sync", config: loadAIConfig() });
+  sendTo(ws, { type: "app_config_sync", config: loadAppConfig() });
   sendTo(ws, { type: "life_activity_sync", activities: loadLifeActivities() });
   sendTo(ws, { type: "life_log_sync", logs: loadTodayLifeLogs() });
   const quotas = loadQuotas();
