@@ -10,9 +10,14 @@ if [ ! -d "client/node_modules" ]; then
   (cd client && npm install)
 fi
 
+if [ ! -d "node_modules" ]; then
+  echo "==> installing server dependencies"
+  bun install
+fi
+
 case "$MODE" in
   dev)
-    echo "==> starting dev servers (Vite :5173 / uvicorn :3002)"
+    echo "==> starting dev servers (Vite :5173 / Bun :3002)"
     pids=()
     cleanup() {
       trap - INT TERM EXIT
@@ -26,18 +31,11 @@ case "$MODE" in
     (cd client && npm run dev) &
     pids+=($!)
 
-    # AI アシスタントが任意の .py を作成/編集すると
-    # uvicorn の既定 '*.py' ウォッチで再起動し、
-    # SDK サブプロセスと WebSocket が落ちてチャットが「止まる」ので、
-    # サーバー側の .py に限定してウォッチする。
-    uv run uvicorn server:app --host 0.0.0.0 --port 3002 \
-      --reload \
-      --reload-exclude '*.py' \
-      --reload-include 'server.py' \
-      --reload-include 'github_sync.py' &
+    # AI アシスタントが任意の .ts を編集すると bun --watch が再起動して
+    # WebSocket セッションと SDK サブプロセスが落ちるので、server/ 配下だけ監視する。
+    bun --watch server/index.ts &
     pids+=($!)
 
-    # macOS デフォルトの bash 3.2 は `wait -n` 未対応なのでポーリングで代替
     while :; do
       for pid in "${pids[@]}"; do
         if ! kill -0 "$pid" 2>/dev/null; then
@@ -51,8 +49,8 @@ case "$MODE" in
   prod)
     echo "==> building client"
     (cd client && npm run build)
-    echo "==> starting uvicorn :3002"
-    exec uv run uvicorn server:app --host 0.0.0.0 --port 3002
+    echo "==> starting Bun :3002"
+    exec bun server/index.ts
     ;;
 
   *)
