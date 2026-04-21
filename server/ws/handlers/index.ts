@@ -1,5 +1,6 @@
 import { registerHandler } from "../dispatch.ts";
 import { aiConfigUpdate } from "./aiConfig.ts";
+import { appConfigUpdate } from "./appConfig.ts";
 import {
   githubCommitDiff,
   githubLink,
@@ -62,6 +63,7 @@ export function registerAllHandlers(): void {
   registerHandler("profile_update", profileUpdate);
   registerHandler("clear_session", clearSession);
   registerHandler("ai_config_update", aiConfigUpdate);
+  registerHandler("app_config_update", appConfigUpdate);
   registerHandler("life_activity_upsert", lifeActivityUpsert);
   registerHandler("life_activity_archive", lifeActivityArchive);
   registerHandler("life_activity_delete", lifeActivityDelete);

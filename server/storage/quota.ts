@@ -1,6 +1,12 @@
 import { getDb } from "../db.ts";
 import { shortId } from "../utils/shortId.ts";
 import { nowLocalIso as nowIso } from "../utils/time.ts";
+import {
+  dayRangeForBoundary,
+  nextBoundaryAfter,
+  todayBoundaryIsoDate,
+} from "../utils/dayBoundary.ts";
+import { getDayBoundaryHour } from "./appConfig.ts";
 import type { Quota, QuotaLog, QuotaStreak } from "../types.ts";
 
 const DEFAULT_QUOTAS: Omit<Quota, "id" | "archived" | "createdAt">[] = [
@@ -69,19 +75,11 @@ function logRowToDict(row: LogRow): QuotaLog {
   };
 }
 
-function todayIsoDate(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
 export function loadTodayQuotaLogs(todayIso?: string): QuotaLog[] {
-  const day = todayIso ?? todayIsoDate();
-  const rows = getDb()
-    .prepare(
-      "SELECT * FROM quota_logs WHERE substr(started_at, 1, 10) = ? ORDER BY started_at ASC"
-    )
-    .all(day) as LogRow[];
-  return rows.map(logRowToDict);
+  const boundaryHour = getDayBoundaryHour();
+  const day = todayIso ?? todayBoundaryIsoDate(boundaryHour);
+  const { startIso, endIso } = dayRangeForBoundary(day, boundaryHour);
+  return loadQuotaLogsInRange(startIso, endIso);
 }
 
 export function loadAllQuotaLogs(): QuotaLog[] {
@@ -150,13 +148,16 @@ function parseIsoLocal(iso: string): Date | null {
   return d;
 }
 
-function ymd(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+function boundaryDayKey(d: Date, boundaryHour: number): string {
+  const shifted = new Date(d);
+  if (shifted.getHours() < boundaryHour) shifted.setDate(shifted.getDate() - 1);
+  return `${shifted.getFullYear()}-${String(shifted.getMonth() + 1).padStart(2, "0")}-${String(shifted.getDate()).padStart(2, "0")}`;
 }
 
 export function computeQuotaDayTotals(
   logs: QuotaLog[],
-  now: Date = new Date()
+  now: Date = new Date(),
+  boundaryHour: number = getDayBoundaryHour()
 ): Record<string, Record<string, number>> {
   const totals: Record<string, Record<string, number>> = {};
   for (const log of logs) {
@@ -167,19 +168,11 @@ export function computeQuotaDayTotals(
     if (end.getTime() <= start.getTime()) continue;
     let cursor = start;
     while (cursor < end) {
-      const dayEnd = new Date(
-        cursor.getFullYear(),
-        cursor.getMonth(),
-        cursor.getDate() + 1,
-        0,
-        0,
-        0,
-        0
-      );
+      const dayEnd = nextBoundaryAfter(cursor, boundaryHour);
       const segEnd = dayEnd < end ? dayEnd : end;
       const seconds = Math.floor((segEnd.getTime() - cursor.getTime()) / 1000);
       if (seconds > 0) {
-        const key = ymd(cursor);
+        const key = boundaryDayKey(cursor, boundaryHour);
         (totals[qid] ??= {})[key] = (totals[qid]![key] ?? 0) + seconds;
       }
       cursor = segEnd;
@@ -242,8 +235,9 @@ export function computeAllQuotaStreaks(
   logs: QuotaLog[],
   todayIso?: string
 ): QuotaStreak[] {
-  const today = todayIso ?? todayIsoDate();
-  const totals = computeQuotaDayTotals(logs);
+  const boundaryHour = getDayBoundaryHour();
+  const today = todayIso ?? todayBoundaryIsoDate(boundaryHour);
+  const totals = computeQuotaDayTotals(logs, new Date(), boundaryHour);
   return quotas.map((q) => {
     const target = Math.max(0, Math.trunc(q.targetMinutes)) * 60;
     const s = computeQuotaStreak(totals[q.id] ?? {}, target, today);

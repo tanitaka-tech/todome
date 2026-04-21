@@ -1,6 +1,11 @@
 import { getDb } from "../db.ts";
 import { shortId } from "../utils/shortId.ts";
 import { nowLocalIso as nowIso } from "../utils/time.ts";
+import {
+  dayRangeForBoundary,
+  todayBoundaryIsoDate,
+} from "../utils/dayBoundary.ts";
+import { getDayBoundaryHour } from "./appConfig.ts";
 import type { LifeActivity, LifeCategory, LifeLimitScope, LifeLog } from "../types.ts";
 
 export const LIFE_ACTIVITY_CATEGORIES: readonly LifeCategory[] = [
@@ -92,19 +97,11 @@ function logRowToDict(row: LogRow): LifeLog {
   };
 }
 
-function todayIsoDate(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
 export function loadTodayLifeLogs(todayIso?: string): LifeLog[] {
-  const day = todayIso ?? todayIsoDate();
-  const rows = getDb()
-    .prepare(
-      "SELECT * FROM life_logs WHERE substr(started_at, 1, 10) = ? ORDER BY started_at ASC"
-    )
-    .all(day) as LogRow[];
-  return rows.map(logRowToDict);
+  const boundaryHour = getDayBoundaryHour();
+  const day = todayIso ?? todayBoundaryIsoDate(boundaryHour);
+  const { startIso, endIso } = dayRangeForBoundary(day, boundaryHour);
+  return loadLifeLogsInRange(startIso, endIso);
 }
 
 export function loadLifeLogsInRange(startIso: string, endIso: string): LifeLog[] {

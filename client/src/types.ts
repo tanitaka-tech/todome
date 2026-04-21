@@ -275,6 +275,10 @@ export interface AIToolConfig {
   thinkingEffort: ThinkingEffort;
 }
 
+export interface AppConfig {
+  dayBoundaryHour: number;
+}
+
 // --- Retrospective ---
 
 export type RetroType = "daily" | "weekly" | "monthly" | "yearly";
@@ -369,7 +373,7 @@ export function isLifeLogActive(log: LifeLog): boolean {
   return !log.endedAt;
 }
 
-function logSecondsInRange(
+export function logSecondsInRange(
   startedAt: string,
   endedAt: string,
   rangeStartMs: number,
@@ -535,6 +539,7 @@ export type WSMessage =
       error: string | null;
     }
   | { type: "ai_config_sync"; config: AIToolConfig }
+  | { type: "app_config_sync"; config: AppConfig }
   | { type: "result"; result: string; cost: number; turns: number; sessionId: string }
   | { type: "retro_list_sync"; retros: Retrospective[] }
   | { type: "retro_sync"; retro: Retrospective }
