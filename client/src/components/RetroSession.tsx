@@ -6,6 +6,8 @@ import type {
   KanbanTask,
   LifeActivity,
   LifeLog,
+  Quota,
+  QuotaLog,
   RetroMessage,
   Retrospective,
 } from "../types";
@@ -19,6 +21,8 @@ interface Props {
   waiting: boolean;
   lifeActivities: LifeActivity[];
   lifeLogsForPeriod: LifeLog[];
+  quotas: Quota[];
+  quotaLogsForPeriod: QuotaLog[];
   dayBoundaryHour: number;
   onSend: (text: string) => void;
   onComplete: () => void;
@@ -45,6 +49,8 @@ export function RetroSession({
   waiting,
   lifeActivities,
   lifeLogsForPeriod,
+  quotas,
+  quotaLogsForPeriod,
   dayBoundaryHour,
   onSend,
   onComplete,
@@ -223,6 +229,8 @@ export function RetroSession({
             typeLabel={typeLabel}
             lifeActivities={lifeActivities}
             lifeLogsForPeriod={lifeLogsForPeriod}
+            quotas={quotas}
+            quotaLogsForPeriod={quotaLogsForPeriod}
             dayBoundaryHour={dayBoundaryHour}
             onEditField={(key, value) => onEditField(retro.id, key, value)}
             onEditDayRating={(v) => onEditDayRating(retro.id, v)}

@@ -1,9 +1,25 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { ColumnId, Goal, KanbanTask, LifeActivity, LifeLog } from "../types";
+import type {
+  ColumnId,
+  Goal,
+  KanbanTask,
+  LifeActivity,
+  LifeLog,
+  Quota,
+  QuotaLog,
+  QuotaStreak,
+} from "../types";
 import { formatDuration, totalSeconds } from "../types";
 import { formatDateTime } from "../i18n/format";
 import { LifeLogSection } from "./LifeLogSection";
+import { QuotaSection } from "./QuotaSection";
+import {
+  loadBoardBottomHeight,
+  loadBoardQuotaWidth,
+  saveBoardBottomHeight,
+  saveBoardQuotaWidth,
+} from "../viewState";
 
 interface Props {
   tasks: KanbanTask[];
@@ -20,6 +36,10 @@ interface Props {
   setRecentDays: (value: number) => void;
   lifeActivities: LifeActivity[];
   lifeLogs: LifeLog[];
+  quotas: Quota[];
+  quotaLogs: QuotaLog[];
+  quotaStreaks: QuotaStreak[];
+  dayBoundaryHour: number;
 }
 
 export const KANBAN_GOAL_FILTER_NONE = "__none__";
@@ -62,6 +82,10 @@ export function KanbanBoard({
   setRecentDays,
   lifeActivities,
   lifeLogs,
+  quotas,
+  quotaLogs,
+  quotaStreaks,
+  dayBoundaryHour,
 }: Props) {
   const { t } = useTranslation("kanban");
   const [dragId, setDragId] = useState<string | null>(null);
@@ -78,6 +102,64 @@ export function KanbanBoard({
   const prevRects = useRef(new Map<string, DOMRect>());
   const originalTasksRef = useRef<KanbanTask[] | null>(null);
   const dropCommittedRef = useRef(false);
+
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const bottomRowRef = useRef<HTMLDivElement>(null);
+  const [bottomHeight, setBottomHeight] = useState<number>(loadBoardBottomHeight);
+  const [quotaWidth, setQuotaWidth] = useState<number>(loadBoardQuotaWidth);
+
+  useEffect(() => {
+    saveBoardBottomHeight(bottomHeight);
+  }, [bottomHeight]);
+
+  useEffect(() => {
+    saveBoardQuotaWidth(quotaWidth);
+  }, [quotaWidth]);
+
+  const startResizeBottom = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startHeight = bottomHeight;
+    const wrap = wrapRef.current;
+    const maxBottom = wrap ? Math.max(140, wrap.clientHeight - 220) : 800;
+    const onMove = (ev: PointerEvent) => {
+      const next = Math.max(140, Math.min(maxBottom, startHeight - (ev.clientY - startY)));
+      setBottomHeight(next);
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
+    };
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "ns-resize";
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
+
+  const startResizeQuota = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = quotaWidth;
+    const row = bottomRowRef.current;
+    const rowWidth = row ? row.clientWidth : 1200;
+    const maxQuota = Math.max(260, rowWidth - 280);
+    const onMove = (ev: PointerEvent) => {
+      const next = Math.max(260, Math.min(maxQuota, startWidth + (ev.clientX - startX)));
+      setQuotaWidth(next);
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
+    };
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "ew-resize";
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
 
   useLayoutEffect(() => {
     const nextRects = new Map<string, DOMRect>();
@@ -481,7 +563,7 @@ export function KanbanBoard({
   ]);
 
   return (
-    <div className="kanban-wrap">
+    <div className="kanban-wrap" ref={wrapRef}>
       <div className="kanban-filter-bar">
         <div className="kanban-filter-group">
           <span className="kanban-filter-label">{t("filterGoal")}</span>
@@ -685,14 +767,48 @@ export function KanbanBoard({
         );
       })}
       </div>
-      <LifeLogSection
-        activities={lifeActivities}
-        logs={lifeLogs}
-        tasks={tasks}
-        tick={tick}
-        send={send}
-        onStopTaskTimer={onTimerToggle}
+      <div
+        className="board-divider board-divider--h"
+        role="separator"
+        aria-orientation="horizontal"
+        onPointerDown={startResizeBottom}
       />
+      <div
+        className="board-bottom-row"
+        ref={bottomRowRef}
+        style={
+          {
+            "--bottom-height": `${bottomHeight}px`,
+            "--quota-width": `${quotaWidth}px`,
+          } as React.CSSProperties
+        }
+      >
+        <QuotaSection
+          quotas={quotas}
+          logs={quotaLogs}
+          streaks={quotaStreaks}
+          tasks={tasks}
+          tick={tick}
+          send={send}
+          onStopTaskTimer={onTimerToggle}
+          dayBoundaryHour={dayBoundaryHour}
+        />
+        <div
+          className="board-divider board-divider--v"
+          role="separator"
+          aria-orientation="vertical"
+          onPointerDown={startResizeQuota}
+        />
+        <LifeLogSection
+          activities={lifeActivities}
+          logs={lifeLogs}
+          tasks={tasks}
+          tick={tick}
+          send={send}
+          onStopTaskTimer={onTimerToggle}
+          dayBoundaryHour={dayBoundaryHour}
+        />
+      </div>
     </div>
   );
 }

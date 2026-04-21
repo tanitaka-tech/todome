@@ -18,6 +18,7 @@ interface Props {
   tick: number;
   send: (data: unknown) => void;
   onStopTaskTimer: (taskId: string) => void;
+  dayBoundaryHour: number;
 }
 
 export function LifeLogSection({
@@ -27,6 +28,7 @@ export function LifeLogSection({
   tick,
   send,
   onStopTaskTimer,
+  dayBoundaryHour,
 }: Props) {
   const { t } = useTranslation("lifeLog");
   const [editorActivity, setEditorActivity] = useState<
@@ -130,6 +132,7 @@ export function LifeLogSection({
             const todaySecs = lifeActivityTodayTotalSeconds(
               activity.id,
               logs,
+              dayBoundaryHour,
               nowMs,
             );
             const alert = lifeLogAlertLevel(
