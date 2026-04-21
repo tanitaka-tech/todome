@@ -34,6 +34,9 @@ case "$MODE" in
       --reload \
       --reload-exclude '*.py' \
       --reload-include 'server.py' \
+      --reload-include 'server_ws.py' \
+      --reload-include 'server_state.py' \
+      --reload-include 'server_retro.py' \
       --reload-include 'github_sync.py' &
     pids+=($!)
 

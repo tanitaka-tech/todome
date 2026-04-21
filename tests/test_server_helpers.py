@@ -7,8 +7,6 @@ import pytest
 from server import (
     AI_DEFAULT_ALLOWED_TOOLS,
     _apply_kpi_time_delta,
-    _compute_retro_period,
-    _completed_task_ids_in_period,
     _diff_entities_by_id,
     _diff_profile,
     _ensure_kpi_ids,
@@ -16,8 +14,6 @@ from server import (
     _find_time_kpi,
     _is_bash_command_allowed,
     _is_goal_all_kpis_achieved,
-    _is_valid_hhmm,
-    _merge_retro_document,
     _migrate_retro_document,
     _normalize_ai_config,
     _normalize_goal_repository,
@@ -25,13 +21,19 @@ from server import (
     _pick_label,
     _rebalance_kpi_contribution,
     _short_id,
-    _strip_retrodoc_block,
     _summarize_diff,
     _sync_goal_achievement,
     apply_profile_update,
     compute_quota_day_totals,
     compute_quota_streak,
     process_todos,
+)
+from server_retro import (
+    _completed_task_ids_in_period,
+    _compute_retro_period,
+    _is_valid_hhmm,
+    _merge_retro_document,
+    _strip_retrodoc_block,
 )
 
 
