@@ -515,6 +515,13 @@ body {
   background: var(--bg);
   transition: grid-template-columns 0.18s ease;
 }
+.app-shell:has(.timer-popup) {
+  grid-template-rows: 42px 1fr 28px;
+  grid-template-areas:
+    "sidebar topbar chat"
+    "sidebar main    chat"
+    "sidebar bar     chat";
+}
 .app-shell--chat-collapsed {
   grid-template-columns: 76px 1fr 0;
 }
@@ -3942,35 +3949,32 @@ body {
 }
 
 /* ===== Floating Timer Popup ===== */
+/* VSCode風のボトムステータスバー。app-shell のグリッド row として生やすため、メイン領域の下端要素と重ならない */
 .timer-popup {
-  position: fixed;
-  bottom: 20px;
-  /* center within main area: sidebar 220px, chat 380px → offset -80px from viewport center */
-  left: 50%;
-  transform: translateX(calc(-50% - 80px));
-  z-index: 90;
+  grid-area: bar;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
+  gap: 10px;
+  padding: 0 12px;
+  height: 28px;
   background: var(--surface);
-  border: 1px solid var(--accent-border);
-  border-radius: 12px;
-  box-shadow: var(--shadow-lg);
-  animation: popupIn 0.2s ease;
-  max-width: 520px;
+  border-top: 1px solid var(--accent-border);
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.06);
+  animation: popupSlideUp 0.18s ease;
+  font-size: 11px;
+  z-index: 90;
 }
-@keyframes popupIn {
-  from { opacity: 0; transform: translateX(calc(-50% - 80px)) translateY(10px); }
-  to   { opacity: 1; transform: translateX(calc(-50% - 80px)) translateY(0); }
+@keyframes popupSlideUp {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
 }
 .timer-popup--paused {
-  border-color: var(--border);
-  box-shadow: var(--shadow-card);
+  border-top-color: var(--border);
+  box-shadow: none;
 }
 .timer-popup-pulse {
-  width: 9px;
-  height: 9px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: var(--danger);
   flex-shrink: 0;
@@ -3982,25 +3986,30 @@ body {
 }
 @keyframes pulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
-  50%      { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+  50%      { box-shadow: 0 0 0 5px rgba(239, 68, 68, 0); }
 }
 .timer-popup-body {
   flex: 1;
   min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
 }
 .timer-popup-title {
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--fg);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
 }
 .timer-popup-meta {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: 1px;
+  flex-shrink: 0;
 }
 .timer-popup-goal {
   font-family: var(--font-mono);
@@ -4016,36 +4025,37 @@ body {
   border: 1px solid var(--warning-border);
   border-radius: 99px;
   padding: 0 6px;
-  line-height: 14px;
+  line-height: 13px;
 }
 .timer-popup-time {
   font-family: var(--font-mono);
-  font-size: 17px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--accent);
   flex-shrink: 0;
   letter-spacing: 0.02em;
 }
 .timer-popup-estimate {
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 400;
   color: var(--fg-dim);
 }
 .timer-popup-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   flex-shrink: 0;
 }
 .timer-popup-btn {
-  padding: 5px 12px;
-  border-radius: var(--radius);
-  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
   font-weight: 600;
   font-family: var(--font-body);
   cursor: pointer;
   transition: all 0.12s;
   border: 1px solid;
+  line-height: 16px;
 }
 .timer-popup-btn--pause {
   background: var(--warning-light);
@@ -4075,12 +4085,12 @@ body {
   color: var(--accent-on);
 }
 .timer-popup-close {
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
   border: none;
   background: none;
-  border-radius: var(--radius-sm);
-  font-size: 15px;
+  border-radius: 3px;
+  font-size: 13px;
   color: var(--fg-muted);
   cursor: pointer;
   display: flex;
