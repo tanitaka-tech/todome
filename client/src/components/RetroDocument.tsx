@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import ReactMarkdown from "react-markdown";
+import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import type {
   KanbanTask,
@@ -147,7 +148,7 @@ function EditableMarkdownSection({
       title={onSave ? t("editClickHint") : undefined}
     >
       {value ? (
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{value}</ReactMarkdown>
+        <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>{value}</ReactMarkdown>
       ) : (
         <div className="retro-doc-placeholder">{placeholder}</div>
       )}

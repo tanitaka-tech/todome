@@ -5251,6 +5251,8 @@ body {
 
 .retro-doc-view {
   border-radius: 6px;
+  max-height: 320px;
+  overflow-y: auto;
 }
 .retro-doc-view--editable {
   cursor: text;
@@ -5275,6 +5277,7 @@ body {
   width: 100%;
   resize: vertical;
   min-height: 80px;
+  max-height: 320px;
   padding: 8px 10px;
   border: 1px solid var(--border);
   border-radius: 6px;
