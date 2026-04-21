@@ -55,6 +55,113 @@ function todaySecondsOfTask(task: KanbanTask): number {
   return sum;
 }
 
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+function dayKeyWithBoundary(iso: string, boundaryHour: number): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  if (d.getHours() < boundaryHour) d.setDate(d.getDate() - 1);
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
+interface DayStat {
+  completed: number;
+  seconds: number;
+}
+
+function buildDayStats(
+  tasks: KanbanTask[],
+  boundaryHour: number,
+): Record<string, DayStat> {
+  const nowMs = Date.now();
+  const byDay: Record<string, DayStat> = {};
+  const add = (key: string | null, completed: number, seconds: number) => {
+    if (!key) return;
+    const entry = (byDay[key] ??= { completed: 0, seconds: 0 });
+    entry.completed += completed;
+    entry.seconds += seconds;
+  };
+  for (const task of tasks) {
+    if (task.completedAt) add(dayKeyWithBoundary(task.completedAt, boundaryHour), 1, 0);
+    for (const log of task.timeLogs) {
+      add(dayKeyWithBoundary(log.start, boundaryHour), 0, log.duration);
+    }
+    if (task.timerStartedAt) {
+      const elapsed = Math.max(
+        0,
+        Math.floor((nowMs - new Date(task.timerStartedAt).getTime()) / 1000),
+      );
+      add(dayKeyWithBoundary(task.timerStartedAt, boundaryHour), 0, elapsed);
+    }
+  }
+  return byDay;
+}
+
+const PROGRESS_MIN_SECONDS = 30 * 60;
+
+function computeProgressStreak(
+  dayStats: Record<string, DayStat>,
+  todayKey: string,
+): { current: number; best: number } {
+  const progressDays = Object.entries(dayStats)
+    .filter(([, v]) => v.completed >= 1 || v.seconds >= PROGRESS_MIN_SECONDS)
+    .map(([k]) => k)
+    .sort();
+  if (progressDays.length === 0) return { current: 0, best: 0 };
+
+  let best = 1;
+  let run = 1;
+  for (let i = 1; i < progressDays.length; i++) {
+    const prev = new Date(`${progressDays[i - 1]}T00:00:00`);
+    const cur = new Date(`${progressDays[i]}T00:00:00`);
+    const diff = Math.round((cur.getTime() - prev.getTime()) / 86400000);
+    if (diff === 1) {
+      run += 1;
+      best = Math.max(best, run);
+    } else {
+      run = 1;
+    }
+  }
+
+  const today = new Date(`${todayKey}T00:00:00`);
+  const last = progressDays[progressDays.length - 1]!;
+  const lastDate = new Date(`${last}T00:00:00`);
+  const gap = Math.round((today.getTime() - lastDate.getTime()) / 86400000);
+  if (gap > 1) return { current: 0, best };
+
+  let current = 1;
+  let cursor = lastDate;
+  for (let i = progressDays.length - 2; i >= 0; i--) {
+    const prev = new Date(`${progressDays[i]}T00:00:00`);
+    const diff = Math.round((cursor.getTime() - prev.getTime()) / 86400000);
+    if (diff === 1) {
+      current += 1;
+      cursor = prev;
+    } else break;
+  }
+  return { current, best: Math.max(best, current) };
+}
+
+function computeWeeklyAvgRatio(
+  dayStats: Record<string, DayStat>,
+  todayKey: string,
+  todaySeconds: number,
+): number | null {
+  const today = new Date(`${todayKey}T00:00:00`);
+  let sum = 0;
+  for (let i = 1; i <= 7; i++) {
+    const d = new Date(today.getTime() - i * 86400000);
+    const key = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+    sum += dayStats[key]?.seconds ?? 0;
+  }
+  const avg = sum / 7;
+  if (avg <= 0) return null;
+  return Math.round(((todaySeconds - avg) / avg) * 100);
+}
+
 export function OverviewPanel({
   tasks,
   goals,
@@ -83,8 +190,6 @@ export function OverviewPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [dayBoundaryHour, _tick],
   );
-  const activeTask = tasks.find((t) => t.timerStartedAt);
-
   const todaySeconds = useMemo(() => {
     return tasks.reduce((s, t) => s + todaySecondsOfTask(t), 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -96,9 +201,22 @@ export function OverviewPanel({
   }, [tasks, _tick]);
 
   const completedToday = tasks.filter((t) => isToday(t.completedAt)).length;
-  const totalCompleted = tasks.filter((t) => !!t.completedAt).length;
   const inProgress = tasks.filter((t) => t.column === "in_progress").length;
   const todoCount = tasks.filter((t) => t.column === "todo").length;
+
+  const dayStats = useMemo(
+    () => buildDayStats(tasks, dayBoundaryHour),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [tasks, dayBoundaryHour, _tick],
+  );
+  const streak = useMemo(
+    () => computeProgressStreak(dayStats, todayRange.dateKey),
+    [dayStats, todayRange.dateKey],
+  );
+  const weeklyRatio = useMemo(
+    () => computeWeeklyAvgRatio(dayStats, todayRange.dateKey, todaySeconds),
+    [dayStats, todayRange.dateKey, todaySeconds],
+  );
 
   const recentActive = useMemo(() => {
     return [...tasks]
@@ -168,8 +286,23 @@ export function OverviewPanel({
               <div className="kpi-value kpi-value--accent">
                 {formatDuration(todaySeconds)}
               </div>
-              <div className="kpi-delta">
-                {t("kpiTotalSuffix", { total: formatDuration(totalTimeSeconds) })}
+              <div
+                className={`kpi-delta${
+                  weeklyRatio !== null && weeklyRatio > 0
+                    ? " kpi-delta--up"
+                    : weeklyRatio !== null && weeklyRatio < 0
+                      ? " kpi-delta--down"
+                      : ""
+                }`}
+              >
+                {weeklyRatio === null
+                  ? t("kpiTodayWorkDeltaNoAvg", {
+                      total: formatDuration(totalTimeSeconds),
+                    })
+                  : t("kpiTodayWorkDelta", {
+                      total: formatDuration(totalTimeSeconds),
+                      ratio: `${weeklyRatio > 0 ? "+" : ""}${weeklyRatio}%`,
+                    })}
               </div>
             </div>
           </div>
@@ -177,9 +310,6 @@ export function OverviewPanel({
             <div className="kpi-tile">
               <div className="kpi-label">{t("kpiTodayDone")}</div>
               <div className="kpi-value">{completedToday}</div>
-              <div className="kpi-delta">
-                {t("kpiTotalSuffix", { total: totalCompleted })}
-              </div>
             </div>
           </div>
           <div className="widget col-3">
@@ -193,25 +323,22 @@ export function OverviewPanel({
           </div>
           <div className="widget col-3">
             <div className="kpi-tile">
-              <div className="kpi-label">{t("kpiActiveTimer")}</div>
+              <div className="kpi-label">{t("kpiStreak")}</div>
               <div
                 className="kpi-value"
                 style={{
-                  color: activeTask ? "var(--accent)" : "var(--fg-muted)",
-                  fontSize: activeTask ? 20 : 22,
+                  color:
+                    streak.current > 0 ? "var(--accent)" : "var(--fg-muted)",
                 }}
               >
-                {activeTask ? formatDuration(totalSeconds(activeTask)) : "—"}
+                {streak.current > 0
+                  ? t("kpiStreakDays", { count: streak.current })
+                  : "—"}
               </div>
-              <div
-                className="kpi-delta"
-                style={{
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                }}
-              >
-                {activeTask ? activeTask.title : t("kpiNoActiveTask")}
+              <div className="kpi-delta">
+                {streak.best > 0
+                  ? t("kpiStreakBest", { count: streak.best })
+                  : t("kpiStreakNone")}
               </div>
             </div>
           </div>
