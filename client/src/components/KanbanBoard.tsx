@@ -50,12 +50,6 @@ const COLUMNS: { id: ColumnId; labelKey: string; color: string }[] = [
   { id: "done", labelKey: "columnDone", color: "#9a5b2f" },
 ];
 
-const PRIORITY_LABELS: Record<string, { labelKey: string; className: string }> = {
-  high: { labelKey: "priorityHigh", className: "priority-high" },
-  medium: { labelKey: "priorityMedium", className: "priority-medium" },
-  low: { labelKey: "priorityLow", className: "priority-low" },
-};
-
 const GOAL_FILTER_NONE = KANBAN_GOAL_FILTER_NONE;
 const RECENT_DAYS_OPTIONS: { value: number; labelKey: string }[] = [
   { value: 0, labelKey: "filterAllPeriod" },
@@ -94,7 +88,6 @@ export function KanbanBoard({
   const [dragOverPos, setDragOverPos] = useState<InsertPos>("above");
   const [addingTo, setAddingTo] = useState<ColumnId | null>(null);
   const [newTitle, setNewTitle] = useState("");
-  const [newPriority, setNewPriority] = useState<"low" | "medium" | "high">("medium");
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const addInputRef = useRef<HTMLInputElement>(null);
 
@@ -407,7 +400,6 @@ export function KanbanBoard({
   const handleAdd = (columnId: ColumnId) => {
     setAddingTo(columnId);
     setNewTitle("");
-    setNewPriority("medium");
     setTimeout(() => addInputRef.current?.focus(), 50);
   };
 
@@ -420,7 +412,6 @@ export function KanbanBoard({
       type: "kanban_add",
       title,
       column: addingTo,
-      priority: newPriority,
       goalId,
     });
     setAddingTo(null);
@@ -431,17 +422,6 @@ export function KanbanBoard({
     e.stopPropagation();
     setTasks((prev) => prev.filter((t) => t.id !== taskId));
     send({ type: "kanban_delete", taskId });
-  };
-
-  const cyclePriority = (e: React.MouseEvent, task: KanbanTask) => {
-    e.stopPropagation();
-    const order: Array<"low" | "medium" | "high"> = ["low", "medium", "high"];
-    const idx = order.indexOf(task.priority);
-    const next = order[(idx + 1) % order.length];
-    setTasks((prev) =>
-      prev.map((t) => (t.id === task.id ? { ...t, priority: next } : t)),
-    );
-    send({ type: "kanban_edit", taskId: task.id, priority: next });
   };
 
   const visibleTasks = useMemo(() => {
@@ -662,24 +642,13 @@ export function KanbanBoard({
                       onCardClick(task);
                     }}
                   >
-                    <div className="kanban-card-top">
-                      <button
-                        className={`kanban-priority-badge ${PRIORITY_LABELS[task.priority].className}`}
-                        onClick={(e) => cyclePriority(e, task)}
-                        title={t("changePriority")}
-                      >
-                        {t(PRIORITY_LABELS[task.priority].labelKey)}
-                      </button>
-                      <div className="kanban-card-actions">
-                        <button
-                          className="kanban-card-action kanban-card-delete"
-                          onClick={(e) => handleDelete(e, task.id)}
-                          title={t("delete")}
-                        >
-                          &times;
-                        </button>
-                      </div>
-                    </div>
+                    <button
+                      className="kanban-card-action kanban-card-delete"
+                      onClick={(e) => handleDelete(e, task.id)}
+                      title={t("delete")}
+                    >
+                      &times;
+                    </button>
                     <div
                       className={`kanban-card-title ${task.column === "done" ? "kanban-card-title--done" : ""}`}
                     >
@@ -744,17 +713,6 @@ export function KanbanBoard({
                     }}
                   />
                   <div className="kanban-add-row">
-                    <select
-                      className="kanban-priority-select"
-                      value={newPriority}
-                      onChange={(e) =>
-                        setNewPriority(e.target.value as "low" | "medium" | "high")
-                      }
-                    >
-                      <option value="low">{t("priorityLow")}</option>
-                      <option value="medium">{t("priorityMedium")}</option>
-                      <option value="high">{t("priorityHigh")}</option>
-                    </select>
                     <button className="kanban-add-submit" onClick={submitAdd}>{t("add")}</button>
                     <button className="kanban-add-cancel" onClick={() => setAddingTo(null)}>
                       {t("cancel")}

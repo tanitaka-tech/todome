@@ -2,12 +2,6 @@ export const ja_taskDetail: Record<string, string> = {
   close: "閉じる",
   untitled: "無題",
 
-  // Priority
-  priority: "優先度",
-  priorityLow: "低",
-  priorityMedium: "中",
-  priorityHigh: "高",
-
   // Goal
   goal: "目標",
   none: "なし",

@@ -1,5 +1,4 @@
 export type ColumnId = "todo" | "in_progress" | "done";
-export type Priority = "low" | "medium" | "high";
 export type KPIUnit = "number" | "percent" | "time";
 
 export interface KPI {
@@ -33,7 +32,6 @@ export interface KanbanTask {
   title: string;
   description: string;
   column: ColumnId;
-  priority: Priority;
   memo: string;
   goalId: string;
   kpiId: string;

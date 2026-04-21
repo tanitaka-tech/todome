@@ -1563,21 +1563,10 @@ body {
   to   { opacity: 1; transform: translateY(0); }
 }
 
-.kanban-card-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 6px;
-}
-.kanban-card-actions {
-  display: flex;
-  gap: 2px;
-  opacity: 0;
-  transition: opacity 0.12s;
-}
-.kanban-card:hover .kanban-card-actions { opacity: 1; }
-
 .kanban-card-action {
+  position: absolute;
+  top: 6px;
+  right: 6px;
   width: 20px;
   height: 20px;
   border: none;
@@ -1586,10 +1575,13 @@ body {
   font-size: 13px;
   color: var(--fg-muted);
   cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s;
   display: flex;
   align-items: center;
   justify-content: center;
 }
+.kanban-card:hover .kanban-card-action { opacity: 1; }
 .kanban-card-action:hover {
   background: var(--surface);
   color: var(--fg);
@@ -1601,6 +1593,7 @@ body {
   font-weight: 500;
   line-height: 1.4;
   color: var(--fg);
+  padding-right: 22px;
 }
 .kanban-card-title--done {
   text-decoration: line-through;
@@ -1703,35 +1696,6 @@ body {
   margin-top: 4px;
 }
 
-/* ===== Priority Badges ===== */
-.kanban-priority-badge {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 500;
-  padding: 1px 8px;
-  border-radius: 99px;
-  border: 1px solid;
-  cursor: pointer;
-  transition: all 0.12s;
-  line-height: 16px;
-  background: none;
-}
-.priority-high {
-  color: var(--danger);
-  border-color: var(--danger-border);
-  background: var(--danger-light);
-}
-.priority-medium {
-  color: var(--warning);
-  border-color: var(--warning-border);
-  background: var(--warning-light);
-}
-.priority-low {
-  color: var(--fg-muted);
-  border-color: var(--border);
-  background: var(--surface-hover);
-}
-
 /* ===== Add task ===== */
 .kanban-add-input {
   width: 100%;
@@ -1751,17 +1715,6 @@ body {
   display: flex;
   gap: 6px;
   align-items: center;
-}
-
-.kanban-priority-select {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  padding: 3px 6px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  color: var(--fg);
-  cursor: pointer;
 }
 
 .kanban-add-submit {
@@ -2776,38 +2729,6 @@ body {
   color: var(--fg-muted);
   font-family: var(--font-mono);
   padding: 0 8px;
-}
-
-.detail-priority-group {
-  display: inline-flex;
-  gap: 4px;
-}
-.detail-priority-chip {
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--fg-muted);
-  padding: 3px 12px;
-  font-size: 12px;
-  border-radius: 999px;
-  cursor: pointer;
-  font-family: var(--font-body);
-  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
-}
-.detail-priority-chip:hover { background: var(--surface-hover); }
-.detail-priority-chip--low.is-active {
-  background: var(--surface-hover);
-  color: var(--fg);
-  border-color: var(--border-strong);
-}
-.detail-priority-chip--medium.is-active {
-  background: var(--warning-light);
-  color: var(--warning);
-  border-color: var(--warning-border);
-}
-.detail-priority-chip--high.is-active {
-  background: var(--danger-light);
-  color: var(--danger);
-  border-color: var(--danger-border);
 }
 
 .detail-estimate {

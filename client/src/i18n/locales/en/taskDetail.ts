@@ -2,12 +2,6 @@ export const en_taskDetail: Record<string, string> = {
   close: "Close",
   untitled: "Untitled",
 
-  // Priority
-  priority: "Priority",
-  priorityLow: "Low",
-  priorityMedium: "Medium",
-  priorityHigh: "High",
-
   // Goal
   goal: "Goal",
   none: "None",

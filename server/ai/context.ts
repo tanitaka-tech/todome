@@ -54,12 +54,11 @@ export function buildBoardContext(tasks: KanbanTask[], goals: Goal[]): string {
   for (const colKey of ["todo", "in_progress", "done"] as const) {
     lines.push(`\n【${labels[colKey]}】`);
     for (const t of cols[colKey] ?? []) {
-      const p = t.priority ? ` [${t.priority.toUpperCase()}]` : "";
       const memoNote = t.memo ? `  メモ: ${t.memo}` : "";
       const goalNote = t.goalId && goalMap.has(t.goalId)
         ? `  目標: ${goalMap.get(t.goalId)!.name}`
         : "";
-      lines.push(`  - ${t.title}${p}${memoNote}${goalNote}`);
+      lines.push(`  - ${t.title}${memoNote}${goalNote}`);
     }
   }
 

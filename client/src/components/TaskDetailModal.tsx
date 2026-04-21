@@ -13,22 +13,12 @@ interface Props {
 
 const AUTOSAVE_DELAY = 400;
 
-const PRIORITY_OPTIONS: Array<{
-  value: KanbanTask["priority"];
-  labelKey: string;
-}> = [
-  { value: "low", labelKey: "priorityLow" },
-  { value: "medium", labelKey: "priorityMedium" },
-  { value: "high", labelKey: "priorityHigh" },
-];
-
 export function TaskDetailModal({ task, goals, onSave, onClose }: Props) {
   const { t } = useTranslation("taskDetail");
   const [title, setTitle] = useState(task.title);
   const [memo, setMemo] = useState(task.memo);
   const [goalId, setGoalId] = useState(task.goalId);
   const [kpiId, setKpiId] = useState(task.kpiId);
-  const [priority, setPriority] = useState<KanbanTask["priority"]>(task.priority);
   const [estH, setEstH] = useState(Math.floor(task.estimatedMinutes / 60));
   const [estM, setEstM] = useState(task.estimatedMinutes % 60);
 
@@ -59,7 +49,6 @@ export function TaskDetailModal({ task, goals, onSave, onClose }: Props) {
       memo === task.memo &&
       goalId === task.goalId &&
       nextKpiId === task.kpiId &&
-      priority === task.priority &&
       estimatedMinutes === task.estimatedMinutes
     ) {
       return;
@@ -71,12 +60,11 @@ export function TaskDetailModal({ task, goals, onSave, onClose }: Props) {
         memo,
         goalId,
         kpiId: nextKpiId,
-        priority,
         estimatedMinutes,
       });
     }, AUTOSAVE_DELAY);
     return () => window.clearTimeout(timer);
-  }, [title, memo, goalId, kpiId, priority, estH, estM, task, onSave]);
+  }, [title, memo, goalId, kpiId, estH, estM, task, onSave]);
 
   return (
     <div
@@ -109,25 +97,6 @@ export function TaskDetailModal({ task, goals, onSave, onClose }: Props) {
           />
 
           <div className="detail-properties">
-            <div className="detail-prop">
-              <div className="detail-prop-label">{t("priority")}</div>
-              <div className="detail-prop-value">
-                <div className="detail-priority-group">
-                  {PRIORITY_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.value}
-                      className={`detail-priority-chip detail-priority-chip--${opt.value}${
-                        priority === opt.value ? " is-active" : ""
-                      }`}
-                      onClick={() => setPriority(opt.value)}
-                    >
-                      {t(opt.labelKey)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
             <div className="detail-prop">
               <div className="detail-prop-label">{t("goal")}</div>
               <div className="detail-prop-value">

@@ -632,7 +632,6 @@ export function App() {
         memo: task.memo,
         goalId: task.goalId,
         kpiId: task.kpiId,
-        priority: task.priority,
         estimatedMinutes: task.estimatedMinutes,
       });
       setSelectedTask(task);

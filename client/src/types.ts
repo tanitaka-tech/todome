@@ -46,7 +46,6 @@ export interface KanbanTask {
   title: string;
   description: string;
   column: ColumnId;
-  priority: "low" | "medium" | "high";
   memo: string;
   goalId: string;
   kpiId: string;           // 紐付け先 KPI (unit=time 限定, "" = 未紐付け)
