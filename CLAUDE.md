@@ -19,6 +19,7 @@ TrelloライクなKanbanボードでタスク管理しつつ、Claude Agent SDK 
 | 型チェック (client) | `cd client && npx tsc -b` |
 | 型チェック (server) | `bunx tsc --noEmit` |
 | Lint | `cd client && npm run lint` |
+| Unit test (server) | `bun run test` (bun:test, `server/**/*.test.ts`) |
 | E2E (Playwright) | `./test.sh` (build → e2e deps → playwright install → test) |
 
 ## ディレクトリ
@@ -44,6 +45,7 @@ TrelloライクなKanbanボードでタスク管理しつつ、Claude Agent SDK 
 - **過剰な抽象化・防御的コードは禁止**。不要な try/catch、使われない引数、将来の仮想要件のためのフラグは足さない。
 - **コメントは WHY のみ**。`start.sh` の reload-exclude のような非自明な制約のみ残し、WHAT は書かない。
 - **破壊的操作は必ず確認**。`data/` の削除、強制push、依存の downgrade は承認なしで行わない。
+- **データ処理のバグ修正は回帰テスト必須**。タスク/目標/プロフィール/振り返り等のデータ変換・永続化・クロスデータ更新でバグが出たら、`bun run test` で拾える単体テストを同時に足す。対象データの挙動だけでなく、関係ない他のデータが影響を受けないことも assert する。詳細は [.claude/rules/server.md](.claude/rules/server.md) の「テスト」節。
 - **日本語で応答**。コミットメッセージ・PR・応答はすべて日本語。
 
 ## 条件付きルール

@@ -42,9 +42,22 @@ purpose: サーバー/WebSocket/Claude Agent ハンドラ変更時のルール
 - tool_use の permission は `{ behavior: "allow" }` を即返す（都度プロンプトしない）。
 - AI が任意の `.ts` を編集すると `bun --watch` が再起動するため、`start.sh` は `server/` 配下のみ監視する。新規サーバー領域が増えたらここを確認する。
 
+## テスト
+
+- 単体テストは `bun:test` を使い、`server/**/*.test.ts` に配置する。実行は `bun run test`（内部的に `bun test server`）。
+- **データ処理・状態遷移のバグを直したら、必ず回帰テストを追加する**。特に対象は:
+  - `server/ai/processTodos.ts` のように AI 応答→タスク/目標/プロフィールへ書き戻す変換層
+  - `server/storage/*.ts` の保存/ロード/マイグレーション
+  - `server/domain/*.ts` のドメインロジック（目標達成判定・KPI 正規化等）
+- 複数データ型（タスク/目標/プロフィール/振り返り 等）を同時に扱うコードのテストでは、**対象データの挙動だけでなく、関係ない他のデータが変更されていないことを明示的に assert する**。参照等価は `toBe`、構造等価は `toEqual` を使い分ける。
+- 入力配列/オブジェクトの非破壊性（immutability）もテストする（スナップショット JSON 比較で十分）。
+- 壊れた JSON・存在しないキー・空配列・非配列入力 などの異常系で既存データが温存されることも assert する。
+- テストデータは `makeTask` / `makeGoal` / `makeProfile` のようなファクトリ関数で組み立てて setup を短く保つ（例: `server/ai/processTodos.test.ts`）。
+
 ## チェック
 
 ```bash
 bunx tsc --noEmit
 cd client && npx tsc -b && npm run lint
+bun run test
 ```
