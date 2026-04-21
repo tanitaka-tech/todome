@@ -4,7 +4,7 @@ TrelloライクなKanbanボードでタスク管理しつつ、Claude Agent SDK 
 
 ## 技術スタック
 
-- **Backend**: Python 3.11+ / FastAPI / WebSocket / uvicorn (`server.py` + `server_ws.py` + `server_retro.py` + `server_state.py`)
+- **Backend**: Python 3.11+ / FastAPI / WebSocket / uvicorn (`server.py` + `server_ws.py` + `server_retro.py` + `server_github.py` + `server_state.py`)
 - **Frontend**: React 19.2 + Vite 8 + TypeScript 5.9 (`client/`)
 - **AI**: claude-agent-sdk (Sonnet) — ツール連携で Kanban/Goal を直接操作
 - **データ**: SQLite (`data/` 配下・gitignore)
@@ -18,7 +18,7 @@ TrelloライクなKanbanボードでタスク管理しつつ、Claude Agent SDK 
 | 本番起動 (build → uvicorn:3002) | `./start.sh prod` |
 | 型チェック | `cd client && npx tsc -b` |
 | Lint | `cd client && npm run lint` |
-| Python構文チェック | `uv run python -c "import ast; [ast.parse(open(f).read()) for f in ['server.py','server_ws.py','server_retro.py','server_state.py']]"` |
+| Python構文チェック | `uv run python -c "import ast; [ast.parse(open(f).read()) for f in ['server.py','server_ws.py','server_retro.py','server_github.py','server_state.py']]"` |
 | Pythonテスト | `uv run pytest -q` |
 | E2E (Playwright) | `./test.sh` (build → e2e deps → playwright install → test) |
 
@@ -27,6 +27,7 @@ TrelloライクなKanbanボードでタスク管理しつつ、Claude Agent SDK 
 - `server.py` — FastAPI app、DB I/O、純粋ヘルパ（storage / context builder / 定数）
 - `server_ws.py` — WebSocket endpoint と `MESSAGE_HANDLERS` dispatch
 - `server_retro.py` — 振り返りモードの AI 呼び出しとプロンプト構築
+- `server_github.py` — GitHub sync (push / pull / link / restore / diff) と autosync debounce
 - `server_state.py` — 型エイリアス、`SessionState`、共有グローバル状態
 - `github_sync.py` — gh CLI / git ラッパー
 - `client/src/components/` — UI (App / KanbanBoard / ChatPanel / GoalPanel / StatsPanel / ProfilePanel / RetroPanel 等)

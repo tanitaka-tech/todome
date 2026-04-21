@@ -1,5 +1,5 @@
 ---
-paths: server.py,server_ws.py,server_retro.py,server_state.py,github_sync.py
+paths: server.py,server_ws.py,server_retro.py,server_github.py,server_state.py,github_sync.py
 purpose: サーバー/WebSocket/Claude Agent ハンドラ変更時のルール
 ---
 
@@ -7,14 +7,15 @@ purpose: サーバー/WebSocket/Claude Agent ハンドラ変更時のルール
 
 ## 構造
 
-サーバーは4ファイル構成。責務で分かれているので新規コードは合う方に入れる。
+サーバーは5ファイル構成。責務で分かれているので新規コードは合う方に入れる。
 
 - `server.py` — FastAPI app、DB I/O、純粋ヘルパ (goal/task/quota/life_log/retrospective の storage、context builder、共通定数)。セクションコメント `# --- SQLite storage ---` など論理区切りを維持する
 - `server_ws.py` — WebSocket endpoint と `MESSAGE_HANDLERS` dispatch。新しい WS メッセージ種別を足すときはここ
 - `server_retro.py` — 振り返り (retrospective) の AI 呼び出し・プロンプト組み立て・関連純粋ヘルパ
+- `server_github.py` — GitHub sync (push/pull/link/restore/diff)、autosync debounce、commit diff 計算。新しい sync 系ロジックはここ
 - `server_state.py` — 型エイリアス (`KanbanTask` / `GoalData` / `ProfileData` / `RetrospectiveData`) と `SessionState` dataclass、グローバル共有状態 (`active_sockets` / `pending_approvals` / `github_state` / `_ws_needs_reload`)
 
-`server_ws.py` と `server_retro.py` は `import server as core` パターンで `server.py` の関数を呼ぶ。逆方向 (server.py → server_ws/server_retro) の依存は避ける。`server.py` は末尾で `from server_ws import websocket_endpoint` を遅延 import しているのはこのため。
+`server_ws.py` / `server_retro.py` / `server_github.py` は `import server as core` パターンで `server.py` の関数を呼ぶ。逆方向 (server.py → 各サブモジュール) の依存は避ける。`server.py` は末尾で `from server_ws import websocket_endpoint` を遅延 import し、`server_github` のシンボルは末尾の `from server_github import ...` で再エクスポートして後方互換を保つ (`core._do_push` / テストの `from server import _pick_label` など)。
 
 ## WebSocket メッセージ
 
