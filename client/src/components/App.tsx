@@ -242,13 +242,10 @@ export function App() {
     setPopupTaskIdState(value);
     savePopupTaskId(value);
   }, []);
-  const setDayBoundaryHour = useCallback((value: number) => {
-    const clamped = Math.max(0, Math.min(23, Math.floor(value)));
-    setDayBoundaryHourState(clamped);
-    saveDayBoundaryHour(clamped);
-  }, []);
   const chatInputRef = useRef<HTMLInputElement>(null);
   const gChordRef = useRef<number | null>(null);
+  const dayBoundaryHourMigratedRef = useRef<boolean>(false);
+  const sendRef = useRef<(data: unknown) => void>(() => {});
 
   useEffect(() => {
     applyTheme(theme);
@@ -369,6 +366,26 @@ export function App() {
       case "ai_config_sync":
         setAIConfig(msg.config);
         break;
+      case "app_config_sync": {
+        const serverHour = msg.config.dayBoundaryHour;
+        if (!dayBoundaryHourMigratedRef.current) {
+          dayBoundaryHourMigratedRef.current = true;
+          const localHour = loadDayBoundaryHour();
+          const hasLocalOverride =
+            typeof window !== "undefined" &&
+            window.localStorage.getItem("todome.dayBoundaryHour") !== null;
+          if (hasLocalOverride && localHour !== serverHour) {
+            sendRef.current({
+              type: "app_config_update",
+              config: { dayBoundaryHour: localHour },
+            });
+            break;
+          }
+        }
+        setDayBoundaryHourState(serverHour);
+        saveDayBoundaryHour(serverHour);
+        break;
+      }
       case "result":
         setStreamText("");
         setThinkingText("");
@@ -510,6 +527,10 @@ export function App() {
 
   const { send, connected } = useWebSocket(handleMessage);
 
+  useEffect(() => {
+    sendRef.current = send;
+  }, [send]);
+
   // 切断直後のフラッシュを避けるため、1.5 秒続いた切断状態のみバナー表示する。
   const [showOfflineBanner, setShowOfflineBanner] = useState(false);
   useEffect(() => {
@@ -597,6 +618,16 @@ export function App() {
     (config: AIToolConfig) => {
       setAIConfig(config);
       send({ type: "ai_config_update", config });
+    },
+    [send],
+  );
+
+  const setDayBoundaryHour = useCallback(
+    (value: number) => {
+      const clamped = Math.max(0, Math.min(23, Math.floor(value)));
+      setDayBoundaryHourState(clamped);
+      saveDayBoundaryHour(clamped);
+      send({ type: "app_config_update", config: { dayBoundaryHour: clamped } });
     },
     [send],
   );

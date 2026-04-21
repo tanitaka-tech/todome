@@ -16,17 +16,14 @@ import {
   resolveAIModel,
   resolveThinkingBudget,
 } from "../../storage/aiConfig.ts";
+import { getDayBoundaryHour } from "../../storage/appConfig.ts";
+import { todayBoundaryIsoDate } from "../../utils/dayBoundary.ts";
 import { loadGoals, saveGoals } from "../../storage/goals.ts";
 import { loadTasks, saveTasks } from "../../storage/kanban.ts";
 import { loadProfile, saveProfile } from "../../storage/profile.ts";
 import type { AppWebSocket, SessionState } from "../../state.ts";
 import { sendTo } from "../broadcast.ts";
 import type { Handler } from "../dispatch.ts";
-
-function todayIso(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
 
 function buildOptions(ws: AppWebSocket, promptAppend: string): Options {
   const cfg = loadAIConfig();
@@ -110,7 +107,11 @@ export const message: Handler = async (ws, session, data) => {
   const profileCtx = buildProfileContext(session.profile);
 
   if (!session.client) {
-    const promptAppend = buildSystemPromptAppend(todayIso(), profileCtx, boardCtx);
+    const promptAppend = buildSystemPromptAppend(
+      todayBoundaryIsoDate(getDayBoundaryHour()),
+      profileCtx,
+      boardCtx,
+    );
     session.client = createAIClient(buildOptions(ws, promptAppend));
   }
   const client = session.client as AIClient;
