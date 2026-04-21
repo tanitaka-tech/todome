@@ -4,7 +4,7 @@ import {
   syncGoalAchievement,
 } from "../domain/goal.ts";
 import { applyProfileUpdate } from "../storage/profile.ts";
-import type { ColumnId, Goal, KanbanTask, Priority, UserProfile } from "../types.ts";
+import type { ColumnId, Goal, KanbanTask, UserProfile } from "../types.ts";
 import { shortId } from "../utils/shortId.ts";
 
 const GOAL_ADD_PREFIX = "GOAL_ADD:";
@@ -115,16 +115,7 @@ export function processTodos(
     }
 
     const status = typeof todo.status === "string" ? todo.status : "pending";
-    let priority: Priority = "medium";
     let title = content;
-    for (const p of ["high", "medium", "low"] as const) {
-      const tag = `[${p.toUpperCase()}]`;
-      if (content.toUpperCase().startsWith(tag)) {
-        priority = p;
-        title = content.slice(tag.length).trim();
-        break;
-      }
-    }
 
     let goalId: string | null = null;
     const goalMatch = /^\[GOAL:([^\]]*)\]\s*/.exec(title);
@@ -137,7 +128,6 @@ export function processTodos(
     if (existing) {
       const task: KanbanTask = { ...existing };
       task.column = STATUS_TO_COLUMN[status] ?? "todo";
-      task.priority = priority;
       if (goalId !== null) task.goalId = goalId;
       tasks.push(task);
     } else {
@@ -146,7 +136,6 @@ export function processTodos(
         title,
         description: "",
         column: STATUS_TO_COLUMN[status] ?? "todo",
-        priority,
         memo: "",
         goalId: goalId ?? "",
         kpiId: "",

@@ -17,7 +17,7 @@ import {
 } from "../../storage/quota.ts";
 import { shortId } from "../../utils/shortId.ts";
 import type { AppWebSocket, SessionState } from "../../state.ts";
-import type { ColumnId, KanbanTask, Priority } from "../../types.ts";
+import type { ColumnId, KanbanTask } from "../../types.ts";
 import { broadcast, sendTo } from "../broadcast.ts";
 import type { Handler } from "../dispatch.ts";
 
@@ -84,7 +84,6 @@ export const kanbanAdd: Handler = async (ws, session, data) => {
     title: String(data.title ?? "新しいタスク"),
     description: String(data.description ?? ""),
     column: (data.column as ColumnId) ?? "todo",
-    priority: (data.priority as Priority) ?? "medium",
     memo: String(data.memo ?? ""),
     goalId: String(data.goalId ?? ""),
     kpiId: String(data.kpiId ?? ""),
@@ -143,7 +142,6 @@ export const kanbanEdit: Handler = async (ws, session, data) => {
     for (const key of [
       "title",
       "description",
-      "priority",
       "memo",
       "goalId",
       "kpiId",
