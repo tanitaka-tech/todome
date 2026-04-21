@@ -6086,21 +6086,72 @@ body {
 }
 
 /* --- Quota (ノルマ) --- */
+.board-divider {
+  flex-shrink: 0;
+  position: relative;
+  background: transparent;
+  touch-action: none;
+}
+.board-divider::before {
+  content: "";
+  position: absolute;
+  background: var(--border);
+  transition: background 0.15s, transform 0.15s;
+  pointer-events: none;
+}
+.board-divider--h {
+  height: 10px;
+  margin: 4px 24px;
+  cursor: ns-resize;
+}
+.board-divider--h::before {
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  transform: translateY(-50%);
+}
+.board-divider--h:hover::before,
+.board-divider--h:active::before {
+  background: var(--accent, #d4a24e);
+  transform: translateY(-50%) scaleY(3);
+}
+.board-divider--v {
+  width: 10px;
+  align-self: stretch;
+  cursor: ew-resize;
+  flex-shrink: 0;
+}
+.board-divider--v::before {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  transform: translateX(-50%);
+}
+.board-divider--v:hover::before,
+.board-divider--v:active::before {
+  background: var(--accent, #d4a24e);
+  transform: translateX(-50%) scaleX(3);
+}
 .board-bottom-row {
   display: flex;
-  gap: 12px;
-  margin: 20px 12px 32px;
+  gap: 0;
+  margin: 0 12px 32px;
   align-items: stretch;
-  flex-wrap: wrap;
+  height: var(--bottom-height, 300px);
+  overflow: hidden;
 }
 .board-bottom-row > .quota-section {
-  flex: 1 1 360px;
-  min-width: 320px;
+  flex: 0 0 var(--quota-width, 440px);
+  min-width: 260px;
+  overflow-y: auto;
 }
 .board-bottom-row > .life-log-section {
-  flex: 0 1 420px;
-  min-width: 280px;
+  flex: 1 1 0;
+  min-width: 260px;
   margin: 0;
+  overflow-y: auto;
 }
 .quota-section {
   padding: 14px 16px;
@@ -6353,11 +6404,17 @@ body {
 @media (max-width: 720px) {
   .board-bottom-row {
     flex-direction: column;
+    height: auto;
+    overflow: visible;
   }
   .board-bottom-row > .life-log-section,
   .board-bottom-row > .quota-section {
     flex: 1 1 auto;
     min-width: 0;
+    overflow: visible;
+  }
+  .board-divider--v {
+    display: none;
   }
 }
 
