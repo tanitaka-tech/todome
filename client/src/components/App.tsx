@@ -63,6 +63,7 @@ import { GitHubSyncTab } from "./GitHubSyncTab";
 import { ShortcutsHelpModal } from "./ShortcutsHelpModal";
 import { LifeLogTimer } from "./LifeLogTimer";
 import { QuotaTimer } from "./QuotaTimer";
+import { WaveText } from "./WaveText";
 
 let msgId = 0;
 const nextId = () => String(++msgId);
@@ -1404,7 +1405,7 @@ export function App() {
             }`}
           />
           <div className="timer-popup-body">
-            <div className="timer-popup-title">{popupTask.title}</div>
+            <div className="timer-popup-title"><WaveText text={popupTask.title} /></div>
             <div className="timer-popup-meta">
               {popupGoalName && (
                 <span className="timer-popup-goal">{popupGoalName}</span>

@@ -5,6 +5,7 @@ import {
   lifeLogAlertLevel,
   lifeLogDurationSeconds,
 } from "../types";
+import { WaveText } from "./WaveText";
 
 interface Props {
   activity: LifeActivity;
@@ -40,7 +41,7 @@ export function LifeLogTimer({ activity, log, tick: _tick, onStop, onClose }: Pr
       <div className="timer-popup-body">
         <div className="timer-popup-title">
           <span className="timer-popup-lifelog-icon">{activity.icon}</span>
-          {activity.name}
+          <WaveText text={activity.name} />
         </div>
         <div className="timer-popup-meta">
           {alert === "hard" && (
