@@ -615,6 +615,8 @@ body {
   align-items: center;
   justify-content: center;
   color: currentColor;
+  font-family: "Apple Symbols", "Segoe UI Symbol", "Noto Sans Symbols",
+    "Noto Sans Symbols 2", sans-serif;
   font-size: 18px;
   line-height: 1;
 }
@@ -1414,7 +1416,7 @@ body {
 .kanban-board {
   display: flex;
   gap: 12px;
-  padding: 18px 24px;
+  padding: 18px 24px 0;
   overflow-x: auto;
   overflow-y: hidden;
   min-width: 0;
@@ -5710,6 +5712,29 @@ body {
   background: var(--danger-light);
   border-color: var(--danger-border);
 }
+.timer-popup-status-badge--success {
+  color: #059669;
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.4);
+}
+.timer-popup--quota {
+  border-color: #a78bfa;
+}
+.timer-popup--quota .timer-popup-pulse {
+  background: #8b5cf6;
+  animation: pulse-quota 1.5s infinite;
+}
+.timer-popup--quota.timer-popup--achieved {
+  border-color: #10b981;
+  background: linear-gradient(135deg, rgba(16,185,129,0.08), rgba(139,92,246,0.08));
+}
+.timer-popup--quota.timer-popup--achieved .timer-popup-pulse {
+  background: #10b981;
+}
+@keyframes pulse-quota {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.55); }
+  50%      { box-shadow: 0 0 0 6px rgba(139, 92, 246, 0); }
+}
 
 .modal-content--life-activity,
 .modal-content--life-manager {
@@ -6060,5 +6085,338 @@ body {
   font-size: 11px;
   color: var(--fg-muted);
   margin-top: 2px;
+}
+
+/* --- Quota (ノルマ) --- */
+.board-divider {
+  flex-shrink: 0;
+  position: relative;
+  background: transparent;
+  touch-action: none;
+}
+.board-divider::before {
+  content: "";
+  position: absolute;
+  background: var(--border);
+  transition: background 0.15s, transform 0.15s;
+  pointer-events: none;
+}
+.board-divider--h {
+  height: 10px;
+  margin: 0 24px;
+  cursor: ns-resize;
+}
+.board-divider--h::before {
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  transform: translateY(-50%);
+}
+.board-divider--h:hover::before,
+.board-divider--h:active::before {
+  background: var(--accent, #d4a24e);
+  transform: translateY(-50%) scaleY(3);
+}
+.board-divider--v {
+  width: 10px;
+  align-self: stretch;
+  cursor: ew-resize;
+  flex-shrink: 0;
+}
+.board-divider--v::before {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  transform: translateX(-50%);
+}
+.board-divider--v:hover::before,
+.board-divider--v:active::before {
+  background: var(--accent, #d4a24e);
+  transform: translateX(-50%) scaleX(3);
+}
+.board-bottom-row {
+  display: flex;
+  gap: 0;
+  margin: 0 12px 32px;
+  align-items: stretch;
+  height: var(--bottom-height, 300px);
+  overflow: hidden;
+}
+.board-bottom-row > .quota-section {
+  flex: 0 0 var(--quota-width, 440px);
+  min-width: 260px;
+  overflow-y: auto;
+}
+.board-bottom-row > .life-log-section {
+  flex: 1 1 0;
+  min-width: 260px;
+  margin: 0;
+  overflow-y: auto;
+}
+.quota-section {
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+.quota-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 10px;
+}
+.quota-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px 10px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--fg);
+  cursor: pointer;
+  text-align: left;
+  overflow: hidden;
+  transition: transform 0.12s, background 0.12s, border-color 0.12s,
+    box-shadow 0.2s;
+}
+.quota-card:hover {
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
+}
+.quota-card--active {
+  border-color: var(--accent-border);
+  background: var(--accent-light);
+  animation: life-log-btn-pulse 1.6s ease-in-out infinite;
+}
+.quota-card--achieved {
+  background: linear-gradient(
+    135deg,
+    var(--success-light),
+    rgba(74, 222, 128, 0.08)
+  );
+  border-color: var(--success-border);
+}
+.quota-card--achieved .quota-card-name {
+  color: var(--success);
+}
+.quota-card-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.quota-card-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+.quota-card-name {
+  font-size: 13px;
+  font-weight: 600;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.quota-card-check {
+  color: var(--success);
+  font-size: 16px;
+  font-weight: 700;
+  animation: quota-check-pop 0.5s ease-out;
+}
+@keyframes quota-check-pop {
+  0% { transform: scale(0); }
+  70% { transform: scale(1.35); }
+  100% { transform: scale(1); }
+}
+.quota-card-time {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 13px;
+  color: var(--fg);
+}
+.quota-card-active-dot {
+  color: var(--accent);
+  font-size: 10px;
+  animation: quota-blink 1s ease-in-out infinite;
+}
+@keyframes quota-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+.quota-card-total {
+  font-weight: 600;
+}
+.quota-card-target {
+  color: var(--fg-muted);
+  font-size: 11px;
+}
+.quota-card-progress {
+  position: relative;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.quota-card-progress-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: var(--p, 0%);
+  background: linear-gradient(90deg, var(--accent), var(--success));
+  border-radius: 2px;
+  transition: width 0.4s ease-out;
+}
+.quota-card--achieved .quota-card-progress-fill {
+  background: var(--success);
+}
+.quota-card-streak {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+.quota-card-streak-fire {
+  font-size: 13px;
+}
+.quota-card-streak-text {
+  font-weight: 500;
+}
+.quota-card-streak-best {
+  color: var(--fg-dim);
+  font-size: 10px;
+}
+.quota-card-streak-idle {
+  color: var(--fg-dim);
+}
+/* 段階ランク: 背景・ボーダー・グロウが徐々に派手に */
+.quota-card--rank1 .quota-card-streak { color: #f59e0b; }
+.quota-card--rank2 {
+  border-color: rgba(249, 115, 22, 0.5);
+  box-shadow: 0 0 0 1px rgba(249, 115, 22, 0.2) inset;
+}
+.quota-card--rank2 .quota-card-streak { color: #f97316; font-weight: 600; }
+.quota-card--rank3 {
+  border-color: rgba(239, 68, 68, 0.6);
+  box-shadow:
+    0 0 12px rgba(239, 68, 68, 0.25),
+    0 0 0 1px rgba(239, 68, 68, 0.3) inset;
+  animation: quota-rank3-glow 2.4s ease-in-out infinite;
+}
+@keyframes quota-rank3-glow {
+  0%, 100% { box-shadow: 0 0 10px rgba(239, 68, 68, 0.2), 0 0 0 1px rgba(239, 68, 68, 0.3) inset; }
+  50% { box-shadow: 0 0 18px rgba(249, 115, 22, 0.5), 0 0 0 1px rgba(249, 115, 22, 0.5) inset; }
+}
+.quota-card--rank3 .quota-card-streak { color: #ef4444; font-weight: 700; }
+.quota-card--rank4 {
+  border-color: transparent;
+  background:
+    linear-gradient(var(--surface-raised), var(--surface-raised)) padding-box,
+    linear-gradient(135deg, #facc15, #f97316, #ef4444, #a855f7, #3b82f6, #facc15)
+      border-box;
+  border: 2px solid transparent;
+  animation: quota-rank4-rainbow 4s linear infinite,
+    quota-rank4-pulse 1.8s ease-in-out infinite;
+}
+.quota-card--rank4.quota-card--achieved {
+  background:
+    linear-gradient(
+      135deg,
+      var(--success-light),
+      rgba(250, 204, 21, 0.12)
+    ) padding-box,
+    linear-gradient(135deg, #facc15, #f97316, #ef4444, #a855f7, #3b82f6, #facc15)
+      border-box;
+}
+@keyframes quota-rank4-pulse {
+  0%, 100% { box-shadow: 0 0 14px rgba(250, 204, 21, 0.3); }
+  50% { box-shadow: 0 0 22px rgba(239, 68, 68, 0.55); }
+}
+@keyframes quota-rank4-rainbow {
+  0% { filter: hue-rotate(0deg); }
+  100% { filter: hue-rotate(360deg); }
+}
+.quota-card--rank4 .quota-card-streak {
+  color: #ef4444;
+  font-weight: 800;
+  text-shadow: 0 0 4px rgba(250, 204, 21, 0.6);
+}
+
+/* --- Quota クラッカー --- */
+.quota-confetti {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+  z-index: 2;
+}
+.quota-confetti-label {
+  position: absolute;
+  font-size: 38px;
+  animation: quota-celebrate-label 2.4s ease-out forwards;
+}
+@keyframes quota-celebrate-label {
+  0% { transform: scale(0.2) translateY(0); opacity: 0; }
+  25% { transform: scale(1.3) translateY(-6px); opacity: 1; }
+  70% { transform: scale(1.1) translateY(-10px); opacity: 1; }
+  100% { transform: scale(1) translateY(-28px); opacity: 0; }
+}
+.quota-confetti-piece {
+  position: absolute;
+  width: 6px;
+  height: 10px;
+  background: var(--c, #facc15);
+  border-radius: 1px;
+  top: 50%;
+  left: 50%;
+  transform-origin: center;
+  opacity: 0;
+  animation: quota-confetti-fly 2.4s cubic-bezier(0.2, 0.7, 0.4, 1) forwards;
+  animation-delay: var(--delay, 0ms);
+}
+@keyframes quota-confetti-fly {
+  0% {
+    transform: translate(-50%, -50%) rotate(0deg) scale(0.6);
+    opacity: 1;
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    transform:
+      translate(
+        calc(-50% + var(--dx, 0px) * 6),
+        calc(-50% + 120px)
+      )
+      rotate(540deg)
+      scale(1);
+    opacity: 0;
+  }
+}
+
+@media (max-width: 720px) {
+  .board-bottom-row {
+    flex-direction: column;
+    height: auto;
+    overflow: visible;
+  }
+  .board-bottom-row > .life-log-section,
+  .board-bottom-row > .quota-section {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: visible;
+  }
+  .board-divider--v {
+    display: none;
+  }
 }
 

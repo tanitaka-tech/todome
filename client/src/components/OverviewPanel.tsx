@@ -1,7 +1,14 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { formatDate, formatDateTime } from "../i18n/format";
-import type { Goal, KanbanTask, LifeActivity, LifeLog } from "../types";
+import type {
+  Goal,
+  KanbanTask,
+  LifeActivity,
+  LifeLog,
+  Quota,
+  QuotaLog,
+} from "../types";
 import { formatDuration, getTodayDayRange, totalSeconds } from "../types";
 import { TimelineBar } from "./TimelineBar";
 
@@ -13,6 +20,8 @@ interface Props {
   onCardClick: (task: KanbanTask) => void;
   lifeActivities: LifeActivity[];
   lifeLogs: LifeLog[];
+  quotas: Quota[];
+  quotaLogs: QuotaLog[];
   dayBoundaryHour: number;
 }
 
@@ -54,6 +63,8 @@ export function OverviewPanel({
   onCardClick,
   lifeActivities,
   lifeLogs,
+  quotas,
+  quotaLogs,
   dayBoundaryHour,
 }: Props) {
   const { t } = useTranslation("overview");
@@ -234,6 +245,8 @@ export function OverviewPanel({
                 tasks={tasks}
                 lifeLogs={lifeLogs}
                 lifeActivities={lifeActivities}
+                quotas={quotas}
+                quotaLogs={quotaLogs}
                 tick={_tick}
                 autoScrollToNow
                 orientation={timelineOrientation}
