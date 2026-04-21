@@ -274,6 +274,78 @@ describe("processTodos — データ分離保証 (regression: 目標追加でタ
     expect(JSON.stringify(goals)).toBe(goalsSnapshot);
   });
 
+  it("GOAL_ADD + pending/in_progress のみ再送 (AIが done を落とす): done タスクは温存される", () => {
+    const tasksWithDone: KanbanTask[] = [
+      makeTask({ id: "t1", title: "既存タスクA", column: "todo" }),
+      makeTask({ id: "t2", title: "既存タスクB", column: "in_progress" }),
+      makeTask({ id: "t3", title: "完了タスクC", column: "done", memo: "done-memo" }),
+      makeTask({ id: "t4", title: "完了タスクD", column: "done" }),
+    ];
+    const result = processTodos(
+      [
+        { content: "既存タスクA", status: "pending" },
+        { content: "既存タスクB", status: "in_progress" },
+        {
+          content:
+            'GOAL_ADD:{"name":"新目標","kpis":[{"name":"件数","unit":"number","targetValue":10,"currentValue":0}]}',
+          status: "completed",
+        },
+      ],
+      tasksWithDone,
+      BASE_GOALS,
+      makeProfile()
+    );
+
+    const titles = result.tasks.map((t) => t.title);
+    expect(titles).toContain("完了タスクC");
+    expect(titles).toContain("完了タスクD");
+    expect(titles).toContain("既存タスクA");
+    expect(titles).toContain("既存タスクB");
+    const preservedC = result.tasks.find((t) => t.title === "完了タスクC");
+    expect(preservedC?.id).toBe("t3");
+    expect(preservedC?.column).toBe("done");
+    expect(preservedC?.memo).toBe("done-memo");
+    expect(result.goals).toHaveLength(2);
+    expect(result.goals[1]?.name).toBe("新目標");
+  });
+
+  it("done タスクを todos に完了として再掲した場合は二重追加にならない", () => {
+    const tasksWithDone: KanbanTask[] = [
+      makeTask({ id: "t1", title: "完了タスクC", column: "done", memo: "keep" }),
+    ];
+    const result = processTodos(
+      [
+        { content: "完了タスクC", status: "completed" },
+        { content: "新タスクE", status: "pending" },
+      ],
+      tasksWithDone,
+      BASE_GOALS,
+      makeProfile()
+    );
+
+    const doneCopies = result.tasks.filter((t) => t.title === "完了タスクC");
+    expect(doneCopies).toHaveLength(1);
+    expect(doneCopies[0]?.id).toBe("t1");
+    expect(doneCopies[0]?.memo).toBe("keep");
+    expect(doneCopies[0]?.column).toBe("done");
+  });
+
+  it("done タスクを pending に戻すと done には残らない (明示的な移動は尊重)", () => {
+    const tasksWithDone: KanbanTask[] = [
+      makeTask({ id: "t1", title: "完了タスクC", column: "done" }),
+    ];
+    const result = processTodos(
+      [{ content: "完了タスクC", status: "pending" }],
+      tasksWithDone,
+      BASE_GOALS,
+      makeProfile()
+    );
+
+    expect(result.tasks).toHaveLength(1);
+    expect(result.tasks[0]?.title).toBe("完了タスクC");
+    expect(result.tasks[0]?.column).toBe("todo");
+  });
+
   it("[GOAL:<id>]プレフィックス付きタスク: goalIdが抽出され本体からは除去される", () => {
     const result = processTodos(
       [{ content: "[GOAL:g1] 企画書を作成", status: "pending" }],
