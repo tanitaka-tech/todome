@@ -138,6 +138,10 @@ export function saveAIConfig(cfg: unknown): AIToolConfig {
   return normalized;
 }
 
+export function resetAIConfigCache(): void {
+  cache = null;
+}
+
 export function resolveAIModel(cfg: AIToolConfig): { model: AIModel; betas: SdkBeta[] } {
   const betas: SdkBeta[] = [];
   let model = cfg.model;
