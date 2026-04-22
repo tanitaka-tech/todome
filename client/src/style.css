@@ -4183,6 +4183,80 @@ body {
   color: var(--fg-muted);
 }
 
+/* ===== Error Toast ===== */
+.error-toast-stack {
+  position: fixed;
+  top: 58px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 210;
+  pointer-events: none;
+}
+.error-toast {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 320px;
+  max-width: 520px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--danger-border);
+  border-left: 3px solid var(--danger);
+  border-radius: 10px;
+  box-shadow: var(--shadow-lg);
+  pointer-events: auto;
+  animation: errorToastIn 0.25s ease;
+}
+@keyframes errorToastIn {
+  from { opacity: 0; transform: translate(-50%, -8px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+.error-toast-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--danger-light);
+  color: var(--danger);
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.error-toast-body {
+  min-width: 0;
+  flex: 1;
+}
+.error-toast-heading {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--danger);
+  line-height: 1.3;
+  margin-bottom: 2px;
+}
+.error-toast-message {
+  font-size: 12px;
+  color: var(--fg);
+  line-height: 1.4;
+  word-break: break-word;
+}
+.error-toast-close {
+  background: transparent;
+  border: none;
+  color: var(--fg-muted);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.error-toast-close:hover { color: var(--fg); }
+
 /* ===== GitHub settings ===== */
 .gh-section {
   display: flex;

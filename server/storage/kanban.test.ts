@@ -72,7 +72,7 @@ describe("saveTasks / loadTasks — 永続化ラウンドトリップ", () => {
   it("保存したタスクを正確に復元できる", () => {
     const tasks = [
       makeTask({ id: "t1", title: "タスクA", column: "todo", description: "説明A" }),
-      makeTask({ id: "t2", title: "タスクB", column: "inprogress" }),
+      makeTask({ id: "t2", title: "タスクB", column: "in_progress" }),
     ];
     saveTasks(tasks);
     const loaded = loadTasks();
@@ -192,7 +192,7 @@ describe("タスクのアップサート挙動", () => {
   it("todo から done へ移動した後も全タスクが保持される", () => {
     const tasks = [
       makeTask({ id: "t1", title: "タスク1", column: "todo" }),
-      makeTask({ id: "t2", title: "タスク2", column: "inprogress" }),
+      makeTask({ id: "t2", title: "タスク2", column: "in_progress" }),
     ];
     saveTasks(tasks);
 
@@ -205,7 +205,7 @@ describe("タスクのアップサート挙動", () => {
     const result = loadTasks();
     expect(result).toHaveLength(2);
     expect(result.find((t) => t.id === "t1")!.column).toBe("done");
-    expect(result.find((t) => t.id === "t2")!.column).toBe("inprogress");
+    expect(result.find((t) => t.id === "t2")!.column).toBe("in_progress");
   });
 });
 
