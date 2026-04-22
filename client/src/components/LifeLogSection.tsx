@@ -62,17 +62,6 @@ export function LifeLogSection({
       send({ type: "life_log_stop", log_id: activeLog.id });
       return;
     }
-    if (activeLog) {
-      const current = activities.find((a) => a.id === activeLog.activityId);
-      const ok = window.confirm(
-        t("stopConfirm", {
-          name: current ? `${current.icon} ${current.name}` : "?",
-          next: `${activity.icon} ${activity.name}`,
-        }),
-      );
-      if (!ok) return;
-    }
-    // タスク計測中でも確認は出さない。サーバー側の排他で自動停止される。
     if (runningTask) {
       onStopTaskTimer(runningTask.id);
     }
