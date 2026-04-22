@@ -101,7 +101,14 @@ interface Celebration {
   duration: string;
 }
 
+interface ErrorToast {
+  id: number;
+  message: string;
+  requestType?: string;
+}
+
 let celebrationId = 0;
+let errorToastId = 0;
 
 const NAV_ITEMS: {
   id: ActiveView;
@@ -165,6 +172,7 @@ export function App() {
     loadPopupTaskId(),
   );
   const [celebrations, setCelebrations] = useState<Celebration[]>([]);
+  const [errorToasts, setErrorToasts] = useState<ErrorToast[]>([]);
   const [theme, setThemeState] = useState<ThemeName>(() => getInitialTheme());
   const [language, setLanguageState] = useState<Language>(() =>
     getInitialLanguage(),
@@ -273,8 +281,26 @@ export function App() {
     }, 3500);
   }, []);
 
+  const showError = useCallback((message: string, requestType?: string) => {
+    const id = ++errorToastId;
+    setErrorToasts((p) => [...p, { id, message, requestType }]);
+    setTimeout(() => {
+      setErrorToasts((p) => p.filter((t) => t.id !== id));
+    }, 6000);
+  }, []);
+
   const handleMessage = useCallback((msg: WSMessage) => {
     switch (msg.type) {
+      case "error":
+        // AI メッセージ送信が失敗した場合は待機表示を解除する。
+        // それ以外（kanban 更新など）はチャット状態に触らない。
+        if (msg.requestType === "message") {
+          setWaiting(false);
+          setStreamText("");
+          setThinkingText("");
+        }
+        showError(msg.message, msg.requestType);
+        break;
       case "thinking_delta":
         setThinkingText((p) => p + msg.text);
         break;
@@ -523,7 +549,7 @@ export function App() {
         }));
         break;
     }
-  }, []);
+  }, [showError]);
 
   const { send, connected } = useWebSocket(handleMessage);
 
@@ -1539,6 +1565,36 @@ export function App() {
           </div>
         </div>
       ))}
+
+      <div className="error-toast-stack" role="alert" aria-live="polite">
+        {errorToasts.map((t, idx) => (
+          <div
+            key={t.id}
+            className="error-toast"
+            style={{ top: `${idx * 68}px` }}
+          >
+            <div className="error-toast-icon">!</div>
+            <div className="error-toast-body">
+              <div className="error-toast-heading">
+                {t.requestType
+                  ? `エラー (${t.requestType})`
+                  : "エラー"}
+              </div>
+              <div className="error-toast-message">{t.message}</div>
+            </div>
+            <button
+              type="button"
+              className="error-toast-close"
+              aria-label="閉じる"
+              onClick={() =>
+                setErrorToasts((p) => p.filter((x) => x.id !== t.id))
+              }
+            >
+              ×
+            </button>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
