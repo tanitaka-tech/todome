@@ -32,7 +32,13 @@ import {
   loadTodayLifeLogs,
 } from "../../storage/life.ts";
 import { loadProfile, saveProfile } from "../../storage/profile.ts";
-import { loadQuotas, loadTodayQuotaLogs } from "../../storage/quota.ts";
+import {
+  computeAllQuotaStreaks,
+  loadAllQuotaLogs,
+  loadQuotas,
+  loadTodayQuotaLogs,
+} from "../../storage/quota.ts";
+import { processQuotaLifeActions } from "../../ai/processQuotaLife.ts";
 import type { AppWebSocket, SessionState } from "../../state.ts";
 import { sendTo } from "../broadcast.ts";
 import type { Handler } from "../dispatch.ts";
@@ -103,6 +109,35 @@ function handleTodoWrite(
   if (profileChanged) {
     sendTo(ws, { type: "profile_sync", profile: session.profile });
   }
+
+  const ql = processQuotaLifeActions(todos);
+  if (ql.quotasChanged) {
+    sendTo(ws, { type: "quota_sync", quotas: loadQuotas() });
+    scheduleAutosync();
+  }
+  if (ql.quotaLogStarted) {
+    sendTo(ws, { type: "quota_log_sync", logs: ql.todayQuotaLogs ?? loadTodayQuotaLogs() });
+    sendTo(ws, { type: "quota_log_started", log: ql.quotaLogStarted });
+    scheduleAutosync();
+  } else if (ql.quotaLogStopped) {
+    sendTo(ws, { type: "quota_log_sync", logs: ql.todayQuotaLogs ?? loadTodayQuotaLogs() });
+    scheduleAutosync();
+  }
+  if (ql.streaks) {
+    sendTo(ws, { type: "quota_streak_sync", streaks: ql.streaks });
+  }
+  if (ql.lifeActivitiesChanged) {
+    sendTo(ws, { type: "life_activity_sync", activities: loadLifeActivities() });
+    scheduleAutosync();
+  }
+  if (ql.lifeLogStarted) {
+    sendTo(ws, { type: "life_log_sync", logs: ql.todayLifeLogs ?? loadTodayLifeLogs() });
+    sendTo(ws, { type: "life_log_started", log: ql.lifeLogStarted });
+    scheduleAutosync();
+  } else if (ql.lifeLogStopped) {
+    sendTo(ws, { type: "life_log_sync", logs: ql.todayLifeLogs ?? loadTodayLifeLogs() });
+    scheduleAutosync();
+  }
 }
 
 interface ContentBlock {
@@ -121,6 +156,8 @@ export const message: Handler = async (ws, session, data) => {
   const boundaryHour = getDayBoundaryHour();
   const todayIso = todayBoundaryIsoDate(boundaryHour);
   const { startIso, endIso } = dayRangeForBoundary(todayIso, boundaryHour);
+  const quotas = loadQuotas();
+  const allQuotaLogs = loadAllQuotaLogs();
   const timelineCtx = buildTimelineContext({
     nowMs: Date.now(),
     rangeStartMs: Date.parse(startIso),
@@ -128,8 +165,9 @@ export const message: Handler = async (ws, session, data) => {
     tasks: session.kanbanTasks,
     lifeActivities: loadLifeActivities(),
     lifeLogs: loadTodayLifeLogs(todayIso),
-    quotas: loadQuotas(),
+    quotas,
     quotaLogs: loadTodayQuotaLogs(todayIso),
+    quotaStreaks: computeAllQuotaStreaks(quotas, allQuotaLogs, todayIso),
   });
 
   if (!session.client) {
