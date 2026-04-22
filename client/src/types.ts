@@ -526,7 +526,15 @@ export function streakRank(days: number): 0 | 1 | 2 | 3 | 4 {
   return 0;
 }
 
+export type WSErrorScope = "parse" | "unknown_type" | "handler";
+
 export type WSMessage =
+  | {
+      type: "error";
+      scope: WSErrorScope;
+      message: string;
+      requestType?: string;
+    }
   | { type: "stream_delta"; text: string }
   | { type: "thinking_delta"; text: string }
   | { type: "assistant"; text: string; toolCalls: unknown[] }

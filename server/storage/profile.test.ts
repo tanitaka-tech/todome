@@ -72,9 +72,9 @@ describe("applyProfileUpdate — プロフィール部分更新 (純粋関数)",
   it("currentState 以外のフィールドが変わらない", () => {
     const profile = makeProfile({
       currentState: "旧状態",
-      balanceWheel: [{ label: "健康", score: 8 }],
-      actionPrinciples: ["原則1"],
-      wantToDo: ["やりたいこと1"],
+      balanceWheel: [{ id: "h", name: "健康", score: 8 }],
+      actionPrinciples: [{ id: "p1", text: "原則1" }],
+      wantToDo: [{ id: "w1", text: "やりたいこと1" }],
     });
     const result = applyProfileUpdate(profile, { currentState: "新状態" });
     expect(result.balanceWheel).toEqual(profile.balanceWheel);
@@ -84,25 +84,37 @@ describe("applyProfileUpdate — プロフィール部分更新 (純粋関数)",
 
   it("balanceWheel を配列で更新できる", () => {
     const profile = makeProfile({ balanceWheel: [] });
-    const newWheel = [{ label: "健康", score: 7 }, { label: "仕事", score: 6 }];
+    const newWheel = [
+      { id: "h", name: "健康", score: 7 },
+      { id: "w", name: "仕事", score: 6 },
+    ];
     const result = applyProfileUpdate(profile, { balanceWheel: newWheel });
     expect(result.balanceWheel).toEqual(newWheel);
   });
 
   it("actionPrinciples を配列で更新できる", () => {
-    const profile = makeProfile({ actionPrinciples: ["旧原則"] });
-    const result = applyProfileUpdate(profile, { actionPrinciples: ["新原則1", "新原則2"] });
-    expect(result.actionPrinciples).toEqual(["新原則1", "新原則2"]);
+    const profile = makeProfile({
+      actionPrinciples: [{ id: "p0", text: "旧原則" }],
+    });
+    const newList = [
+      { id: "p1", text: "新原則1" },
+      { id: "p2", text: "新原則2" },
+    ];
+    const result = applyProfileUpdate(profile, { actionPrinciples: newList });
+    expect(result.actionPrinciples).toEqual(newList);
   });
 
   it("wantToDo を配列で更新できる", () => {
-    const profile = makeProfile({ wantToDo: ["旧やりたいこと"] });
-    const result = applyProfileUpdate(profile, { wantToDo: ["新やりたいこと"] });
-    expect(result.wantToDo).toEqual(["新やりたいこと"]);
+    const profile = makeProfile({
+      wantToDo: [{ id: "w0", text: "旧やりたいこと" }],
+    });
+    const newList = [{ id: "w1", text: "新やりたいこと" }];
+    const result = applyProfileUpdate(profile, { wantToDo: newList });
+    expect(result.wantToDo).toEqual(newList);
   });
 
   it("配列フィールドに非配列値を渡しても更新されない", () => {
-    const profile = makeProfile({ balanceWheel: [{ label: "健康", score: 8 }] });
+    const profile = makeProfile({ balanceWheel: [{ id: "h", name: "健康", score: 8 }] });
     const result = applyProfileUpdate(profile, { balanceWheel: "invalid" });
     expect(result.balanceWheel).toEqual(profile.balanceWheel);
   });
@@ -114,10 +126,13 @@ describe("applyProfileUpdate — プロフィール部分更新 (純粋関数)",
   });
 
   it("空の updates オブジェクトはプロフィールを変更しない", () => {
-    const profile = makeProfile({ currentState: "状態", actionPrinciples: ["原則"] });
+    const profile = makeProfile({
+      currentState: "状態",
+      actionPrinciples: [{ id: "p", text: "原則" }],
+    });
     const result = applyProfileUpdate(profile, {});
     expect(result.currentState).toBe("状態");
-    expect(result.actionPrinciples).toEqual(["原則"]);
+    expect(result.actionPrinciples).toEqual([{ id: "p", text: "原則" }]);
   });
 
   it("未知のキーを渡してもエラーにならない", () => {
@@ -143,9 +158,9 @@ describe("saveProfile / loadProfile — 永続化ラウンドトリップ", () =
   it("プロフィールを保存して正確に復元できる", () => {
     const profile = makeProfile({
       currentState: "集中作業中",
-      balanceWheel: [{ label: "健康", score: 7 }],
-      actionPrinciples: ["原則A"],
-      wantToDo: ["旅行"],
+      balanceWheel: [{ id: "h", name: "健康", score: 7 }],
+      actionPrinciples: [{ id: "a", text: "原則A" }],
+      wantToDo: [{ id: "t", text: "旅行" }],
     });
     saveProfile(profile);
     const loaded = loadProfile();
