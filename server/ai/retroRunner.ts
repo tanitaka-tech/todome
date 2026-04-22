@@ -55,6 +55,10 @@ function buildBaseOptions(systemPrompt: string): Options {
   };
 }
 
+// SDK サブプロセスや WS 切断で AI 応答が戻らなくなった場合でも、ハンドラが
+// finally ブロックまで必ず到達するように上限時間で強制終了する。
+const RETRO_QUERY_TIMEOUT_MS = 3 * 60 * 1000;
+
 async function runRetroQuery(
   ws: AppWebSocket,
   prompt: string,
@@ -66,6 +70,9 @@ async function runRetroQuery(
   if (thinkingBudget !== undefined) {
     baseOptions.maxThinkingTokens = thinkingBudget;
   }
+  const abort = new AbortController();
+  baseOptions.abortController = abort;
+  const timeoutHandle = setTimeout(() => abort.abort(), RETRO_QUERY_TIMEOUT_MS);
   const q = query({ prompt, options: baseOptions });
 
   const textParts: string[] = [];
@@ -96,11 +103,21 @@ async function runRetroQuery(
             textParts.push(block.text);
           }
         }
+      } else if (msg.type === "result") {
+        // one-shot クエリは result 受信時点で完了。後続イベントを待たずに抜ける。
+        break;
       }
     }
   } catch (err) {
     console.error("retro query error:", err);
     throw err;
+  } finally {
+    clearTimeout(timeoutHandle);
+    try {
+      await q.return(undefined);
+    } catch {
+      // ignore — サブプロセス終了の後処理が失敗しても応答処理は続行する
+    }
   }
   return textParts.join("").trim();
 }
