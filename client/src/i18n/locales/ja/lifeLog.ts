@@ -4,8 +4,6 @@ export const ja_lifeLog: Record<string, string> = {
   manage: "⚙編集",
   todayTotal: "今日の合計",
   noActivities: "まだ計測項目がありません。右上の「＋項目追加」から作成してください。",
-  stopConfirm: "計測中の「{{name}}」を停止して「{{next}}」を開始しますか？",
-  stopTaskConfirm: "計測中のタスクを停止して「{{next}}」を開始しますか？",
   newActivity: "新しい計測項目",
   editActivity: "計測項目を編集",
   name: "名前",

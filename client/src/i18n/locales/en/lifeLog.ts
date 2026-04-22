@@ -5,8 +5,6 @@ export const en_lifeLog: Record<string, string> = {
   todayTotal: "Today total",
   noActivities:
     "No activities yet. Use “+ Add” in the top right to create one.",
-  stopConfirm: "Stop “{{name}}” and start “{{next}}”?",
-  stopTaskConfirm: "Stop the running task and start “{{next}}”?",
   newActivity: "New activity",
   editActivity: "Edit activity",
   name: "Name",
