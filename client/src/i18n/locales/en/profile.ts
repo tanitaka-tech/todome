@@ -3,7 +3,7 @@ export const en_profile: Record<string, string> = {
   pageSubtitle: "Used as context by the AI assistant",
   currentStateTitle: "Current state",
   currentStatePlaceholder:
-    "e.g. I'm a Unity engineer making games on the side, but perfectionism keeps slowing me down",
+    "e.g. Work keeps me busy and I struggle to find time for what I really want to do, even though the motivation is there",
   balanceWheelTitle: "Balance wheel",
   balanceWheelCategoriesSub: "{{count}} categories",
   balanceWheelDesc:
@@ -18,10 +18,10 @@ export const en_profile: Record<string, string> = {
   addCategoryPlaceholder: "Enter category name...",
   addCategorySubmit: "Add",
   principlesTitle: "Guiding principles",
-  principlePlaceholder: "e.g. Always focus on what I can do right now",
+  principlePlaceholder: "e.g. Done is better than perfect — start small and build momentum",
   principleAdd: "+ Add principle",
   wantToDoTitle: "Things I want to do",
-  wantToDoPlaceholder: "e.g. Ship a game with Godot",
+  wantToDoPlaceholder: "e.g. Build and launch my own product",
   wantToDoAdd: "+ Add item",
   defaultCatHobby: "Hobbies",
   defaultCatRelationships: "Relationships",

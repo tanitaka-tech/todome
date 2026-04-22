@@ -209,6 +209,10 @@ export interface CommitDiffSummary {
   tasks: DiffCounts;
   goals: DiffCounts;
   retros: DiffCounts;
+  lifeActivities: DiffCounts;
+  lifeLogs: DiffCounts;
+  quotas: DiffCounts;
+  quotaLogs: DiffCounts;
   profileChanged: boolean;
 }
 
@@ -227,6 +231,10 @@ export interface CommitDiffDetails {
   tasks: DiffSection;
   goals: DiffSection;
   retros: DiffSection;
+  lifeActivities: DiffSection;
+  lifeLogs: DiffSection;
+  quotas: DiffSection;
+  quotaLogs: DiffSection;
   profileChanged: boolean;
 }
 

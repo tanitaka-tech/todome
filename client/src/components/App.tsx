@@ -541,6 +541,19 @@ export function App() {
     return () => clearTimeout(id);
   }, [connected]);
 
+  // 切断中はサーバ側の retro 処理結果 (retro_completed / retro_session_waiting) が
+  // 旧セッションに届くだけで現クライアントには戻らない。waiting を解放しないと
+  // 完了ボタン押下後にスピナーが張り付いたままになるため、切断時点で巻き戻す。
+  // setTimeout 経由にしているのは react-hooks/set-state-in-effect 回避のため。
+  useEffect(() => {
+    if (connected) return;
+    const id = setTimeout(() => {
+      setRetroWaiting(false);
+      setRetroStreamText("");
+    }, 0);
+    return () => clearTimeout(id);
+  }, [connected]);
+
   const handleSendMessage = useCallback(
     (text: string) => {
       if (!connected) return;

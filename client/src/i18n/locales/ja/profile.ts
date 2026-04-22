@@ -3,7 +3,7 @@ export const ja_profile: Record<string, string> = {
   pageSubtitle: "AIアシスタントのコンテキストとして使われます",
   currentStateTitle: "現在の自分の状態",
   currentStatePlaceholder:
-    "例: Unityエンジニアで、個人でもゲームを作っているが完璧主義でなかなか進まない",
+    "例: 本業が忙しく、やりたいことに時間を割けていない。モチベーションはあるが行動できていない",
   balanceWheelTitle: "バランスホイール",
   balanceWheelCategoriesSub: "{{count}} categories",
   balanceWheelDesc:
@@ -18,10 +18,10 @@ export const ja_profile: Record<string, string> = {
   addCategoryPlaceholder: "カテゴリ名を入力...",
   addCategorySubmit: "追加",
   principlesTitle: "心がけたい行動指針",
-  principlePlaceholder: "例: 常に「今やれること」に集中する",
+  principlePlaceholder: "例: 完璧を求めすぎず、小さく始めて積み重ねる",
   principleAdd: "+ 行動指針を追加",
   wantToDoTitle: "やりたいこと",
-  wantToDoPlaceholder: "例: Godotで作品を作る",
+  wantToDoPlaceholder: "例: 自分のプロダクトをリリースする",
   wantToDoAdd: "+ やりたいことを追加",
   defaultCatHobby: "趣味",
   defaultCatRelationships: "人間関係",
