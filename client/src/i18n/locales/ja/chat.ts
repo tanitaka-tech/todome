@@ -13,6 +13,8 @@ export const ja_chat: Record<string, string> = {
   suggestionProfile: "自己紹介するので、プロフィールに整理して登録して",
   suggestionGoal: "達成したいことを話すので、目標とKPIに落とし込んで",
   suggestionToday: "プロフィールと目標を踏まえて、今日やるべきタスクを提案して",
+  suggestionSchedule: "今日のタイムスケジュールを評価して",
+  suggestionRetro: "今週を振り返って、次の一週間の方針を決めて",
 
   // Tool event
   showDetails: "詳細を表示",

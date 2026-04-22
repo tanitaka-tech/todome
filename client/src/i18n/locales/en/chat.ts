@@ -13,6 +13,8 @@ export const en_chat: Record<string, string> = {
   suggestionProfile: "I'll introduce myself — organize it into my profile",
   suggestionGoal: "I'll share what I want to achieve — turn it into goals and KPIs",
   suggestionToday: "Suggest tasks for today based on my profile and goals",
+  suggestionSchedule: "Evaluate today's time schedule",
+  suggestionRetro: "Reflect on this week and plan next week's direction",
 
   // Tool event
   showDetails: "Show details",
