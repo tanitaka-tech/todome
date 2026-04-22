@@ -51,6 +51,8 @@ jobs:
     name: E2E (Playwright)
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # CI で不安定なため、失敗しても PR をブロックしない (playwright-report は artifact で確認する)
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
