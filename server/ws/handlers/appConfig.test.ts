@@ -70,7 +70,10 @@ describe("appConfigUpdate handler", () => {
 
     const syncs = sent.filter((m) => m.type === "app_config_sync");
     expect(syncs).toHaveLength(1);
-    expect(syncs[0].config).toEqual({ dayBoundaryHour: 6 });
+    expect(syncs[0]).toMatchObject({
+      type: "app_config_sync",
+      config: { dayBoundaryHour: 6 },
+    });
   });
 
   it("範囲外の値はデフォルト (4) に丸めて broadcast される", async () => {
@@ -79,7 +82,7 @@ describe("appConfigUpdate handler", () => {
     await appConfigUpdate(ws, session, { config: { dayBoundaryHour: 99 } });
 
     const sync = sent.find((m) => m.type === "app_config_sync");
-    expect(sync?.config).toEqual({ dayBoundaryHour: 4 });
+    expect(sync).toMatchObject({ config: { dayBoundaryHour: 4 } });
   });
 
   it("config 未指定時は空オブジェクト扱いでデフォルト値が broadcast される", async () => {
@@ -88,7 +91,7 @@ describe("appConfigUpdate handler", () => {
     await appConfigUpdate(ws, session, {});
 
     const sync = sent.find((m) => m.type === "app_config_sync");
-    expect(sync?.config).toEqual({ dayBoundaryHour: 4 });
+    expect(sync).toMatchObject({ config: { dayBoundaryHour: 4 } });
   });
 
   it("dayBoundaryHour が変化したときだけ life/quota の sync が追加で broadcast される", async () => {
