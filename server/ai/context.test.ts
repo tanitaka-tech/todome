@@ -171,10 +171,10 @@ describe("buildTimelineContext", () => {
       quotas,
       quotaLogs: logs,
     });
-    expect(out).toContain("【ノルマ達成状況 (今日)】");
-    expect(out).toContain("🧹 掃除: 20分 / 15分 ✓達成");
-    expect(out).toContain("🏃 運動: 10分 / 30分");
-    expect(out).not.toContain("🏃 運動: 10分 / 30分 ✓達成");
+    expect(out).toContain("【ノルマ一覧と今日の達成状況】");
+    expect(out).toContain("🧹 掃除 (id: q1): 目標15分 → 今日20分 ✓達成");
+    expect(out).toContain("🏃 運動 (id: q2): 目標30分 → 今日10分");
+    expect(out).not.toContain("🏃 運動 (id: q2): 目標30分 → 今日10分 ✓達成");
   });
 
   it("範囲外のログは除外される", () => {

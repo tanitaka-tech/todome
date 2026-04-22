@@ -24,25 +24,45 @@ export function loadSessionState(session: SessionState): void {
   session.profile = loadProfile();
 }
 
+// 初期同期は複数ストレージ / 外部コマンドを直列に叩くため、いずれか 1 段が
+// throw すると以降が全部送られずクライアントが partial state に陥る。各段を
+// 独立にして失敗段のみエラー通知にすり替え、残りの同期は続行する。
 export async function sendInitialState(
   ws: AppWebSocket,
   session: SessionState
 ): Promise<void> {
-  sendTo(ws, { type: "kanban_sync", tasks: session.kanbanTasks });
-  sendTo(ws, { type: "goal_sync", goals: session.goals });
-  sendTo(ws, { type: "profile_sync", profile: session.profile });
-  sendTo(ws, { type: "retro_list_sync", retros: loadRetros() });
-  sendTo(ws, { type: "ai_config_sync", config: loadAIConfig() });
-  sendTo(ws, { type: "app_config_sync", config: loadAppConfig() });
-  sendTo(ws, { type: "life_activity_sync", activities: loadLifeActivities() });
-  sendTo(ws, { type: "life_log_sync", logs: loadTodayLifeLogs() });
-  const quotas = loadQuotas();
-  const allQuotaLogs = loadAllQuotaLogs();
-  sendTo(ws, { type: "quota_sync", quotas });
-  sendTo(ws, { type: "quota_log_sync", logs: loadTodayQuotaLogs() });
-  sendTo(ws, {
-    type: "quota_streak_sync",
-    streaks: computeAllQuotaStreaks(quotas, allQuotaLogs),
-  });
-  sendTo(ws, await buildGitHubStatus());
+  const steps: Array<readonly [string, () => unknown]> = [
+    ["kanban", () => ({ type: "kanban_sync", tasks: session.kanbanTasks })],
+    ["goal", () => ({ type: "goal_sync", goals: session.goals })],
+    ["profile", () => ({ type: "profile_sync", profile: session.profile })],
+    ["retro", () => ({ type: "retro_list_sync", retros: loadRetros() })],
+    ["ai_config", () => ({ type: "ai_config_sync", config: loadAIConfig() })],
+    ["app_config", () => ({ type: "app_config_sync", config: loadAppConfig() })],
+    ["life_activity", () => ({ type: "life_activity_sync", activities: loadLifeActivities() })],
+    ["life_log", () => ({ type: "life_log_sync", logs: loadTodayLifeLogs() })],
+    ["quota", () => {
+      const quotas = loadQuotas();
+      return { type: "quota_sync", quotas };
+    }],
+    ["quota_log", () => ({ type: "quota_log_sync", logs: loadTodayQuotaLogs() })],
+    ["quota_streak", () => ({
+      type: "quota_streak_sync",
+      streaks: computeAllQuotaStreaks(loadQuotas(), loadAllQuotaLogs()),
+    })],
+    ["github_status", async () => await buildGitHubStatus()],
+  ];
+
+  for (const [name, produce] of steps) {
+    try {
+      sendTo(ws, await produce());
+    } catch (err) {
+      console.error(`[ws] initial state step "${name}" failed:`, err);
+      sendTo(ws, {
+        type: "error",
+        scope: "initial_state",
+        requestType: name,
+        message: err instanceof Error ? err.message : "internal error",
+      });
+    }
+  }
 }
