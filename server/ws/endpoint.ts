@@ -14,14 +14,12 @@ import { sendTo } from "./broadcast.ts";
 import { MESSAGE_HANDLERS } from "./dispatch.ts";
 import { loadSessionState, sendInitialState } from "./initialState.ts";
 
+// Error.message のみを返す。任意 throw されたオブジェクトを JSON.stringify すると
+// 内部プロパティがそのままクライアントへ漏れるため、非 Error は固定文字列で塞ぐ。
 function errorMessage(err: unknown): string {
   if (err instanceof Error) return err.message;
   if (typeof err === "string") return err;
-  try {
-    return JSON.stringify(err);
-  } catch {
-    return String(err);
-  }
+  return "internal error";
 }
 
 export const wsHandlers = {

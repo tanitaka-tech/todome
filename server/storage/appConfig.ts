@@ -54,3 +54,7 @@ export function saveAppConfig(partial: unknown): AppConfig {
 export function getDayBoundaryHour(): number {
   return loadAppConfig().dayBoundaryHour;
 }
+
+export function resetAppConfigCache(): void {
+  cache = null;
+}

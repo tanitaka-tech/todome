@@ -526,7 +526,7 @@ export function streakRank(days: number): 0 | 1 | 2 | 3 | 4 {
   return 0;
 }
 
-export type WSErrorScope = "parse" | "unknown_type" | "handler";
+export type WSErrorScope = "parse" | "unknown_type" | "handler" | "initial_state";
 
 export type WSMessage =
   | {
