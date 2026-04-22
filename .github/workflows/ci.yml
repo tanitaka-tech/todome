@@ -46,3 +46,48 @@ jobs:
         run: npm run lint
       - name: Unit test (client)
         run: npm test
+
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # CI で不安定なため、失敗しても PR をブロックしない (playwright-report は artifact で確認する)
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            client/package-lock.json
+            e2e/package-lock.json
+      - name: Install server deps
+        run: bun install --frozen-lockfile
+      - name: Install client deps
+        run: npm ci
+        working-directory: client
+      - name: Build client
+        run: npm run build
+        working-directory: client
+      - name: Install e2e deps
+        run: npm install
+        working-directory: e2e
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+        working-directory: e2e
+      - name: Run Playwright tests
+        run: npx playwright test
+        working-directory: e2e
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            e2e/playwright-report
+            e2e/test-results
+          retention-days: 7
