@@ -1,6 +1,10 @@
 import type { Options } from "@anthropic-ai/claude-agent-sdk";
 import { PROJECT_ROOT } from "../../config.ts";
-import { buildBoardContext, buildProfileContext } from "../../ai/context.ts";
+import {
+  buildBoardContext,
+  buildProfileContext,
+  buildTimelineContext,
+} from "../../ai/context.ts";
 import { buildSystemPromptAppend } from "../../ai/systemPrompt.ts";
 import { processTodos } from "../../ai/processTodos.ts";
 import { handleAskUserViaWS } from "../../ai/askUser.ts";
@@ -17,10 +21,18 @@ import {
   resolveThinkingBudget,
 } from "../../storage/aiConfig.ts";
 import { getDayBoundaryHour } from "../../storage/appConfig.ts";
-import { todayBoundaryIsoDate } from "../../utils/dayBoundary.ts";
+import {
+  dayRangeForBoundary,
+  todayBoundaryIsoDate,
+} from "../../utils/dayBoundary.ts";
 import { loadGoals, saveGoals } from "../../storage/goals.ts";
 import { loadTasks, saveTasks } from "../../storage/kanban.ts";
+import {
+  loadLifeActivities,
+  loadTodayLifeLogs,
+} from "../../storage/life.ts";
 import { loadProfile, saveProfile } from "../../storage/profile.ts";
+import { loadQuotas, loadTodayQuotaLogs } from "../../storage/quota.ts";
 import type { AppWebSocket, SessionState } from "../../state.ts";
 import { sendTo } from "../broadcast.ts";
 import type { Handler } from "../dispatch.ts";
@@ -106,17 +118,32 @@ export const message: Handler = async (ws, session, data) => {
   const boardCtx = buildBoardContext(session.kanbanTasks, session.goals);
   const profileCtx = buildProfileContext(session.profile);
 
+  const boundaryHour = getDayBoundaryHour();
+  const todayIso = todayBoundaryIsoDate(boundaryHour);
+  const { startIso, endIso } = dayRangeForBoundary(todayIso, boundaryHour);
+  const timelineCtx = buildTimelineContext({
+    nowMs: Date.now(),
+    rangeStartMs: Date.parse(startIso),
+    rangeEndMs: Date.parse(endIso),
+    tasks: session.kanbanTasks,
+    lifeActivities: loadLifeActivities(),
+    lifeLogs: loadTodayLifeLogs(todayIso),
+    quotas: loadQuotas(),
+    quotaLogs: loadTodayQuotaLogs(todayIso),
+  });
+
   if (!session.client) {
     const promptAppend = buildSystemPromptAppend(
-      todayBoundaryIsoDate(getDayBoundaryHour()),
+      todayIso,
       profileCtx,
       boardCtx,
+      timelineCtx,
     );
     session.client = createAIClient(buildOptions(ws, promptAppend));
   }
   const client = session.client as AIClient;
 
-  const fullMsg = `${userText}\n\n---\n${profileCtx}\n\n${boardCtx}`;
+  const fullMsg = `${userText}\n\n---\n${profileCtx}\n\n${boardCtx}\n\n${timelineCtx}`;
   client.queue.push(makeUserMessage(fullMsg, client.sessionId));
 
   session.cancelRequested = false;

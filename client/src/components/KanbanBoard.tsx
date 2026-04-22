@@ -554,7 +554,7 @@ export function KanbanBoard({
           >
             <option value="">{t("filterAll")}</option>
             <option value={GOAL_FILTER_NONE}>{t("filterNoGoal")}</option>
-            {goals.map((g) => (
+            {goals.filter((g) => !g.achieved).map((g) => (
               <option key={g.id} value={g.id}>
                 {g.name}
               </option>
