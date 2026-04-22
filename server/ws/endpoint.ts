@@ -10,8 +10,19 @@ import {
 import { loadGoals } from "../storage/goals.ts";
 import { loadTasks } from "../storage/kanban.ts";
 import { loadProfile } from "../storage/profile.ts";
+import { sendTo } from "./broadcast.ts";
 import { MESSAGE_HANDLERS } from "./dispatch.ts";
 import { loadSessionState, sendInitialState } from "./initialState.ts";
+
+function errorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (typeof err === "string") return err;
+  try {
+    return JSON.stringify(err);
+  } catch {
+    return String(err);
+  }
+}
 
 export const wsHandlers = {
   async open(ws: AppWebSocket) {
@@ -25,7 +36,13 @@ export const wsHandlers = {
     try {
       const text = typeof raw === "string" ? raw : raw.toString("utf8");
       data = JSON.parse(text) as Record<string, unknown>;
-    } catch {
+    } catch (err) {
+      console.error("[ws] malformed JSON:", err);
+      sendTo(ws, {
+        type: "error",
+        scope: "parse",
+        message: "受信メッセージの JSON パースに失敗しました",
+      });
       return;
     }
     if (wsNeedsReload.has(ws)) {
@@ -58,12 +75,24 @@ export const wsHandlers = {
     const handler = MESSAGE_HANDLERS.get(type);
     if (!handler) {
       console.warn(`[ws] unknown message type: ${type}`);
+      sendTo(ws, {
+        type: "error",
+        scope: "unknown_type",
+        requestType: type,
+        message: `未知のメッセージ種別: ${type || "(empty)"}`,
+      });
       return;
     }
     try {
       await handler(ws, ws.data.session, data);
     } catch (err) {
       console.error(`[ws] handler ${type} failed:`, err);
+      sendTo(ws, {
+        type: "error",
+        scope: "handler",
+        requestType: type,
+        message: errorMessage(err),
+      });
     }
   },
 
