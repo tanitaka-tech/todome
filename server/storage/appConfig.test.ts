@@ -1,9 +1,5 @@
-// NOTE: Bun は ES モジュールの import を巻き上げるため、この .test.ts の top-level で
-// TODOME_DATA_DIR を設定しても config.ts の DATA_DIR は import 時点で解決済み。したがって
-// APP_CONFIG_PATH は実データパスを指すため、テスト開始時に元の内容を退避し、終了時に
-// 復元する。既存データを巻き込まない防御策。
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
-import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { afterAll, afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { existsSync, unlinkSync, writeFileSync } from "node:fs";
 import { APP_CONFIG_PATH } from "../config.ts";
 import {
   getDayBoundaryHour,
@@ -12,14 +8,6 @@ import {
   resetAppConfigCache,
   saveAppConfig,
 } from "./appConfig.ts";
-
-let originalContent: string | null = null;
-
-beforeAll(() => {
-  originalContent = existsSync(APP_CONFIG_PATH)
-    ? readFileSync(APP_CONFIG_PATH, "utf8")
-    : null;
-});
 
 beforeEach(() => {
   resetAppConfigCache();
@@ -32,11 +20,6 @@ afterEach(() => {
 
 afterAll(() => {
   resetAppConfigCache();
-  if (originalContent !== null) {
-    writeFileSync(APP_CONFIG_PATH, originalContent);
-  } else if (existsSync(APP_CONFIG_PATH)) {
-    unlinkSync(APP_CONFIG_PATH);
-  }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -1,13 +1,4 @@
-// config.ts は読み込み時点で DATA_DIR を固定するため、server コードを import する前に
-// テスト用ディレクトリを環境変数で指すようにする。
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-
-const TEST_DATA_DIR = mkdtempSync(join(tmpdir(), "todome-retro-test-"));
-process.env.TODOME_DATA_DIR = TEST_DATA_DIR;
-
-import { afterAll, afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { getDb, resetDbCache } from "../db.ts";
 import type { Retrospective } from "../types.ts";
 
@@ -21,9 +12,6 @@ afterEach(() => {
   resetDbCache();
 });
 
-afterAll(() => {
-  rmSync(TEST_DATA_DIR, { recursive: true, force: true });
-});
 
 function makeRetro(partial: Partial<Retrospective> & Pick<Retrospective, "id">): Retrospective {
   return {
