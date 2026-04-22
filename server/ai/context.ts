@@ -5,6 +5,7 @@ import type {
   LifeLog,
   Quota,
   QuotaLog,
+  QuotaStreak,
   UserProfile,
 } from "../types.ts";
 
@@ -104,6 +105,7 @@ export interface TimelineContextInput {
   lifeLogs: LifeLog[];
   quotas: Quota[];
   quotaLogs: QuotaLog[];
+  quotaStreaks?: QuotaStreak[];
 }
 
 interface TimelineEntry {
@@ -131,6 +133,18 @@ function overlaps(start: number, end: number, rangeStart: number, rangeEnd: numb
   return end > rangeStart && start < rangeEnd;
 }
 
+const LIFE_CATEGORY_LABELS: Record<string, string> = {
+  rest: "休息",
+  play: "娯楽",
+  routine: "日常",
+  other: "その他",
+};
+
+const LIFE_SCOPE_LABELS: Record<string, string> = {
+  per_session: "セッションあたり",
+  per_day: "1日あたり",
+};
+
 export function buildTimelineContext(input: TimelineContextInput): string {
   const {
     nowMs,
@@ -141,6 +155,7 @@ export function buildTimelineContext(input: TimelineContextInput): string {
     lifeLogs,
     quotas,
     quotaLogs,
+    quotaStreaks,
   } = input;
 
   const entries: TimelineEntry[] = [];
@@ -243,13 +258,41 @@ export function buildTimelineContext(input: TimelineContextInput): string {
       if (ee <= ss) continue;
       doneByQuota.set(log.quotaId, (doneByQuota.get(log.quotaId) ?? 0) + (ee - ss) / 1000);
     }
-    lines.push("\n【ノルマ達成状況 (今日)】");
+    const streakMap = new Map((quotaStreaks ?? []).map((s) => [s.quotaId, s]));
+    lines.push("\n【ノルマ一覧と今日の達成状況】");
     for (const quota of activeQuotas) {
       const doneSec = doneByQuota.get(quota.id) ?? 0;
       const targetSec = quota.targetMinutes * 60;
       const achieved = targetSec > 0 && doneSec >= targetSec ? " ✓達成" : "";
+      const streak = streakMap.get(quota.id);
+      const streakNote = streak
+        ? `  連続${streak.current}日・最高${streak.best}日`
+        : "";
       lines.push(
-        `  - ${quota.icon} ${quota.name}: ${formatMinutes(doneSec)} / ${quota.targetMinutes}分${achieved}`
+        `  - ${quota.icon} ${quota.name} (id: ${quota.id}): 目標${quota.targetMinutes}分 → 今日${formatMinutes(doneSec)}${achieved}${streakNote}`
+      );
+    }
+  }
+
+  const activeLifeActivities = lifeActivities.filter((a) => !a.archived);
+  if (activeLifeActivities.length) {
+    const lifeTotals = new Map<string, number>();
+    for (const log of lifeLogs) {
+      const s = Date.parse(log.startedAt);
+      const e = log.endedAt ? Date.parse(log.endedAt) : nowMs;
+      if (Number.isNaN(s) || Number.isNaN(e)) continue;
+      const ss = Math.max(s, rangeStartMs);
+      const ee = Math.min(e, rangeEndMs);
+      if (ee <= ss) continue;
+      lifeTotals.set(log.activityId, (lifeTotals.get(log.activityId) ?? 0) + (ee - ss) / 1000);
+    }
+    lines.push("\n【タイムボックス設定と今日の使用状況】");
+    for (const activity of activeLifeActivities) {
+      const totalSec = lifeTotals.get(activity.id) ?? 0;
+      const catLabel = LIFE_CATEGORY_LABELS[activity.category] ?? activity.category;
+      const scopeLabel = LIFE_SCOPE_LABELS[activity.limitScope] ?? activity.limitScope;
+      lines.push(
+        `  - ${activity.icon} ${activity.name} (id: ${activity.id}) [${catLabel}]: ソフト${activity.softLimitMinutes}分・ハード${activity.hardLimitMinutes}分 (${scopeLabel})  今日${formatMinutes(totalSec)}`
       );
     }
   }
