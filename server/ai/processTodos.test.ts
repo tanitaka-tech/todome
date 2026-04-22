@@ -1,19 +1,7 @@
-// config.ts は読み込み時点で DATA_DIR を固定するため、server コードを import する前に
-// テスト用ディレクトリを環境変数で指すようにする。
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-
-const TEST_DATA_DIR = mkdtempSync(join(tmpdir(), "todome-processTodos-test-"));
-process.env.TODOME_DATA_DIR = TEST_DATA_DIR;
-
-import { afterAll, describe, expect, it } from "bun:test";
+import { describe, expect, it } from "bun:test";
 import type { Goal, KanbanTask, UserProfile } from "../types.ts";
 import { processTodos } from "./processTodos.ts";
 
-afterAll(() => {
-  rmSync(TEST_DATA_DIR, { recursive: true, force: true });
-});
 
 function makeTask(partial: Partial<KanbanTask> & Pick<KanbanTask, "id" | "title">): KanbanTask {
   return {

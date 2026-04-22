@@ -1,12 +1,3 @@
-// config.ts は読み込み時点で DATA_DIR を固定するため、server コードを import する前に
-// テスト用ディレクトリを環境変数で指すようにする。
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-
-const TEST_DATA_DIR = mkdtempSync(join(tmpdir(), "todome-endpoint-test-"));
-process.env.TODOME_DATA_DIR = TEST_DATA_DIR;
-
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { resetDbCache } from "../db.ts";
 import { createSessionState, type AppWebSocket } from "../state.ts";
@@ -43,7 +34,6 @@ describe("wsHandlers.message error propagation", () => {
 
   afterAll(() => {
     resetDbCache();
-    rmSync(TEST_DATA_DIR, { recursive: true, force: true });
   });
 
   it("ハンドラ例外時に error メッセージを WS へ返す", async () => {
