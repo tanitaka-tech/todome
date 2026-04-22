@@ -7,6 +7,7 @@ __pycache__/
 # Env
 .env
 .env.*
+!.env.example
 
 # Local data (DB) and GitHub sync state
 data/todome.db
