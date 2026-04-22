@@ -102,6 +102,26 @@ describe("wsHandlers.message error propagation", () => {
     expect(sent).toHaveLength(0);
   });
 
+  it("非 Error オブジェクトが throw されてもプロパティを外部漏洩しない", async () => {
+    // ハンドラが { secret, message } のような任意オブジェクトを throw した場合、
+    // JSON.stringify されてクライアントに全プロパティが返る挙動を避けたい。
+    registerHandler("leaky", async () => {
+      throw { secret: "DO_NOT_LEAK", message: "look here" };
+    });
+    const { ws, sent } = makeFakeWs();
+
+    await wsHandlers.message(ws, JSON.stringify({ type: "leaky" }));
+
+    expect(sent).toHaveLength(1);
+    const serialized = JSON.stringify(sent[0]);
+    expect(serialized).not.toContain("DO_NOT_LEAK");
+    expect(sent[0]).toMatchObject({
+      type: "error",
+      scope: "handler",
+      requestType: "leaky",
+    });
+  });
+
   it("正常ハンドラの場合は error を返さない", async () => {
     let called = false;
     registerHandler("ok", async () => {
