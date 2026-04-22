@@ -47,7 +47,15 @@ function formatFull(iso: string | null, t: TFn): string {
 }
 
 function hasAnyChangeInDetails(details: CommitDiffDetails): boolean {
-  const sections = [details.tasks, details.goals, details.retros];
+  const sections = [
+    details.tasks,
+    details.goals,
+    details.retros,
+    details.lifeActivities,
+    details.lifeLogs,
+    details.quotas,
+    details.quotaLogs,
+  ];
   for (const s of sections) {
     if (s.added.length || s.removed.length || s.modified.length) return true;
   }
@@ -312,6 +320,22 @@ export function GitHubSyncTab({
                   {renderSection(t("sectionTasks"), hoveredDiff.details.tasks, t)}
                   {renderSection(t("sectionGoals"), hoveredDiff.details.goals, t)}
                   {renderSection(t("sectionRetros"), hoveredDiff.details.retros, t)}
+                  {renderSection(
+                    t("sectionLifeActivities"),
+                    hoveredDiff.details.lifeActivities,
+                    t,
+                  )}
+                  {renderSection(
+                    t("sectionLifeLogs"),
+                    hoveredDiff.details.lifeLogs,
+                    t,
+                  )}
+                  {renderSection(t("sectionQuotas"), hoveredDiff.details.quotas, t)}
+                  {renderSection(
+                    t("sectionQuotaLogs"),
+                    hoveredDiff.details.quotaLogs,
+                    t,
+                  )}
                   {hoveredDiff.details.profileChanged && (
                     <div className="sidebar-github-commit-tip-section">
                       <div className="sidebar-github-commit-tip-section-title">
