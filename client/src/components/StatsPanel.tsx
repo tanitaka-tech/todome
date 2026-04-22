@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useTick } from "../hooks/useTick";
 import type { Goal, KanbanTask, TimeLog } from "../types";
 import { formatDuration } from "../types";
 
 interface Props {
   tasks: KanbanTask[];
   goals: Goal[];
-  tick: number;
 }
 
 type Period = "day" | "month" | "year";
@@ -265,8 +265,9 @@ function BarChart({
   );
 }
 
-export function StatsPanel({ tasks, goals, tick: _tick }: Props) {
+export function StatsPanel({ tasks, goals }: Props) {
   const { t } = useTranslation("stats");
+  useTick();
   const [period, setPeriod] = useState<Period>("day");
   const noGoalLabel = t("noGoalLabel");
   const unknownGoalLabel = t("unknownGoalLabel");

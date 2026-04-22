@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useTick } from "../hooks/useTick";
 import { useTranslation } from "react-i18next";
 import type { KanbanTask, LifeActivity, LifeLog } from "../types";
 import {
@@ -15,7 +16,6 @@ interface Props {
   activities: LifeActivity[];
   logs: LifeLog[];
   tasks: KanbanTask[];
-  tick: number;
   send: (data: unknown) => void;
   onStopTaskTimer: (taskId: string) => void;
   dayBoundaryHour: number;
@@ -25,12 +25,12 @@ export function LifeLogSection({
   activities,
   logs,
   tasks,
-  tick,
   send,
   onStopTaskTimer,
   dayBoundaryHour,
 }: Props) {
   const { t } = useTranslation("lifeLog");
+  const tick = useTick();
   const [editorActivity, setEditorActivity] = useState<
     LifeActivity | "new" | null
   >(null);

@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { useTick } from "../hooks/useTick";
 import type { Quota, QuotaLog } from "../types";
 import {
   formatDuration,
@@ -12,7 +13,6 @@ interface Props {
   quota: Quota;
   log: QuotaLog;
   allLogs: QuotaLog[];
-  tick: number;
   dayBoundaryHour: number;
   onStop: () => void;
   onClose: () => void;
@@ -22,12 +22,12 @@ export function QuotaTimer({
   quota,
   log,
   allLogs,
-  tick: _tick,
   dayBoundaryHour,
   onStop,
   onClose,
 }: Props) {
   const { t } = useTranslation("quota");
+  useTick();
   const elapsed = quotaLogDurationSeconds(log);
   const todayTotal = quotaTodayTotalSeconds(quota.id, allLogs, dayBoundaryHour);
   const achieved = quotaIsAchieved(quota, todayTotal);

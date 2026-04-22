@@ -167,7 +167,6 @@ export function App() {
   const [waiting, setWaiting] = useState(false);
   const [selectedTask, setSelectedTask] = useState<KanbanTask | null>(null);
   const [activeView, setActiveView] = useState<ActiveView>("overview");
-  const [tick, setTick] = useState(0);
   const [popupTaskId, setPopupTaskIdState] = useState<string | null>(() =>
     loadPopupTaskId(),
   );
@@ -262,11 +261,6 @@ export function App() {
   useEffect(() => {
     applyLanguage(language);
   }, [language]);
-
-  useEffect(() => {
-    const id = setInterval(() => setTick((t) => t + 1), 1000);
-    return () => clearInterval(id);
-  }, []);
 
   const showCelebration = useCallback((title: string, timeSpent: number) => {
     const id = ++celebrationId;
@@ -1105,8 +1099,7 @@ export function App() {
     const found = tasks.find((t) => t.id === popupTaskId);
     if (!found || found.column === "done") return undefined;
     return found;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [popupTaskId, tasks, tick]);
+  }, [popupTaskId, tasks]);
 
   const activeLifeLog = useMemo(
     () => lifeLogs.find((l) => isLifeLogActive(l)) ?? null,
@@ -1281,7 +1274,6 @@ export function App() {
           {githubStatus?.authOk && githubStatus?.linked && (
             <GitHubSyncTab
               status={githubStatus}
-              tick={tick}
               commits={githubCommits}
               commitDiffs={commitDiffs}
               onSyncNow={handleSyncNow}
@@ -1339,7 +1331,6 @@ export function App() {
           <OverviewPanel
             tasks={tasks}
             goals={goals}
-            tick={tick}
             onOpenBoard={() => setActiveView("board")}
             onCardClick={setSelectedTask}
             lifeActivities={lifeActivities}
@@ -1357,7 +1348,6 @@ export function App() {
             onCardClick={setSelectedTask}
             onTimerToggle={handleTimerToggle}
             onMoveColumn={handleMoveColumn}
-            tick={tick}
             goalFilter={boardGoalFilter}
             setGoalFilter={setBoardGoalFilter}
             recentDays={boardRecentDays}
@@ -1407,7 +1397,7 @@ export function App() {
             onEditSleep={handleRetroEditSleep}
           />
         ) : activeView === "stats" ? (
-          <StatsPanel tasks={tasks} goals={goals} tick={tick} />
+          <StatsPanel tasks={tasks} goals={goals} />
         ) : activeView === "profile" ? (
           <ProfilePanel profile={profile} setProfile={setProfile} send={send} />
         ) : (
@@ -1535,7 +1525,6 @@ export function App() {
         <LifeLogTimer
           activity={activeLifeActivity}
           log={activeLifeLog}
-          tick={tick}
           onStop={handleLifeLogStop}
           onClose={() => setLifeLogPopupDismissedId(activeLifeLog.id)}
         />
@@ -1546,7 +1535,6 @@ export function App() {
           quota={activeQuota}
           log={activeQuotaLog}
           allLogs={quotaLogs}
-          tick={tick}
           dayBoundaryHour={dayBoundaryHour}
           onStop={handleQuotaLogStop}
           onClose={() => setQuotaLogPopupDismissedId(activeQuotaLog.id)}

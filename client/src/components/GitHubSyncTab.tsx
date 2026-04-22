@@ -11,7 +11,6 @@ import type {
 
 interface Props {
   status: GitHubStatus;
-  tick: number;
   commits: GitCommit[];
   commitDiffs: Record<string, CommitDiffEntry>;
   onSyncNow: () => void;
@@ -109,7 +108,6 @@ function renderSection(
 
 export function GitHubSyncTab({
   status,
-  tick,
   commits,
   commitDiffs,
   onSyncNow,
@@ -119,7 +117,6 @@ export function GitHubSyncTab({
   onRestoreCommit,
 }: Props) {
   const { t } = useTranslation("github");
-  void tick;
   const [open, setOpen] = useState(false);
   const [anchor, setAnchor] = useState<{ bottom: number; left: number } | null>(
     null,

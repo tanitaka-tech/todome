@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useTick } from "../hooks/useTick";
 import { useTranslation } from "react-i18next";
 import { formatDate, formatDateTime } from "../i18n/format";
 import type {
@@ -20,7 +21,6 @@ import { TimelineBar } from "./TimelineBar";
 interface Props {
   tasks: KanbanTask[];
   goals: Goal[];
-  tick: number;
   onOpenBoard: () => void;
   onCardClick: (task: KanbanTask) => void;
   lifeActivities: LifeActivity[];
@@ -194,7 +194,6 @@ function computeWeeklyAvgRatio(
 export function OverviewPanel({
   tasks,
   goals,
-  tick: _tick,
   onOpenBoard,
   onCardClick,
   lifeActivities,
@@ -204,6 +203,7 @@ export function OverviewPanel({
   dayBoundaryHour,
 }: Props) {
   const { t } = useTranslation("overview");
+  const _tick = useTick();
   const [timelineOrientation, setTimelineOrientation] = useState<
     "vertical" | "horizontal"
   >(() => {

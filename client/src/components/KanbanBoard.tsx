@@ -29,7 +29,6 @@ interface Props {
   onCardClick: (task: KanbanTask) => void;
   onTimerToggle: (taskId: string) => void;
   onMoveColumn: (taskId: string, column: string) => void;
-  tick: number;
   goalFilter: string;
   setGoalFilter: (value: string) => void;
   recentDays: number;
@@ -69,7 +68,6 @@ export function KanbanBoard({
   onCardClick,
   onTimerToggle,
   onMoveColumn,
-  tick,
   goalFilter,
   setGoalFilter,
   recentDays,
@@ -746,7 +744,6 @@ export function KanbanBoard({
           logs={quotaLogs}
           streaks={quotaStreaks}
           tasks={tasks}
-          tick={tick}
           send={send}
           onStopTaskTimer={onTimerToggle}
           dayBoundaryHour={dayBoundaryHour}
@@ -761,7 +758,6 @@ export function KanbanBoard({
           activities={lifeActivities}
           logs={lifeLogs}
           tasks={tasks}
-          tick={tick}
           send={send}
           onStopTaskTimer={onTimerToggle}
           dayBoundaryHour={dayBoundaryHour}
