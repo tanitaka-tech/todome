@@ -62,13 +62,20 @@ cd todome
 
 `claude login` でログイン済みの環境では Anthropic API Key の設定は不要です。このステップは飛ばして次へ進んでください。
 
-API Key で利用する場合のみ、プロジェクトルートに `.env` を作成して設定します。
+API Key で利用する場合や、データ保存先・ポートを変更したい場合のみ、プロジェクトルートに `.env` を作成します。サンプルとして `.env.example` を同梱しているので、そこからコピーするのが手早いです。
 
 ```bash
-cat > .env <<'EOF'
-ANTHROPIC_API_KEY=sk-ant-...
-EOF
+cp .env.example .env
+# 必要な行のコメントを外して値を編集
 ```
+
+設定可能な環境変数:
+
+| 変数 | デフォルト | 説明 |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | (未設定) | Anthropic API Key。`claude login` 済みなら不要。 |
+| `TODOME_DATA_DIR` | `./data` | SQLite DB・GitHub 同期状態・各種設定 JSON の保存先。 |
+| `TODOME_BACKEND_PORT` | `3002` | Bun サーバーが listen するポート。 |
 
 ### 3. 依存関係をインストール
 
