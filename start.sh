@@ -16,8 +16,13 @@ if [ ! -d "node_modules" ]; then
 fi
 
 case "$MODE" in
-  dev)
-    echo "==> starting dev servers (Vite :5173 / Bun :3002)"
+  dev|test)
+    if [ "$MODE" = "test" ]; then
+      export TODOME_DATA_DIR="$ROOT/data-test"
+      echo "==> starting dev servers (Vite :5173 / Bun :3002) [TEST DATA: data-test/]"
+    else
+      echo "==> starting dev servers (Vite :5173 / Bun :3002)"
+    fi
     pids=()
     cleanup() {
       trap - INT TERM EXIT
@@ -54,7 +59,7 @@ case "$MODE" in
     ;;
 
   *)
-    echo "usage: $0 [dev|prod]" >&2
+    echo "usage: $0 [dev|prod|test]" >&2
     exit 1
     ;;
 esac
