@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { useTick } from "../hooks/useTick";
 import type { LifeActivity, LifeLog } from "../types";
 import {
   formatDuration,
@@ -10,13 +11,13 @@ import { WaveText } from "./WaveText";
 interface Props {
   activity: LifeActivity;
   log: LifeLog;
-  tick: number;
   onStop: () => void;
   onClose: () => void;
 }
 
-export function LifeLogTimer({ activity, log, tick: _tick, onStop, onClose }: Props) {
+export function LifeLogTimer({ activity, log, onStop, onClose }: Props) {
   const { t } = useTranslation("lifeLog");
+  useTick();
   const elapsed = lifeLogDurationSeconds(log);
   const alert = lifeLogAlertLevel(activity, elapsed);
   const limitLabel =

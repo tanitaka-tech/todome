@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTick } from "../hooks/useTick";
 import { useTranslation } from "react-i18next";
 import type {
   KanbanTask,
@@ -21,7 +22,6 @@ interface Props {
   logs: QuotaLog[];
   streaks: QuotaStreak[];
   tasks: KanbanTask[];
-  tick: number;
   send: (data: unknown) => void;
   onStopTaskTimer: (taskId: string) => void;
   dayBoundaryHour: number;
@@ -62,12 +62,12 @@ export function QuotaSection({
   logs,
   streaks,
   tasks,
-  tick,
   send,
   onStopTaskTimer,
   dayBoundaryHour,
 }: Props) {
   const { t } = useTranslation("quota");
+  const tick = useTick();
   const [editorQuota, setEditorQuota] = useState<Quota | "new" | null>(null);
   const [showManager, setShowManager] = useState(false);
   const [celebrating, setCelebrating] = useState<Record<string, number>>({});
