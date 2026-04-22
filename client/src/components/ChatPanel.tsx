@@ -157,6 +157,8 @@ export function ChatPanel({
     t("suggestionProfile"),
     t("suggestionGoal"),
     t("suggestionToday"),
+    t("suggestionSchedule"),
+    t("suggestionRetro"),
   ];
 
   const handleSend = () => {
