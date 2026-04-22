@@ -8,6 +8,10 @@ import { DEFAULT_PROFILE } from "../storage/profile.ts";
 import type {
   Goal,
   KanbanTask,
+  LifeActivity,
+  LifeLog,
+  Quota,
+  QuotaLog,
   Retrospective,
   RetroType,
   UserProfile,
@@ -35,6 +39,10 @@ interface DiffSummary {
   tasks: DiffCounts;
   goals: DiffCounts;
   retros: DiffCounts;
+  lifeActivities: DiffCounts;
+  lifeLogs: DiffCounts;
+  quotas: DiffCounts;
+  quotaLogs: DiffCounts;
   profileChanged: boolean;
 }
 
@@ -42,6 +50,10 @@ interface DiffDetails {
   tasks: DiffSection;
   goals: DiffSection;
   retros: DiffSection;
+  lifeActivities: DiffSection;
+  lifeLogs: DiffSection;
+  quotas: DiffSection;
+  quotaLogs: DiffSection;
   profileChanged: boolean;
 }
 
@@ -50,10 +62,14 @@ interface DiffResult {
   details: DiffDetails;
 }
 
-interface EntitySnapshot {
+export interface EntitySnapshot {
   tasks: KanbanTask[];
   goals: Goal[];
   retros: Retrospective[];
+  lifeActivities: LifeActivity[];
+  lifeLogs: LifeLog[];
+  quotas: Quota[];
+  quotaLogs: QuotaLog[];
   profile: UserProfile;
 }
 
@@ -127,6 +143,10 @@ function summarize(details: DiffDetails): DiffSummary {
     tasks: counts(details.tasks),
     goals: counts(details.goals),
     retros: counts(details.retros),
+    lifeActivities: counts(details.lifeActivities),
+    lifeLogs: counts(details.lifeLogs),
+    quotas: counts(details.quotas),
+    quotaLogs: counts(details.quotaLogs),
     profileChanged: details.profileChanged,
   };
 }
@@ -208,44 +228,202 @@ function loadEntitiesFromDb(dbPath: string, isSnapshot: boolean): EntitySnapshot
       }
     }
 
-    return { tasks, goals, retros, profile };
+    let lifeActivities: LifeActivity[] = [];
+    if (tableExists(db, "life_activities")) {
+      const rows = db
+        .prepare("SELECT data FROM life_activities ORDER BY sort_order")
+        .all() as { data: string }[];
+      lifeActivities = rows.map((r) => JSON.parse(r.data) as LifeActivity);
+    }
+
+    const lifeLogs: LifeLog[] = [];
+    if (tableExists(db, "life_logs")) {
+      const rows = db
+        .prepare("SELECT * FROM life_logs ORDER BY started_at ASC")
+        .all() as {
+        id: string;
+        activity_id: string;
+        started_at: string;
+        ended_at: string | null;
+        memo: string | null;
+        alert_triggered: string | null;
+      }[];
+      for (const r of rows) {
+        lifeLogs.push({
+          id: r.id,
+          activityId: r.activity_id,
+          startedAt: r.started_at,
+          endedAt: r.ended_at ?? "",
+          memo: r.memo ?? "",
+          alertTriggered: (r.alert_triggered ?? "") as LifeLog["alertTriggered"],
+        });
+      }
+    }
+
+    let quotas: Quota[] = [];
+    if (tableExists(db, "quotas")) {
+      const rows = db
+        .prepare("SELECT data FROM quotas ORDER BY sort_order")
+        .all() as { data: string }[];
+      quotas = rows.map((r) => JSON.parse(r.data) as Quota);
+    }
+
+    const quotaLogs: QuotaLog[] = [];
+    if (tableExists(db, "quota_logs")) {
+      const rows = db
+        .prepare("SELECT * FROM quota_logs ORDER BY started_at ASC")
+        .all() as {
+        id: string;
+        quota_id: string;
+        started_at: string;
+        ended_at: string | null;
+        memo: string | null;
+      }[];
+      for (const r of rows) {
+        quotaLogs.push({
+          id: r.id,
+          quotaId: r.quota_id,
+          startedAt: r.started_at,
+          endedAt: r.ended_at ?? "",
+          memo: r.memo ?? "",
+        });
+      }
+    }
+
+    return { tasks, goals, retros, lifeActivities, lifeLogs, quotas, quotaLogs, profile };
   } finally {
     db.close();
   }
 }
 
+function pickLogLabel(
+  log: { startedAt: string; endedAt: string },
+  ownerName: string | undefined,
+  fallback: string,
+): string {
+  const start = log.startedAt ? log.startedAt.slice(0, 16).replace("T", " ") : "";
+  if (ownerName && start) return `${ownerName} ${start}`;
+  if (ownerName) return ownerName;
+  if (start) return start;
+  return fallback;
+}
+
+function diffLogsById<T extends { id: string; startedAt: string; endedAt: string }>(
+  current: T[],
+  target: T[],
+  ownerKey: keyof T,
+  ownerNames: Map<string, string>,
+): DiffSection {
+  const byCurrent = new Map<string, T>();
+  for (const e of current) if (e.id) byCurrent.set(e.id, e);
+  const byTarget = new Map<string, T>();
+  for (const e of target) if (e.id) byTarget.set(e.id, e);
+
+  const added: LabeledId[] = [];
+  const removed: LabeledId[] = [];
+  const modified: LabeledId[] = [];
+
+  for (const [tid, tval] of byTarget) {
+    if (!byCurrent.has(tid)) {
+      const ownerId = String(tval[ownerKey] ?? "");
+      added.push({
+        id: tid,
+        label: pickLogLabel(tval, ownerNames.get(ownerId), tid),
+      });
+    }
+  }
+  for (const [cid, cval] of byCurrent) {
+    if (!byTarget.has(cid)) {
+      const ownerId = String(cval[ownerKey] ?? "");
+      removed.push({
+        id: cid,
+        label: pickLogLabel(cval, ownerNames.get(ownerId), cid),
+      });
+    }
+  }
+  for (const [tid, tval] of byTarget) {
+    const cval = byCurrent.get(tid);
+    if (!cval) continue;
+    if (JSON.stringify(cval) !== JSON.stringify(tval)) {
+      const ownerId = String(tval[ownerKey] ?? "");
+      modified.push({
+        id: tid,
+        label: pickLogLabel(tval, ownerNames.get(ownerId), tid),
+      });
+    }
+  }
+  return { added, removed, modified };
+}
+
+function buildOwnerNameMap<T extends { id: string; name: string }>(
+  current: T[],
+  target: T[],
+): Map<string, string> {
+  const map = new Map<string, string>();
+  // target を優先しつつ current の名前でも補完 (restore 後に失われるものにも対応できるよう両方)
+  for (const e of current) if (e.id) map.set(e.id, e.name);
+  for (const e of target) if (e.id) map.set(e.id, e.name);
+  return map;
+}
+
 export async function computeCommitDiff(
   commitHash: string
 ): Promise<DiffResult> {
-  const cache = githubState.diffCache;
-  const cached = cache.get(commitHash) as DiffResult | undefined;
-  if (cached) return cached;
-
   const currentDb = getDbPath();
   if (!existsSync(currentDb)) {
     throw new GitHubSyncError("ローカル DB が見つかりません");
   }
 
-  const tmp = mkdtempSync(join(tmpdir(), "todome-diff-"));
-  try {
-    const targetDb = join(tmp, `${commitHash}.db`);
-    await extractDbAtCommit(REPO_DIR, commitHash, targetDb);
-    const current = loadEntitiesFromDb(currentDb, false);
-    const target = loadEntitiesFromDb(targetDb, true);
-    const details: DiffDetails = {
-      tasks: diffEntitiesById(current.tasks, target.tasks, ["title"]),
-      goals: diffEntitiesById(current.goals, target.goals, ["name"]),
-      retros: diffEntitiesById(current.retros, target.retros, [
-        "periodEnd",
-        "type",
-      ]),
-      profileChanged:
-        JSON.stringify(current.profile) !== JSON.stringify(target.profile),
-    };
-    const result: DiffResult = { summary: summarize(details), details };
-    cache.set(commitHash, result);
-    return result;
-  } finally {
-    rmSync(tmp, { recursive: true, force: true });
+  // target は commit hash で一意に決まる (git commit は immutable) のでキャッシュしてよい。
+  // 一方 current は DB 書き込みで常に変わるため、差分結果そのものをキャッシュすると
+  // push 直後の「差分ゼロ」が居座って以降の編集が UI に反映されなくなる。
+  const cache = githubState.diffCache;
+  let target = cache.get(commitHash) as EntitySnapshot | undefined;
+  if (!target) {
+    const tmp = mkdtempSync(join(tmpdir(), "todome-diff-"));
+    try {
+      const targetDb = join(tmp, `${commitHash}.db`);
+      await extractDbAtCommit(REPO_DIR, commitHash, targetDb);
+      target = loadEntitiesFromDb(targetDb, true);
+      cache.set(commitHash, target);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
   }
+
+  const current = loadEntitiesFromDb(currentDb, false);
+  const activityNames = buildOwnerNameMap(
+    current.lifeActivities,
+    target.lifeActivities,
+  );
+  const quotaNames = buildOwnerNameMap(current.quotas, target.quotas);
+  const details: DiffDetails = {
+    tasks: diffEntitiesById(current.tasks, target.tasks, ["title"]),
+    goals: diffEntitiesById(current.goals, target.goals, ["name"]),
+    retros: diffEntitiesById(current.retros, target.retros, [
+      "periodEnd",
+      "type",
+    ]),
+    lifeActivities: diffEntitiesById(
+      current.lifeActivities,
+      target.lifeActivities,
+      ["name"],
+    ),
+    lifeLogs: diffLogsById(
+      current.lifeLogs,
+      target.lifeLogs,
+      "activityId",
+      activityNames,
+    ),
+    quotas: diffEntitiesById(current.quotas, target.quotas, ["name"]),
+    quotaLogs: diffLogsById(
+      current.quotaLogs,
+      target.quotaLogs,
+      "quotaId",
+      quotaNames,
+    ),
+    profileChanged:
+      JSON.stringify(current.profile) !== JSON.stringify(target.profile),
+  };
+  return { summary: summarize(details), details };
 }
