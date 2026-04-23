@@ -1,0 +1,7 @@
+interface:
+  display_name: "Todome E2E Runner"
+  short_description: "Runs ./test.sh and returns a compact E2E summary"
+  default_prompt: "Use $todome-e2e-runner to run the project's E2E suite and summarize only the important failures."
+
+policy:
+  allow_implicit_invocation: true

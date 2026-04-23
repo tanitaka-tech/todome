@@ -1,0 +1,7 @@
+interface:
+  display_name: "Todome Server Implementation"
+  short_description: "Applies todome server repo rules and checks"
+  default_prompt: "Use $todome-server-implementation to implement or review server changes under server/ with the repo constraints."
+
+policy:
+  allow_implicit_invocation: true

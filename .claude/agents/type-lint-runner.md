@@ -12,7 +12,7 @@ model: sonnet
 - プロジェクトはモノレポではないが `client/` 配下にフロント（React 19.2 + Vite + TypeScript 5.9）がある
 - 型チェック: `cd client && npx tsc -b`
 - Lint: `cd client && npm run lint`
-- Python 側の構文チェックは `uv run python -c "import ast; ast.parse(open('server.py').read())"` だが、これはメインが直接叩く。あなたはフロント担当。
+- サーバー側の型チェックは `bunx tsc --noEmit` だが、これはメインが直接叩く。あなたはフロント担当。
 
 ## 実行フロー
 

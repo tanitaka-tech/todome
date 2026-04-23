@@ -1,0 +1,7 @@
+interface:
+  display_name: "Todome Server Navigator"
+  short_description: "Finds server handlers and payload flow without log spam"
+  default_prompt: "Use $todome-server-navigator to locate the relevant server flow and summarize it with file and line references."
+
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Todome Type/Lint Runner"
+  short_description: "Runs client typecheck and lint with compact results"
+  default_prompt: "Use $todome-type-lint-runner to run the frontend typecheck and lint, then summarize only the actionable failures."
+
+policy:
+  allow_implicit_invocation: true

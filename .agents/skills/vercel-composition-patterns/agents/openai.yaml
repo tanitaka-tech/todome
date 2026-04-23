@@ -1,0 +1,7 @@
+interface:
+  display_name: "React Composition Patterns"
+  short_description: "Guides scalable composition patterns for React"
+  default_prompt: "Use $vercel-composition-patterns to refactor this component API away from boolean props and toward composition."
+
+policy:
+  allow_implicit_invocation: true

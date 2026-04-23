@@ -16,7 +16,7 @@ export const en_nav: Record<string, string> = {
   connected: "connected",
   connecting: "connecting…",
   offlineBanner: "Cannot reach the backend",
-  offlineBannerHint: "Check that uvicorn (:3002) is running. State will sync automatically once the connection returns.",
+  offlineBannerHint: "Check that the Bun backend (:3002) is running. State will sync automatically once the connection returns.",
   openAiAssistant: "Open AI assistant",
   openGithubRepo: "Open GitHub repository",
   toolUseTodoWriteGoal: "Updating board & goals",
