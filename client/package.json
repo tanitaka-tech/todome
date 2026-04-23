@@ -14,8 +14,8 @@
   "dependencies": {
     "emoji-picker-react": "^4.18.0",
     "i18next": "^26.0.6",
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4",
+    "react": "^19.3.0-canary-142cfde8-20260422",
+    "react-dom": "^19.3.0-canary-142cfde8-20260422",
     "react-i18next": "^17.0.4",
     "react-markdown": "^10.1.0",
     "remark-breaks": "^4.0.0",
