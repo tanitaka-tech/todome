@@ -9,13 +9,18 @@
 | **ブラウザ `localStorage`** | テーマ設定 (`todome.theme`) のみ | ✅ |
 | **ブラウザ React state** | UI 表示用コピー・チャット履歴・タイマー tick 等 | ❌ リロードで消失 |
 
-`data/` は `.gitignore` に追加されている。接続時に DB からロードし `kanban_sync` / `goal_sync` / `profile_sync` で初期同期 → 各種ミューテーション後に `save_tasks` / `save_goals` / `save_profile` で書き戻し。
+`data/` は `.gitignore` に追加されている。接続時に `server/ws/initialState.ts` が DB からロードし `kanban_sync` / `goal_sync` / `profile_sync` などで初期同期する。各種ミューテーション後は `server/storage/*.ts` の `save*()` で書き戻す。
 
-### SQLite スキーマ (`server.py` の `init_db()`)
+### SQLite スキーマ (`server/db.ts` の `initDb()`)
 ```sql
 kanban_tasks (id TEXT PRIMARY KEY, sort_order INTEGER, data TEXT)  -- data は JSON
 goals        (id TEXT PRIMARY KEY, sort_order INTEGER, data TEXT)
 profile      (id INTEGER PRIMARY KEY CHECK (id = 1), data TEXT)
+retrospectives (...)
+life_activities (...)
+life_logs (...)
+quotas (...)
+quota_logs (...)
 ```
 ネストしたフィールド (`kpis`, `timeLogs`, `balanceWheel` など) は `data` 列内で JSON 保持。
 
@@ -40,7 +45,7 @@ id, name, memo, deadline
 achieved, achievedAt
 kpis: KPI[]   // {id, name, unit: "number"|"percent", targetValue, currentValue}
 ```
-全 KPI が `currentValue >= targetValue` になると `_sync_goal_achievement()` (`server.py:91`) が `achieved` を自動更新する。
+全 KPI が `currentValue >= targetValue` になると `syncGoalAchievement()` (`server/domain/goal.ts`) が `achieved` を自動更新する。
 
 ### 3. UserProfile (`client/src/types.ts:70`)
 ```
@@ -56,10 +61,11 @@ wantToDo[]             // {id, text}[]
 ## データ更新フロー
 
 1. **直接操作**: クライアント → WS で `kanban_add/edit/delete/move`, `goal_add/edit/delete`, `profile_update` 送信 → サーバー state 更新 → `*_sync` で全量返却。
-2. **AI 経由**: ユーザー発話 → サーバーが `build_board_context` + `build_profile_context` をプロンプトに付与 → Claude が `TodoWrite` を呼ぶ → `process_todos()` (`server.py:104`) が
+2. **AI 経由**: ユーザー発話 → サーバーが `buildBoardContext()` + `buildProfileContext()` + `buildTimelineContext()` をプロンプトに付与 → Claude が `TodoWrite` を呼ぶ → `processTodos()` (`server/ai/processTodos.ts`) が
    - `GOAL_ADD:{json}` → 目標追加
    - `GOAL_UPDATE:name:{json}` → 目標更新
    - `[HIGH]/[MEDIUM]/[LOW]` 接頭辞付きテキスト → カンバンタスクへ変換
+   - ライフログ / ノルマ系アクションは `processQuotaLifeActions()` (`server/ai/processQuotaLife.ts`) が反映
 3. クライアントは `kanban_sync` / `goal_sync` / `profile_sync` を受けて state 置換。
 
 ## 注意点

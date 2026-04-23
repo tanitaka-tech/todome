@@ -201,12 +201,12 @@ client/src/components/
   RetroHistory.tsx        # 履歴カード一覧
 ```
 
-サーバー側 (`server.py`):
-- `handle_retro_start()` — 期間・達成タスク取得、AI プロンプト構築、`resumeDraftId` 指定時はドラフト読み込み
-- `handle_retro_complete()` — AI 評価コメント生成、DB 保存（`completedAt` 設定）
-- `handle_retro_discard_draft()` — ドラフト削除
+サーバー側 (`server/`):
+- `server/ws/handlers/retro.ts` の `retroStart()` — 期間計算、AI 用の初期メッセージ構築、`resumeDraftId` 指定時はドラフト再開
+- `server/ws/handlers/retro.ts` の `retroComplete()` — AI 評価コメント生成、DB 保存（`completedAt` 設定）
+- `server/ws/handlers/retroList.ts` と `server/storage/retro.ts` — 一覧取得、ドラフト削除、永続化
 - 対話ターンごとに `document` をドラフトとして upsert（自動保存）
-- `init_db()` に `retrospectives` テーブル追加
+- `server/db.ts` の `initDb()` で `retrospectives` テーブルを管理
 
 ---
 

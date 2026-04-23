@@ -98,7 +98,7 @@
 | 他のタイムボックス計測中 | **確認ダイアログ** →「現在の◯◯を停止して△△を開始しますか？」 | 同左 |
 | タスク計測中 | **確認ダイアログ** →「計測中のタスク「◯◯」を停止して△△を開始しますか？」 | 同左 |
 
-- 実装: サーバー側 `life_log_start` / `task_measurement_start` ハンドラで現在の active 計測をチェックし、存在すれば拒否 or 自動停止
+- 実装: サーバー側 `server/ws/handlers/life.ts` の `lifeLogStart()` がタスク計測を停止し、`server/ws/handlers/kanban.ts` のタイマー開始経路がライフログ/ノルマ計測を停止する
 - フロントは開始操作前にモーダルで確認し、「停止して切替」選択で連続リクエスト（stop → start）を送る
 
 ---
@@ -223,7 +223,7 @@
 
 ### Step 1: 基本計測（MVP）
 - [ ] DB マイグレーション（`life_activities` / `life_logs` テーブル追加＋初期プリセット投入）
-- [ ] `server.py` に `life_log_start` / `life_log_stop` ハンドラ
+- [ ] `server/ws/handlers/life.ts` に `life_log_start` / `life_log_stop` ハンドラ
 - [ ] `client/src/types.ts` に型追加
 - [ ] `LifeLogPanel` 実装（ボタン群＋計測中表示）
 - [ ] WebSocket で状態同期・リロード復元
@@ -246,7 +246,7 @@
 
 ## Git同期
 
-タイムボックス関連のデータは既存の `github_sync.py` の同期対象に含める。
+タイムボックス関連のデータは既存の `server/github/` 同期フローの対象に含める。
 
 - `life_activities` テーブル: プリセット定義。全件同期
 - `life_logs` テーブル: 計測ログ。全件同期
@@ -272,6 +272,6 @@
 ---
 
 ## 参考
-- 既存のタスク計測実装: `server.py` の `task_measurement_*` ハンドラ
+- 既存のタスク計測実装: `server/ws/handlers/kanban.ts` と `server/domain/kanban.ts`
 - 既存の計測ポップアップ: `client/src/components/` の TaskTimer 系
 - 振り返りモード: `docs/retrospective-mode-spec.md`

@@ -1,0 +1,7 @@
+interface:
+  display_name: "React Best Practices"
+  short_description: "Applies Vercel React performance guidance"
+  default_prompt: "Use $vercel-react-best-practices to review or refactor this React code for performance and rendering efficiency."
+
+policy:
+  allow_implicit_invocation: true

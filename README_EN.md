@@ -51,8 +51,7 @@ The user manual is located in `docs/manual/`.
 ### Prerequisites
 
 - **Node.js** 18+
-- **Python** 3.11+
-- **[uv](https://docs.astral.sh/uv/)** (Python package manager)
+- **[Bun](https://bun.sh/)** 1.3+ (server runtime)
 - A contracted ClaudeCode with an **Anthropic API Key**, or an environment already logged in via `claude login`
 - **[gh CLI](https://cli.github.com/)** (optional — required only for GitHub sync)
 
@@ -67,19 +66,18 @@ cd todome
 
 If you're already logged in with `claude login`, you don't need to set an Anthropic API Key. Skip this step and move on.
 
-Only when you want to use an API Key instead, create `.env` in the project root:
+If you want to use an API Key instead, or if you want to change the data directory or port, create `.env` in the project root. A sample is included as `.env.example`, so copying that is the quickest path:
 
 ```bash
-cat > .env <<'EOF'
-ANTHROPIC_API_KEY=sk-ant-...
-EOF
+cp .env.example .env
+# Uncomment and edit only the values you need
 ```
 
 ### 3. Install dependencies
 
 ```bash
-# Python (uv auto-resolves pyproject.toml)
-uv sync
+# Server (Bun)
+bun install
 
 # Frontend
 cd client
@@ -92,13 +90,13 @@ cd ..
 ### One-command start (recommended)
 
 ```bash
-./start.sh          # Dev mode (runs Vite + uvicorn --reload in parallel)
-./start.sh prod     # Prod mode (builds client, then runs uvicorn only)
+./start.sh          # Dev mode (runs Vite + bun --watch in parallel)
+./start.sh prod     # Prod mode (builds client, then runs Bun only)
 ```
 
 - Dev mode serves at **http://localhost:5173**, prod mode at **http://localhost:3002**.
 - Ctrl+C stops both processes.
-- If `client/node_modules` is missing, `npm install` runs automatically on first launch.
+- If `client/node_modules` or `node_modules` is missing, `npm install` or `bun install` runs automatically on first launch.
 
 ### Manual startup
 
@@ -112,7 +110,7 @@ cd client && npm run dev
 
 ```bash
 # Terminal 2: backend (hot reload)
-uv run uvicorn server:app --host 0.0.0.0 --port 3002 --reload
+bun --watch server/index.ts
 ```
 </details>
 
@@ -121,7 +119,7 @@ uv run uvicorn server:app --host 0.0.0.0 --port 3002 --reload
 
 ```bash
 cd client && npm run build && cd ..
-uv run uvicorn server:app --host 0.0.0.0 --port 3002
+bun server/index.ts
 ```
 </details>
 
@@ -130,7 +128,7 @@ uv run uvicorn server:app --host 0.0.0.0 --port 3002
 | Layer | Tech |
 |---|---|
 | Frontend | React 19 + Vite + TypeScript |
-| Backend | Python / FastAPI + WebSocket |
+| Backend | Bun + Hono + WebSocket (TypeScript) |
 | AI | Claude Agent SDK (Sonnet) |
 | Transport | Real-time bi-directional WebSocket |
 
@@ -138,9 +136,14 @@ uv run uvicorn server:app --host 0.0.0.0 --port 3002
 
 ```
 todome/
-├── server.py               # FastAPI + WebSocket backend
-├── github_sync.py           # gh CLI / git wrapper (GitHub sync)
-├── pyproject.toml           # Python dependencies
+├── server/                  # Bun + Hono + WebSocket backend
+│   ├── index.ts             # Entry point (Bun.serve)
+│   ├── config.ts / db.ts / state.ts
+│   ├── storage/             # SQLite I/O (kanban / goals / profile / retro / github)
+│   ├── ai/                  # Claude Agent SDK wrappers
+│   ├── github/              # gh CLI / git integration (sync / diff / autosync)
+│   └── ws/                  # WebSocket endpoint and handler dispatch
+├── package.json             # Server dependencies (Bun)
 ├── .gitignore
 ├── README.md
 ├── data/                    # SQLite DB & GitHub sync state (gitignored)
@@ -171,7 +174,7 @@ todome/
 ## Architecture
 
 ```
-Browser (React)                         Server (FastAPI)
+Browser (React)                         Server (Bun + Hono)
 ┌──────────────────┐                   ┌──────────────────┐
 │  KanbanBoard     │──kanban_*────→    │                  │
 │  GoalPanel       │──goal_*──────→    │  State manager    │

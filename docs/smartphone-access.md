@@ -20,7 +20,7 @@ PC とスマホが**同じ Wi-Fi に接続している**ときに使えます。
 ./start.sh prod
 ```
 
-> 開発モード(`./start.sh`)は Vite dev server が `localhost` のみで待ち受けるためスマホからは使えません。本番モードでは uvicorn が `client/dist` を配信するので、ポート 3002 一本でアクセスできます。
+> 開発モード(`./start.sh`)は Vite dev server が `localhost` のみで待ち受けるためスマホからは使えません。本番モードでは Bun サーバーが `client/dist` を配信するので、ポート 3002 一本でアクセスできます。
 > どうしても dev モードで使いたい場合は [client/vite.config.ts](../client/vite.config.ts) に `server: { host: true }` を追加してください。
 
 ### 2. PC の LAN IP を確認
@@ -43,7 +43,7 @@ http://<PC の LAN IP>:3002
 
 ### つまずきポイント
 
-- **macOS のファイアウォール** — システム設定 → ネットワーク → ファイアウォール で Python/uvicorn の受信接続を許可
+- **macOS のファイアウォール** — システム設定 → ネットワーク → ファイアウォール で Bun の受信接続を許可
 - **ゲスト Wi-Fi / 公衆 Wi-Fi** — 端末分離(クライアントアイソレーション)が有効だと同一LANでも通信できません
 - **VPN** — PC かスマホが VPN に繋がっていると LAN IP では届きません
 
@@ -159,7 +159,7 @@ cloudflared tunnel --url http://localhost:3002
 
 ### `address already in use` でサーバーが起動しない
 
-過去の uvicorn プロセスがポート 3002 を掴んでいます。
+過去の Bun サーバープロセスがポート 3002 を掴んでいます。
 
 ```bash
 lsof -nP -iTCP:3002 -sTCP:LISTEN  # PID を確認
@@ -174,4 +174,4 @@ kill <PID>                         # 終了させる
 http://[fd7a:115c:a1e0::xxxx]:3002
 ```
 
-ただし uvicorn を `--host 0.0.0.0` で起動している場合は **IPv4 でしか待ち受けない** ため、IPv6 接続は失敗します。IPv6 でも待ち受けたい場合は [start.sh](../start.sh) の `--host 0.0.0.0` を `--host ::` に変更してください(macOS では IPv4/IPv6 両対応になります)。
+ただし現状のサーバーは [server/index.ts](../server/index.ts) で `hostname: "0.0.0.0"` を指定しているため **IPv4 でしか待ち受けません**。IPv6 でも待ち受けたい場合は `hostname` を `::` に変更してください (macOS では IPv4/IPv6 両対応になります)。
