@@ -16,7 +16,7 @@ export const ja_nav: Record<string, string> = {
   connected: "connected",
   connecting: "connecting…",
   offlineBanner: "バックエンドに接続できません",
-  offlineBannerHint: "uvicorn (:3002) が起動しているか確認してください。接続が戻れば自動で同期されます。",
+  offlineBannerHint: "Bun バックエンド (:3002) が起動しているか確認してください。接続が戻れば自動で同期されます。",
   openAiAssistant: "AIアシスタントを開く",
   openGithubRepo: "GitHub リポジトリを開く",
   toolUseTodoWriteGoal: "ボード・目標を更新中",

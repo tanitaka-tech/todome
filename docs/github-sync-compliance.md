@@ -1,6 +1,6 @@
 # GitHub 同期機能と利用規約について
 
-todome の GitHub 同期機能 (`github_sync.py`) が GitHub の利用規約・[Acceptable Use Policies (AUP)](https://docs.github.com/en/site-policy/acceptable-use-policies/github-acceptable-use-policies) に準拠しているかを整理したドキュメントです。
+todome の GitHub 同期機能 (`server/github/*.ts`) が GitHub の利用規約・[Acceptable Use Policies (AUP)](https://docs.github.com/en/site-policy/acceptable-use-policies/github-acceptable-use-policies) に準拠しているかを整理したドキュメントです。
 
 > **注記**: 本書は法的助言ではなく、todome 開発者が公開ドキュメントを参照して整理した現状認識です。最終的な判断は各自で GitHub の公式規約を確認してください。
 
@@ -8,8 +8,8 @@ todome の GitHub 同期機能 (`github_sync.py`) が GitHub の利用規約・[
 
 - ユーザー自身の `gh` CLI 認証トークンで、ユーザー自身の private repo に `todome.db` (SQLite バイナリ) を `git add → commit → push` する
 - トークンは todome サーバーがディスクに保存しない。`gh auth token` で毎回取り直し、プロセス環境変数経由で `git` に渡す
-- push のトリガは DB 書き込みごとに debounce された `schedule_autosync()`
-- 履歴から任意コミット時点の DB を復元する機能あり (`restore_db_to_commit`)
+- push のトリガは DB 書き込みごとに debounce された `scheduleAutosync()`
+- 履歴から任意コミット時点の DB を復元する機能あり (`restoreDbToCommit()`)
 
 つまり GitHub 側から見ると **「ユーザー A が自分の PC で git/gh を使って自分の repo に push している」** 以上の情報はなく、VS Code や SourceTree からの操作と区別がつきません。
 
@@ -74,9 +74,9 @@ todome の利用可否を論じる際は、明文化された Section 4 / Sectio
 
 個人利用の範囲でも、以下を守ることで安全側に倒せます:
 
-- **autosync の頻度**: 書き込みごとの即時 push ではなく debounce する ([server.py](../server.py) の `schedule_autosync` がこれを担当)
+- **autosync の頻度**: 書き込みごとの即時 push ではなく debounce する ([server/github/autosync.ts](../server/github/autosync.ts) の `scheduleAutosync()` がこれを担当)
 - **DB サイズ**: `todome.db` が肥大化してリポジトリが数 GB 規模になったら、履歴を `git filter-repo` で truncate するか、別ストレージへの移行を検討
-- **push 失敗時**: [github_sync.py](../github_sync.py) の retry ロジックが無限リトライしないことを確認 (現状は 1 回のみ rebase+retry)
+- **push 失敗時**: [server/github/cli.ts](../server/github/cli.ts) の retry ロジックが無限リトライしないことを確認 (現状は 1 回のみ rebase+retry)
 
 ## まとめ
 

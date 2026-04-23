@@ -1,0 +1,7 @@
+interface:
+  display_name: "Todome Frontend Implementation"
+  short_description: "Applies todome frontend repo rules and checks"
+  default_prompt: "Use $todome-frontend-implementation to implement or review frontend changes in client/ with the repo constraints."
+
+policy:
+  allow_implicit_invocation: true

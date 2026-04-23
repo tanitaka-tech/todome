@@ -1,0 +1,7 @@
+interface:
+  display_name: "Web Design Guidelines"
+  short_description: "Reviews UI against web interface guidelines"
+  default_prompt: "Use $web-design-guidelines to audit these UI files against the latest web interface guidelines."
+
+policy:
+  allow_implicit_invocation: true
