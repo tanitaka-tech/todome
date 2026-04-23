@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState, ViewTransition } from "react";
 import { useTranslation } from "react-i18next";
 import i18n from "../i18n";
 import type {
@@ -167,6 +167,9 @@ export function App() {
   const [waiting, setWaiting] = useState(false);
   const [selectedTask, setSelectedTask] = useState<KanbanTask | null>(null);
   const [activeView, setActiveView] = useState<ActiveView>("overview");
+  const navigateTo = useCallback((view: ActiveView) => {
+    startTransition(() => setActiveView(view));
+  }, []);
   const [popupTaskId, setPopupTaskIdState] = useState<string | null>(() =>
     loadPopupTaskId(),
   );
@@ -1060,12 +1063,12 @@ export function App() {
         };
         if (map[k]) {
           e.preventDefault();
-          setActiveView(map[k]);
+          startTransition(() => setActiveView(map[k]));
           return;
         }
         if (e.key === ",") {
           e.preventDefault();
-          setActiveView("settings");
+          startTransition(() => setActiveView("settings"));
           return;
         }
         return;
@@ -1244,7 +1247,7 @@ export function App() {
               className={`sidebar-nav-item ${
                 activeView === item.id ? "sidebar-nav-item--active" : ""
               }`}
-              onClick={() => setActiveView(item.id)}
+              onClick={() => navigateTo(item.id)}
               title={tNav(item.id)}
             >
               <span className="sidebar-nav-icon">
@@ -1262,7 +1265,7 @@ export function App() {
               className={`sidebar-nav-item ${
                 activeView === item.id ? "sidebar-nav-item--active" : ""
               }`}
-              onClick={() => setActiveView(item.id)}
+              onClick={() => navigateTo(item.id)}
               title={tNav(item.id)}
             >
               <span className="sidebar-nav-icon">
@@ -1327,11 +1330,12 @@ export function App() {
 
       {/* === Main === */}
       <main className="main">
+        <ViewTransition key={activeView} enter="fade-in" exit="fade-out" default="none">
         {activeView === "overview" ? (
           <OverviewPanel
             tasks={tasks}
             goals={goals}
-            onOpenBoard={() => setActiveView("board")}
+            onOpenBoard={() => navigateTo("board")}
             onCardClick={setSelectedTask}
             lifeActivities={lifeActivities}
             lifeLogs={lifeLogs}
@@ -1420,6 +1424,7 @@ export function App() {
             onDayBoundaryHourChange={setDayBoundaryHour}
           />
         )}
+        </ViewTransition>
       </main>
 
       {/* === AI Assistant === */}

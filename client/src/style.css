@@ -540,6 +540,8 @@ body {
   padding: 10px 4px 12px;
   gap: 6px;
   overflow-y: auto;
+  position: relative;
+  z-index: 20;
 }
 
 .sidebar-brand {
@@ -6438,6 +6440,64 @@ body {
   }
   .board-divider--v {
     display: none;
+  }
+}
+
+/* ===== View Transitions ===== */
+:root {
+  --vt-duration-exit: 100ms;
+  --vt-duration-enter: 160ms;
+}
+
+/* Extract persistent chrome from root snapshot so old-root is background-only */
+.sidebar    { view-transition-name: vt-sidebar; }
+.topbar     { view-transition-name: vt-topbar; }
+.chat-panel { view-transition-name: vt-chat-panel; }
+
+/* Freeze extracted elements in place — no animation */
+::view-transition-group(vt-sidebar),
+::view-transition-group(vt-topbar),
+::view-transition-group(vt-chat-panel) {
+  animation: none;
+}
+::view-transition-old(vt-sidebar),
+::view-transition-new(vt-sidebar),
+::view-transition-old(vt-topbar),
+::view-transition-new(vt-topbar),
+::view-transition-old(vt-chat-panel),
+::view-transition-new(vt-chat-panel) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+@keyframes vt-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* React <ViewTransition enter="fade-in" exit="fade-out"> */
+::view-transition-old(.fade-out) {
+  animation: var(--vt-duration-exit) ease-in both vt-fade reverse;
+}
+::view-transition-new(.fade-in) {
+  animation: var(--vt-duration-enter) ease-out both vt-fade;
+}
+
+/* Root snapshot only contains background now — hide old to prevent flash */
+::view-transition-old(root) {
+  display: none;
+}
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
   }
 }
 
