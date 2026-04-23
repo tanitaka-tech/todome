@@ -540,6 +540,8 @@ body {
   padding: 10px 4px 12px;
   gap: 6px;
   overflow-y: auto;
+  position: relative;
+  z-index: 20;
 }
 
 .sidebar-brand {
