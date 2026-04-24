@@ -124,6 +124,8 @@ const NAV_ITEMS: {
   { id: "settings", icon: "⚙", group: "app" },
 ];
 
+const MOBILE_LAYOUT_QUERY = "(max-width: 720px)";
+
 const GITHUB_MARK = (
   <svg
     viewBox="0 0 16 16"
@@ -183,7 +185,10 @@ export function App() {
     setLanguageState(lang);
     applyLanguage(lang);
   }, []);
-  const [chatOpen, setChatOpen] = useState(true);
+  const [chatOpen, setChatOpen] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return !window.matchMedia(MOBILE_LAYOUT_QUERY).matches;
+  });
   const [githubStatus, setGithubStatus] = useState<GitHubStatus | null>(null);
   const [githubRepos, setGithubRepos] = useState<RepoInfo[]>([]);
   const [githubCommits, setGithubCommits] = useState<GitCommit[]>([]);
@@ -553,6 +558,25 @@ export function App() {
   useEffect(() => {
     sendRef.current = send;
   }, [send]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const media = window.matchMedia(MOBILE_LAYOUT_QUERY);
+    const syncChatVisibility = (matches: boolean) => {
+      if (matches) setChatOpen(false);
+    };
+    const handleChange = (event: MediaQueryListEvent) => {
+      syncChatVisibility(event.matches);
+    };
+
+    syncChatVisibility(media.matches);
+    if (typeof media.addEventListener === "function") {
+      media.addEventListener("change", handleChange);
+      return () => media.removeEventListener("change", handleChange);
+    }
+    media.addListener(handleChange);
+    return () => media.removeListener(handleChange);
+  }, []);
 
   // 切断直後のフラッシュを避けるため、1.5 秒続いた切断状態のみバナー表示する。
   const [showOfflineBanner, setShowOfflineBanner] = useState(false);
