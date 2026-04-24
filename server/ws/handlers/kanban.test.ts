@@ -8,13 +8,14 @@ const TEST_DATA_DIR = mkdtempSync(join(tmpdir(), "todome-kanban-handler-test-"))
 process.env.TODOME_DATA_DIR = TEST_DATA_DIR;
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { resetDbCache } from "../../db.ts";
+import { getDb, resetDbCache } from "../../db.ts";
 import {
   activeSockets,
   createSessionState,
   type AppWebSocket,
   type SessionState,
 } from "../../state.ts";
+import { loadTasks } from "../../storage/kanban.ts";
 import type { Goal, KanbanTask } from "../../types.ts";
 import {
   kanbanAdd,
@@ -45,10 +46,10 @@ function makeRequester(): {
   return { ws, session, sent };
 }
 
-function makeTask(overrides: Partial<KanbanTask> = {}): KanbanTask {
+function makeTask(
+  partial: Partial<KanbanTask> & Pick<KanbanTask, "id" | "title">
+): KanbanTask {
   return {
-    id: "task-1",
-    title: "テストタスク",
     description: "",
     column: "todo",
     memo: "",
@@ -60,7 +61,7 @@ function makeTask(overrides: Partial<KanbanTask> = {}): KanbanTask {
     timerStartedAt: "",
     completedAt: "",
     timeLogs: [],
-    ...overrides,
+    ...partial,
   };
 }
 
@@ -88,6 +89,18 @@ function makeGoalWithTimeKpi(
   };
 }
 
+beforeEach(() => {
+  activeSockets.clear();
+  resetDbCache();
+  const db = getDb();
+  db.exec("DELETE FROM kanban_tasks");
+  db.exec("DELETE FROM goals");
+});
+
+afterEach(() => {
+  activeSockets.clear();
+});
+
 afterAll(() => {
   resetDbCache();
   rmSync(TEST_DATA_DIR, { recursive: true, force: true });
@@ -97,12 +110,7 @@ describe("kanbanAdd handler", () => {
   let ctx: ReturnType<typeof makeRequester>;
 
   beforeEach(() => {
-    activeSockets.clear();
     ctx = makeRequester();
-  });
-
-  afterEach(() => {
-    activeSockets.clear();
   });
 
   it("タスクを追加して kanban_sync を送る", async () => {
@@ -142,12 +150,7 @@ describe("kanbanMove handler", () => {
   let ctx: ReturnType<typeof makeRequester>;
 
   beforeEach(() => {
-    activeSockets.clear();
     ctx = makeRequester();
-  });
-
-  afterEach(() => {
-    activeSockets.clear();
   });
 
   it("done に移動すると、紐づく time KPI に timeSpent が加算され、kpiContributed=true になる", async () => {
@@ -155,6 +158,7 @@ describe("kanbanMove handler", () => {
     ctx.session.kanbanTasks.push(
       makeTask({
         id: "t1",
+        title: "対象タスク",
         column: "in_progress",
         goalId: "goal-1",
         kpiId: "kpi-1",
@@ -182,6 +186,7 @@ describe("kanbanMove handler", () => {
     ctx.session.kanbanTasks.push(
       makeTask({
         id: "t1",
+        title: "対象タスク",
         column: "done",
         goalId: "goal-1",
         kpiId: "kpi-1",
@@ -209,6 +214,7 @@ describe("kanbanMove handler", () => {
     ctx.session.kanbanTasks.push(
       makeTask({
         id: "target",
+        title: "対象",
         column: "in_progress",
         goalId: "goal-1",
         kpiId: "kpi-1",
@@ -216,6 +222,7 @@ describe("kanbanMove handler", () => {
       }),
       makeTask({
         id: "other",
+        title: "他人",
         column: "in_progress",
         goalId: "goal-2",
         kpiId: "kpi-2",
@@ -234,7 +241,9 @@ describe("kanbanMove handler", () => {
   });
 
   it("存在しない taskId が指定されても落ちずに sync を送る", async () => {
-    ctx.session.kanbanTasks.push(makeTask({ id: "t1", column: "todo" }));
+    ctx.session.kanbanTasks.push(
+      makeTask({ id: "t1", title: "残るタスク", column: "todo" })
+    );
 
     await kanbanMove(ctx.ws, ctx.session, { taskId: "nonexistent", column: "done" });
 
@@ -247,12 +256,7 @@ describe("kanbanEdit handler", () => {
   let ctx: ReturnType<typeof makeRequester>;
 
   beforeEach(() => {
-    activeSockets.clear();
     ctx = makeRequester();
-  });
-
-  afterEach(() => {
-    activeSockets.clear();
   });
 
   it("title / memo / estimatedMinutes など指定したフィールドだけが更新される", async () => {
@@ -281,7 +285,12 @@ describe("kanbanEdit handler", () => {
 
   it("goalId を空にすると kpiId もクリアされる", async () => {
     ctx.session.kanbanTasks.push(
-      makeTask({ id: "t1", goalId: "goal-1", kpiId: "kpi-1" })
+      makeTask({
+        id: "t1",
+        title: "タスク",
+        goalId: "goal-1",
+        kpiId: "kpi-1",
+      })
     );
 
     await kanbanEdit(ctx.ws, ctx.session, {
@@ -299,6 +308,7 @@ describe("kanbanEdit handler", () => {
     ctx.session.kanbanTasks.push(
       makeTask({
         id: "t1",
+        title: "完了タスク",
         column: "done",
         goalId: "goal-1",
         kpiId: "kpi-1",
@@ -323,12 +333,7 @@ describe("kanbanDelete handler", () => {
   let ctx: ReturnType<typeof makeRequester>;
 
   beforeEach(() => {
-    activeSockets.clear();
     ctx = makeRequester();
-  });
-
-  afterEach(() => {
-    activeSockets.clear();
   });
 
   it("kpiContributed なタスクを削除すると KPI から timeSpent が引かれる", async () => {
@@ -336,6 +341,7 @@ describe("kanbanDelete handler", () => {
     ctx.session.kanbanTasks.push(
       makeTask({
         id: "t1",
+        title: "削除するタスク",
         column: "done",
         goalId: "goal-1",
         kpiId: "kpi-1",
@@ -353,7 +359,12 @@ describe("kanbanDelete handler", () => {
   it("削除対象以外のタスクは温存される", async () => {
     ctx.session.kanbanTasks.push(
       makeTask({ id: "t1", title: "消す" }),
-      makeTask({ id: "t2", title: "残す", column: "in_progress", timeSpent: 60 })
+      makeTask({
+        id: "t2",
+        title: "残す",
+        column: "in_progress",
+        timeSpent: 60,
+      })
     );
 
     await kanbanDelete(ctx.ws, ctx.session, { taskId: "t1" });
@@ -371,19 +382,14 @@ describe("kanbanReorder handler", () => {
   let ctx: ReturnType<typeof makeRequester>;
 
   beforeEach(() => {
-    activeSockets.clear();
     ctx = makeRequester();
-  });
-
-  afterEach(() => {
-    activeSockets.clear();
   });
 
   it("taskIds の順序通りに並び替わる", async () => {
     ctx.session.kanbanTasks.push(
-      makeTask({ id: "a" }),
-      makeTask({ id: "b" }),
-      makeTask({ id: "c" })
+      makeTask({ id: "a", title: "A" }),
+      makeTask({ id: "b", title: "B" }),
+      makeTask({ id: "c", title: "C" })
     );
 
     await kanbanReorder(ctx.ws, ctx.session, { taskIds: ["c", "a", "b"] });
@@ -393,9 +399,9 @@ describe("kanbanReorder handler", () => {
 
   it("taskIds に含まれないタスクは末尾に温存される", async () => {
     ctx.session.kanbanTasks.push(
-      makeTask({ id: "a" }),
-      makeTask({ id: "b" }),
-      makeTask({ id: "c" })
+      makeTask({ id: "a", title: "A" }),
+      makeTask({ id: "b", title: "B" }),
+      makeTask({ id: "c", title: "C" })
     );
 
     await kanbanReorder(ctx.ws, ctx.session, { taskIds: ["c"] });
@@ -404,7 +410,10 @@ describe("kanbanReorder handler", () => {
   });
 
   it("重複した id は1回だけ反映され、未知の id は無視される", async () => {
-    ctx.session.kanbanTasks.push(makeTask({ id: "a" }), makeTask({ id: "b" }));
+    ctx.session.kanbanTasks.push(
+      makeTask({ id: "a", title: "A" }),
+      makeTask({ id: "b", title: "B" })
+    );
 
     await kanbanReorder(ctx.ws, ctx.session, {
       taskIds: ["a", "a", "ghost", "b"],
@@ -414,10 +423,68 @@ describe("kanbanReorder handler", () => {
   });
 
   it("非配列入力でも落ちずに既存順序が温存される", async () => {
-    ctx.session.kanbanTasks.push(makeTask({ id: "a" }), makeTask({ id: "b" }));
+    ctx.session.kanbanTasks.push(
+      makeTask({ id: "a", title: "A" }),
+      makeTask({ id: "b", title: "B" })
+    );
 
     await kanbanReorder(ctx.ws, ctx.session, { taskIds: "not-an-array" });
 
     expect(ctx.session.kanbanTasks.map((t) => t.id)).toEqual(["a", "b"]);
+  });
+
+  it("列移動と並び替えを同じ同期で反映する", async () => {
+    const todo = makeTask({ id: "todo-1", title: "TODO", column: "todo" });
+    const doing = makeTask({
+      id: "doing-1",
+      title: "進行中",
+      column: "in_progress",
+    });
+    ctx.session.kanbanTasks = [todo, doing];
+
+    await kanbanReorder(ctx.ws, ctx.session, {
+      taskIds: ["todo-1", "doing-1"],
+      move: { taskId: "todo-1", column: "in_progress", completedAt: "" },
+    });
+
+    expect(ctx.session.kanbanTasks.map((t) => [t.id, t.column])).toEqual([
+      ["todo-1", "in_progress"],
+      ["doing-1", "in_progress"],
+    ]);
+    expect(loadTasks().map((t) => [t.id, t.column])).toEqual([
+      ["todo-1", "in_progress"],
+      ["doing-1", "in_progress"],
+    ]);
+    expect(ctx.sent).toHaveLength(2);
+    expect(ctx.sent[0]).toMatchObject({
+      type: "kanban_sync",
+      tasks: [
+        { id: "todo-1", column: "in_progress" },
+        { id: "doing-1", column: "in_progress" },
+      ],
+    });
+    expect(ctx.sent[1]).toMatchObject({ type: "goal_sync", goals: [] });
+  });
+
+  it("関係ないタスクは列も順序も壊さない", async () => {
+    const todo = makeTask({ id: "todo-1", title: "TODO", column: "todo" });
+    const doing = makeTask({
+      id: "doing-1",
+      title: "進行中",
+      column: "in_progress",
+    });
+    const done = makeTask({
+      id: "done-1",
+      title: "完了",
+      column: "done",
+      completedAt: "2026-04-24T09:00:00",
+    });
+    ctx.session.kanbanTasks = [todo, doing, done];
+
+    await kanbanReorder(ctx.ws, ctx.session, {
+      taskIds: ["doing-1", "todo-1", "done-1"],
+    });
+
+    expect(ctx.session.kanbanTasks).toEqual([doing, todo, done]);
   });
 });
