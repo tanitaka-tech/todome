@@ -100,6 +100,8 @@ export interface TimelineContextInput {
   nowMs: number;
   rangeStartMs: number;
   rangeEndMs: number;
+  heading?: string;
+  referenceTimeLabel?: string;
   tasks: KanbanTask[];
   lifeActivities: LifeActivity[];
   lifeLogs: LifeLog[];
@@ -119,6 +121,11 @@ interface TimelineEntry {
 function formatHhMm(ms: number): string {
   const d = new Date(ms);
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+function formatMdHhMm(ms: number): string {
+  const d = new Date(ms);
+  return `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")} ${formatHhMm(ms)}`;
 }
 
 function formatMinutes(seconds: number): string {
@@ -150,6 +157,8 @@ export function buildTimelineContext(input: TimelineContextInput): string {
     nowMs,
     rangeStartMs,
     rangeEndMs,
+    heading,
+    referenceTimeLabel,
     tasks,
     lifeActivities,
     lifeLogs,
@@ -230,14 +239,19 @@ export function buildTimelineContext(input: TimelineContextInput): string {
     quota: "ノルマ",
   };
 
-  const lines: string[] = ["=== 今日のタイムスケジュール ==="];
-  lines.push(`現在時刻: ${formatHhMm(nowMs)}`);
+  const isMultiDay = rangeEndMs - rangeStartMs > 26 * 60 * 60 * 1000;
+  const formatEntryTime = isMultiDay ? formatMdHhMm : formatHhMm;
+
+  const lines: string[] = [heading ?? "=== 今日のタイムスケジュール ==="];
+  if (referenceTimeLabel !== "") {
+    lines.push(`${referenceTimeLabel ?? "現在時刻"}: ${formatHhMm(nowMs)}`);
+  }
 
   if (entries.length === 0) {
     lines.push("  (今日はまだ計測されていません)");
   } else {
     for (const entry of entries) {
-      const range = `${formatHhMm(entry.startMs)}–${formatHhMm(entry.endMs)}`;
+      const range = `${formatEntryTime(entry.startMs)}–${formatEntryTime(entry.endMs)}`;
       const durSec = Math.max(0, Math.floor((entry.endMs - entry.startMs) / 1000));
       const activeMark = entry.active ? " [計測中]" : "";
       lines.push(
