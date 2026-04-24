@@ -159,7 +159,8 @@ export function buildRetroSystemPrompt(
   retro: Retrospective,
   tasks: KanbanTask[],
   goals: Goal[],
-  profile: UserProfile
+  profile: UserProfile,
+  timelineContext: string = "(タイムスケジュール情報なし)"
 ): string {
   const profileCtx = buildProfileContext(profile);
   const doneCtx = retroDoneTasksContext(tasks, retro.periodStart, retro.periodEnd, goals);
@@ -224,6 +225,14 @@ ${currentDocJson}
 
 ## 期間内の達成タスク
 ${doneCtx}
+
+## タイムスケジュール
+${timelineContext}
+
+## タイムスケジュールを踏まえた対話方針
+- タイムスケジュールに記録がある場合は、作業・休息・遊び・ノルマの時間配分や流れを根拠にコメントする
+- 記録されていない時間帯は推測で埋めず、必要なら「この時間帯はどう過ごしましたか？」と確認する
+- 達成タスクだけでなく、計測中/未完了の作業やライフログも振り返り材料として扱う
 
 ${profileCtx}
 `;
