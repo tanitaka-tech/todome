@@ -9,10 +9,21 @@ import {
 } from "../../ai/retroPrompt.ts";
 import {
   finalizeRetro,
+  type RetroTimelineData,
   runRetroReopenGreeting,
   runRetroTurn,
 } from "../../ai/retroRunner.ts";
 import { getDayBoundaryHour } from "../../storage/appConfig.ts";
+import {
+  loadLifeActivities,
+  loadLifeLogsInRange,
+} from "../../storage/life.ts";
+import {
+  computeAllQuotaStreaks,
+  loadAllQuotaLogs,
+  loadQuotaLogsInRange,
+  loadQuotas,
+} from "../../storage/quota.ts";
 import {
   deleteRetroById,
   getRetro,
@@ -21,9 +32,28 @@ import {
 } from "../../storage/retro.ts";
 import { shortId } from "../../utils/shortId.ts";
 import { nowLocalIso as nowIso } from "../../utils/time.ts";
+import { dayRangeForBoundary } from "../../utils/dayBoundary.ts";
 import type { Retrospective, RetroDocument, RetroType } from "../../types.ts";
 import { broadcast, sendTo } from "../broadcast.ts";
 import type { Handler } from "../dispatch.ts";
+
+function buildRetroTimelineData(retro: Retrospective): RetroTimelineData {
+  const boundaryHour = getDayBoundaryHour();
+  const startRange = dayRangeForBoundary(retro.periodStart, boundaryHour);
+  const endRange = dayRangeForBoundary(retro.periodEnd, boundaryHour);
+  const quotas = loadQuotas();
+  const allQuotaLogs = loadAllQuotaLogs();
+  return {
+    nowMs: Date.now(),
+    rangeStartMs: Date.parse(startRange.startIso),
+    rangeEndMs: Date.parse(endRange.endIso),
+    lifeActivities: loadLifeActivities(),
+    lifeLogs: loadLifeLogsInRange(startRange.startIso, endRange.endIso),
+    quotas,
+    quotaLogs: loadQuotaLogsInRange(startRange.startIso, endRange.endIso),
+    quotaStreaks: computeAllQuotaStreaks(quotas, allQuotaLogs, retro.periodEnd),
+  };
+}
 
 export const retroStart: Handler = async (ws, session, data) => {
   let retroType = (data.retroType as string) || "weekly";
@@ -92,7 +122,8 @@ export const retroMessage: Handler = async (ws, session, data) => {
       userText,
       session.kanbanTasks,
       session.goals,
-      session.profile
+      session.profile,
+      buildRetroTimelineData(entry)
     );
     const persisted = getRetro(retroId) !== null;
     if (persisted) {
@@ -130,7 +161,8 @@ export const retroComplete: Handler = async (ws, session, data) => {
       entry,
       session.kanbanTasks,
       session.goals,
-      session.profile
+      session.profile,
+      buildRetroTimelineData(entry)
     );
     session.pendingRetros.delete(retroId);
     sendTo(ws, { type: "retro_list_sync", retros: loadRetros() });
@@ -173,7 +205,8 @@ export const retroReopen: Handler = async (ws, session, data) => {
       reopened,
       session.kanbanTasks,
       session.goals,
-      session.profile
+      session.profile,
+      buildRetroTimelineData(reopened)
     );
     broadcast({ type: "retro_list_sync", retros: loadRetros() });
   } catch (err) {
