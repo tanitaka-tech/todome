@@ -113,7 +113,25 @@ export const kanbanDelete: Handler = async (ws, session, data) => {
   sendKanbanAndGoals(ws, session);
 };
 
-export const kanbanReorder: Handler = async (_ws, session, data) => {
+export const kanbanReorder: Handler = async (ws, session, data) => {
+  const move = data.move;
+  const moveData =
+    move && typeof move === "object" ? (move as Record<string, unknown>) : null;
+  const movedTaskId = String(moveData?.taskId ?? "");
+  const startingTimer = Boolean(moveData?.timerStartedAt);
+  if (moveData && movedTaskId) {
+    for (const task of session.kanbanTasks) {
+      if (task.id !== movedTaskId) continue;
+      const prev = before(task);
+      task.column = moveData.column as ColumnId;
+      for (const key of ["timeSpent", "timerStartedAt", "completedAt", "timeLogs"] as const) {
+        assignIfPresent(task, moveData, key);
+      }
+      rebalanceKpiContribution(task, prev, session.goals);
+      break;
+    }
+  }
+
   const ids = Array.isArray(data.taskIds) ? (data.taskIds as string[]) : [];
   const taskMap = new Map(session.kanbanTasks.map((t) => [t.id, t]));
   const seen = new Set<string>();
@@ -129,8 +147,15 @@ export const kanbanReorder: Handler = async (_ws, session, data) => {
     if (!seen.has(t.id)) newOrder.push(t);
   }
   session.kanbanTasks = newOrder;
+  if (startingTimer) {
+    stopActiveLifeLogIfAny();
+    stopActiveQuotaLogIfAny();
+  }
   saveTasks(session.kanbanTasks);
+  saveGoals(session.goals);
   scheduleAutosync();
+  sendKanbanAndGoals(ws, session);
+  if (startingTimer) broadcastTimeTrackingSync();
 };
 
 export const kanbanEdit: Handler = async (ws, session, data) => {
@@ -167,4 +192,3 @@ export const kanbanEdit: Handler = async (ws, session, data) => {
   sendKanbanAndGoals(ws, session);
   if (startingTimer) broadcastTimeTrackingSync();
 };
-

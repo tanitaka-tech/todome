@@ -7,12 +7,17 @@ import type { AppWebSocket } from "../state.ts";
 import type {
   Goal,
   KanbanTask,
+  LifeActivity,
+  LifeLog,
+  Quota,
+  QuotaLog,
+  QuotaStreak,
   Retrospective,
   UserProfile,
 } from "../types.ts";
 import { nowLocalIso as nowIso } from "../utils/time.ts";
 import { sendTo } from "../ws/broadcast.ts";
-import { buildProfileContext } from "./context.ts";
+import { buildProfileContext, buildTimelineContext } from "./context.ts";
 import {
   RETRO_DOC_TEXT_KEYS,
   RETRO_DOC_TIME_KEYS,
@@ -28,6 +33,17 @@ interface ContentBlock {
   type: string;
   text?: string;
   thinking?: string;
+}
+
+export interface RetroTimelineData {
+  nowMs: number;
+  rangeStartMs: number;
+  rangeEndMs: number;
+  lifeActivities: LifeActivity[];
+  lifeLogs: LifeLog[];
+  quotas: Quota[];
+  quotaLogs: QuotaLog[];
+  quotaStreaks?: QuotaStreak[];
 }
 
 function hasContent(retro: Retrospective): boolean {
@@ -58,6 +74,19 @@ function buildBaseOptions(systemPrompt: string): Options {
 // SDK サブプロセスや WS 切断で AI 応答が戻らなくなった場合でも、ハンドラが
 // finally ブロックまで必ず到達するように上限時間で強制終了する。
 const RETRO_QUERY_TIMEOUT_MS = 3 * 60 * 1000;
+
+function buildRetroTimelineContext(
+  retro: Retrospective,
+  tasks: KanbanTask[],
+  timeline: RetroTimelineData
+): string {
+  return buildTimelineContext({
+    ...timeline,
+    tasks,
+    heading: `=== 振り返り期間のタイムスケジュール (${retro.periodStart} 〜 ${retro.periodEnd}) ===`,
+    referenceTimeLabel: "生成時刻",
+  });
+}
 
 async function runRetroQuery(
   ws: AppWebSocket,
@@ -128,9 +157,11 @@ export async function runRetroTurn(
   userMsg: string,
   tasks: KanbanTask[],
   goals: Goal[],
-  profile: UserProfile
+  profile: UserProfile,
+  timeline: RetroTimelineData
 ): Promise<Retrospective> {
-  const systemPrompt = buildRetroSystemPrompt(retro, tasks, goals, profile);
+  const timelineCtx = buildRetroTimelineContext(retro, tasks, timeline);
+  const systemPrompt = buildRetroSystemPrompt(retro, tasks, goals, profile, timelineCtx);
   const transcript = buildRetroTranscript(retro, userMsg);
   const full = await runRetroQuery(ws, transcript, systemPrompt, {
     thinkingBudget: 4000,
@@ -169,9 +200,11 @@ export async function runRetroReopenGreeting(
   retro: Retrospective,
   tasks: KanbanTask[],
   goals: Goal[],
-  profile: UserProfile
+  profile: UserProfile,
+  timeline: RetroTimelineData
 ): Promise<Retrospective> {
-  const baseSystem = buildRetroSystemPrompt(retro, tasks, goals, profile);
+  const timelineCtx = buildRetroTimelineContext(retro, tasks, timeline);
+  const baseSystem = buildRetroSystemPrompt(retro, tasks, goals, profile, timelineCtx);
   const systemPrompt =
     baseSystem +
     "\n\n## 会話再開モード\n" +
@@ -209,11 +242,13 @@ async function generateRetroReviewText(
   retro: Retrospective,
   tasks: KanbanTask[],
   goals: Goal[],
-  profile: UserProfile
+  profile: UserProfile,
+  timeline: RetroTimelineData
 ): Promise<string> {
   const profileCtx = buildProfileContext(profile);
   const doc = retro.document;
   const doneCtx = retroDoneTasksContext(tasks, retro.periodStart, retro.periodEnd, goals);
+  const timelineCtx = buildRetroTimelineContext(retro, tasks, timeline);
   const typeLabel = RETRO_TYPE_LABEL[retro.type] ?? "振り返り";
   const docSnapshot: Record<string, unknown> = {
     did: doc.did ?? "",
@@ -238,6 +273,8 @@ async function generateRetroReviewText(
     `対象期間: ${retro.periodStart} 〜 ${retro.periodEnd}\n\n` +
     `## 振り返りドキュメント\n${docText}\n\n` +
     `## 期間内の達成タスク\n${doneCtx}\n\n` +
+    `## タイムスケジュール\n${timelineCtx}\n\n` +
+    "タイムスケジュールに記録がある場合は、時間配分や流れも根拠に含めてください。未記録の時間帯は推測しないでください。\n\n" +
     `${profileCtx}\n\n` +
     "この振り返りに対して総評コメントを書いてください。";
 
@@ -250,9 +287,10 @@ export async function finalizeRetro(
   retro: Retrospective,
   tasks: KanbanTask[],
   goals: Goal[],
-  profile: UserProfile
+  profile: UserProfile,
+  timeline: RetroTimelineData
 ): Promise<Retrospective> {
-  const aiComment = await generateRetroReviewText(ws, retro, tasks, goals, profile);
+  const aiComment = await generateRetroReviewText(ws, retro, tasks, goals, profile, timeline);
   const nowStr = nowIso();
   const newMessages = [...retro.messages, { role: "assistant" as const, text: aiComment }];
   const updated: Retrospective = {
