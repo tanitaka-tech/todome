@@ -58,7 +58,15 @@ const RECENT_DAYS_OPTIONS: { value: number; labelKey: string }[] = [
   { value: 30, labelKey: "filterDay30" },
 ];
 
+const MIN_BOTTOM_HEIGHT = 140;
+const MIN_BOARD_HEIGHT = 220;
+
 type InsertPos = "above" | "below";
+
+function clampBottomHeight(height: number, availableHeight: number): number {
+  const maxBottom = Math.max(MIN_BOTTOM_HEIGHT, availableHeight - MIN_BOARD_HEIGHT);
+  return Math.max(MIN_BOTTOM_HEIGHT, Math.min(maxBottom, height));
+}
 
 export function KanbanBoard({
   tasks,
@@ -91,13 +99,31 @@ export function KanbanBoard({
 
   const cardRefs = useRef(new Map<string, HTMLElement>());
   const prevRects = useRef(new Map<string, DOMRect>());
+  const prevColumns = useRef(new Map<string, ColumnId>());
   const originalTasksRef = useRef<KanbanTask[] | null>(null);
   const dropCommittedRef = useRef(false);
 
   const wrapRef = useRef<HTMLDivElement>(null);
+  const filterBarRef = useRef<HTMLDivElement>(null);
+  const horizontalDividerRef = useRef<HTMLDivElement>(null);
   const bottomRowRef = useRef<HTMLDivElement>(null);
   const [bottomHeight, setBottomHeight] = useState<number>(loadBoardBottomHeight);
   const [quotaWidth, setQuotaWidth] = useState<number>(loadBoardQuotaWidth);
+
+  const getAvailableBoardHeight = () => {
+    const wrap = wrapRef.current;
+    if (!wrap) return MIN_BOARD_HEIGHT + MIN_BOTTOM_HEIGHT;
+    const filterHeight = filterBarRef.current?.getBoundingClientRect().height ?? 0;
+    const dividerHeight =
+      horizontalDividerRef.current?.getBoundingClientRect().height ?? 0;
+    const bottomStyle = bottomRowRef.current
+      ? window.getComputedStyle(bottomRowRef.current)
+      : null;
+    const bottomMargin =
+      (bottomStyle ? Number.parseFloat(bottomStyle.marginTop) : 0) +
+      (bottomStyle ? Number.parseFloat(bottomStyle.marginBottom) : 0);
+    return wrap.clientHeight - filterHeight - dividerHeight - bottomMargin;
+  };
 
   useEffect(() => {
     saveBoardBottomHeight(bottomHeight);
@@ -111,10 +137,11 @@ export function KanbanBoard({
     e.preventDefault();
     const startY = e.clientY;
     const startHeight = bottomHeight;
-    const wrap = wrapRef.current;
-    const maxBottom = wrap ? Math.max(140, wrap.clientHeight - 220) : 800;
     const onMove = (ev: PointerEvent) => {
-      const next = Math.max(140, Math.min(maxBottom, startHeight - (ev.clientY - startY)));
+      const next = clampBottomHeight(
+        startHeight - (ev.clientY - startY),
+        getAvailableBoardHeight(),
+      );
       setBottomHeight(next);
     };
     const onUp = () => {
@@ -128,6 +155,23 @@ export function KanbanBoard({
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
   };
+
+  useLayoutEffect(() => {
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+
+    const applyClamp = () => {
+      setBottomHeight((prev) => {
+        const next = clampBottomHeight(prev, getAvailableBoardHeight());
+        return next === prev ? prev : next;
+      });
+    };
+
+    applyClamp();
+    const observer = new ResizeObserver(applyClamp);
+    observer.observe(wrap);
+    return () => observer.disconnect();
+  }, []);
 
   const startResizeQuota = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -153,6 +197,7 @@ export function KanbanBoard({
   };
 
   useLayoutEffect(() => {
+    const nextColumns = new Map(tasks.map((task) => [task.id, task.column]));
     const nextRects = new Map<string, DOMRect>();
     cardRefs.current.forEach((el, id) => {
       nextRects.set(id, el.getBoundingClientRect());
@@ -162,6 +207,9 @@ export function KanbanBoard({
       // The dragging card itself is handled by the OS drag ghost —
       // we don't want to FLIP-animate its in-flow placeholder.
       if (id === dragId) return;
+      const prevColumn = prevColumns.current.get(id);
+      const nextColumn = nextColumns.get(id);
+      if (prevColumn && nextColumn && prevColumn !== nextColumn) return;
       const prev = prevRects.current.get(id);
       const next = nextRects.get(id);
       if (!prev || !next) return;
@@ -189,6 +237,7 @@ export function KanbanBoard({
       if (preserved) newPrev.set(dragId, preserved);
     }
     prevRects.current = newPrev;
+    prevColumns.current = nextColumns;
   }, [tasks, dragId]);
 
   const setCardRef = (id: string) => (el: HTMLDivElement | null) => {
@@ -261,6 +310,11 @@ export function KanbanBoard({
     const dragged = tasks.find((t) => t.id === draggedId);
     if (!dragged) return;
     const columnChanged = dragged.column !== targetColumn;
+    const shouldMoveWithReorder = columnChanged && targetColumn !== "done";
+    const finalDragged =
+      shouldMoveWithReorder
+        ? { ...dragged, column: targetColumn, completedAt: "" }
+        : dragged;
 
     const without = tasks.filter((t) => t.id !== draggedId);
     let insertIdx: number;
@@ -278,17 +332,24 @@ export function KanbanBoard({
 
     const finalOrder = [
       ...without.slice(0, insertIdx),
-      dragged,
+      finalDragged,
       ...without.slice(insertIdx),
     ];
     const needsReorder = finalOrder.some((t, i) => t.id !== tasks[i]?.id);
 
-    if (columnChanged) {
+    if (columnChanged && !shouldMoveWithReorder) {
       onMoveColumn(draggedId, targetColumn);
     }
-    if (needsReorder) {
+    if (needsReorder || shouldMoveWithReorder) {
       setTasks((prev) => {
         const map = new Map(prev.map((t) => [t.id, t]));
+        if (shouldMoveWithReorder) {
+          map.set(draggedId, {
+            ...(map.get(draggedId) ?? dragged),
+            column: targetColumn,
+            completedAt: "",
+          });
+        }
         return finalOrder
           .map((t) => map.get(t.id))
           .filter((t): t is KanbanTask => !!t);
@@ -301,7 +362,19 @@ export function KanbanBoard({
       finalOrder.some((t, i) => t.id !== origOrder[i]?.id) ||
       columnChanged;
     if (changedFromOriginal) {
-      send({ type: "kanban_reorder", taskIds: finalOrder.map((t) => t.id) });
+      send({
+        type: "kanban_reorder",
+        taskIds: finalOrder.map((t) => t.id),
+        ...(shouldMoveWithReorder
+          ? {
+              move: {
+                taskId: draggedId,
+                column: targetColumn,
+                completedAt: "",
+              },
+            }
+          : {}),
+      });
     }
   };
 
@@ -542,7 +615,7 @@ export function KanbanBoard({
 
   return (
     <div className="kanban-wrap" ref={wrapRef}>
-      <div className="kanban-filter-bar">
+      <div className="kanban-filter-bar" ref={filterBarRef}>
         <div className="kanban-filter-group">
           <span className="kanban-filter-label">{t("filterGoal")}</span>
           <select
@@ -725,6 +798,7 @@ export function KanbanBoard({
       </div>
       <div
         className="board-divider board-divider--h"
+        ref={horizontalDividerRef}
         role="separator"
         aria-orientation="horizontal"
         onPointerDown={startResizeBottom}

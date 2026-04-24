@@ -260,4 +260,39 @@ describe("buildTimelineContext", () => {
     });
     expect(out).not.toContain("【ノルマ達成状況");
   });
+
+  it("複数日にまたがる範囲では日付付きでスケジュールを出力する", () => {
+    const rangeStartMs = new Date(2026, 3, 22, 4, 0, 0).getTime();
+    const rangeEndMs = new Date(2026, 3, 24, 4, 0, 0).getTime();
+    const tasks: KanbanTask[] = [
+      makeTask({
+        id: "t1",
+        title: "週次レビュー",
+        timeLogs: [
+          {
+            start: iso(new Date(2026, 3, 23, 9, 0, 0).getTime()),
+            end: iso(new Date(2026, 3, 23, 10, 0, 0).getTime()),
+            duration: 3600,
+          },
+        ],
+      }),
+    ];
+
+    const out = buildTimelineContext({
+      nowMs: NOW,
+      rangeStartMs,
+      rangeEndMs,
+      heading: "=== 振り返り期間のタイムスケジュール ===",
+      referenceTimeLabel: "生成時刻",
+      tasks,
+      lifeActivities: [],
+      lifeLogs: [],
+      quotas: [],
+      quotaLogs: [],
+    });
+
+    expect(out).toContain("=== 振り返り期間のタイムスケジュール ===");
+    expect(out).toContain("生成時刻: 14:00");
+    expect(out).toContain("[タスク] 04/23 09:00–04/23 10:00 (1時間) 週次レビュー");
+  });
 });
