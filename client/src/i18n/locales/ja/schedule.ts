@@ -14,7 +14,7 @@ export const ja_schedule: Record<string, string> = {
   createEvent: "イベントを作成",
   viewEvent: "イベント詳細",
   readOnlyBadge: "購読 (読み取り専用)",
-  icloudWriteBackBadge: "iCloud に書き戻し",
+  calendarWriteBackBadge: "外部カレンダーに書き戻し",
   fieldTitle: "タイトル",
   fieldDescription: "メモ",
   fieldLocation: "場所",

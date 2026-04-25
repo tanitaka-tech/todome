@@ -63,6 +63,14 @@ function fromInputDateTime(d: string): string {
   return d.length === 16 ? `${d}:00` : d;
 }
 
+function hasValidRange(schedule: Schedule): boolean {
+  if (!schedule.start || !schedule.end) return false;
+  if (schedule.allDay) {
+    return schedule.end.slice(0, 10) >= schedule.start.slice(0, 10);
+  }
+  return schedule.end > schedule.start;
+}
+
 function defaultStart(): string {
   const now = new Date();
   now.setMinutes(0, 0, 0);
@@ -120,11 +128,7 @@ export function ScheduleEventEditor({
       setError(t("needTitle"));
       return;
     }
-    if (!draft.start || !draft.end) {
-      setError(t("invalidRange"));
-      return;
-    }
-    if (draft.end <= draft.start) {
+    if (!hasValidRange(draft)) {
       setError(t("invalidRange"));
       return;
     }
@@ -181,8 +185,8 @@ export function ScheduleEventEditor({
                 {t("readOnlyBadge")}
               </span>
             ) : (
-              <span className="schedule-editor-icloud-badge">
-                {t("icloudWriteBackBadge")}
+              <span className="schedule-editor-writeback-badge">
+                {t("calendarWriteBackBadge")}
               </span>
             )
           )}

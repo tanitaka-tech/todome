@@ -13,7 +13,7 @@ export const en_schedule: Record<string, string> = {
   createEvent: "Create event",
   viewEvent: "Event details",
   readOnlyBadge: "Subscription (read-only)",
-  icloudWriteBackBadge: "Writes back to iCloud",
+  calendarWriteBackBadge: "Writes back to external calendar",
   fieldTitle: "Title",
   fieldDescription: "Notes",
   fieldLocation: "Location",
