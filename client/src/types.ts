@@ -526,6 +526,81 @@ export function streakRank(days: number): 0 | 1 | 2 | 3 | 4 {
   return 0;
 }
 
+// --- Schedule (スケジュール) ---
+
+export type ScheduleSource = "manual" | "subscription";
+
+export interface Schedule {
+  id: string;
+  source: ScheduleSource;
+  subscriptionId: string;
+  externalUid: string;
+  title: string;
+  description: string;
+  location: string;
+  start: string; // ローカル ISO "YYYY-MM-DDTHH:mm:ss"
+  end: string;
+  allDay: boolean;
+  color: string; // "" = subscription / デフォルト色を使う
+  rrule: string;
+  recurrenceId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type SubscriptionStatus = "idle" | "fetching" | "ok" | "error";
+
+export interface CalendarSubscription {
+  id: string;
+  name: string;
+  url: string;
+  color: string;
+  enabled: boolean;
+  lastFetchedAt: string;
+  lastError: string;
+  status: SubscriptionStatus;
+  eventCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const DEFAULT_SUBSCRIPTION_COLORS: readonly string[] = [
+  "#3b82f6",
+  "#ec4899",
+  "#10b981",
+  "#f59e0b",
+  "#a855f7",
+  "#ef4444",
+];
+
+export const DEFAULT_SCHEDULE_COLOR = "#0ea5e9";
+
+export function scheduleColor(
+  schedule: Schedule,
+  subscriptions: CalendarSubscription[],
+): string {
+  if (schedule.color) return schedule.color;
+  if (schedule.source === "subscription" && schedule.subscriptionId) {
+    const sub = subscriptions.find((s) => s.id === schedule.subscriptionId);
+    if (sub?.color) return sub.color;
+  }
+  return DEFAULT_SCHEDULE_COLOR;
+}
+
+function compareIsoStrings(a: string, b: string): number {
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
+}
+
+export function sortSchedulesByStart(items: Schedule[]): Schedule[] {
+  return [...items].sort((a, b) => {
+    const cmp = compareIsoStrings(a.start, b.start);
+    if (cmp !== 0) return cmp;
+    return compareIsoStrings(a.end, b.end);
+  });
+}
+
 export type WSErrorScope = "parse" | "unknown_type" | "handler" | "initial_state";
 
 export type WSMessage =
@@ -577,4 +652,6 @@ export type WSMessage =
   | { type: "quota_log_started"; log: QuotaLog }
   | { type: "quota_log_stopped"; log: QuotaLog }
   | { type: "quota_streak_sync"; streaks: QuotaStreak[] }
-  | { type: "quota_log_range_sync"; requestId: string; logs: QuotaLog[] };
+  | { type: "quota_log_range_sync"; requestId: string; logs: QuotaLog[] }
+  | { type: "schedule_sync"; schedules: Schedule[] }
+  | { type: "subscription_sync"; subscriptions: CalendarSubscription[] };

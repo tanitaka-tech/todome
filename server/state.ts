@@ -1,8 +1,10 @@
 import type { ServerWebSocket } from "bun";
 import type {
+  CalendarSubscription,
   Goal,
   KanbanTask,
   Retrospective,
+  Schedule,
   UserProfile,
 } from "./types.ts";
 
@@ -18,6 +20,8 @@ export interface SessionState {
   kanbanTasks: KanbanTask[];
   goals: Goal[];
   profile: UserProfile;
+  schedules: Schedule[];
+  subscriptions: CalendarSubscription[];
   pendingRetros: Map<string, Retrospective>;
   needsReload: boolean;
   cancelRequested: boolean;
@@ -34,6 +38,8 @@ export function createSessionState(): SessionState {
       actionPrinciples: [],
       wantToDo: [],
     },
+    schedules: [],
+    subscriptions: [],
     pendingRetros: new Map(),
     needsReload: false,
     cancelRequested: false,

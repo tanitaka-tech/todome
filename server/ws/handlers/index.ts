@@ -50,6 +50,13 @@ import {
   retroStart,
 } from "./retro.ts";
 import { retroDelete, retroDiscardDraft, retroList } from "./retroList.ts";
+import { scheduleAdd, scheduleDelete, scheduleEdit } from "./schedule.ts";
+import {
+  subscriptionAdd,
+  subscriptionDelete,
+  subscriptionEdit,
+  subscriptionRefresh,
+} from "./subscription.ts";
 
 export function registerAllHandlers(): void {
   registerHandler("kanban_move", kanbanMove);
@@ -97,5 +104,12 @@ export function registerAllHandlers(): void {
   registerHandler("github_list_commits", githubListCommits);
   registerHandler("github_commit_diff", githubCommitDiff);
   registerHandler("github_restore_commit", githubRestoreCommit);
+  registerHandler("schedule_add", scheduleAdd);
+  registerHandler("schedule_edit", scheduleEdit);
+  registerHandler("schedule_delete", scheduleDelete);
+  registerHandler("subscription_add", subscriptionAdd);
+  registerHandler("subscription_edit", subscriptionEdit);
+  registerHandler("subscription_delete", subscriptionDelete);
+  registerHandler("subscription_refresh", subscriptionRefresh);
   registerHandler("message", message);
 }

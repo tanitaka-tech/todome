@@ -10,6 +10,7 @@ const DAY_BOUNDARY_HOUR_KEY = "todome.dayBoundaryHour";
 const DEFAULT_DAY_BOUNDARY_HOUR = 4;
 const BOARD_BOTTOM_HEIGHT_KEY = "todome.board.bottomHeight";
 const BOARD_QUOTA_WIDTH_KEY = "todome.board.quotaWidth";
+const SCHEDULE_VIEW_KEY = "todome.schedule.view";
 const DEFAULT_BOARD_BOTTOM_HEIGHT = 300;
 const DEFAULT_BOARD_QUOTA_WIDTH = 440;
 
@@ -144,6 +145,23 @@ export function saveBoardQuotaWidth(value: number): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(BOARD_QUOTA_WIDTH_KEY, String(Math.round(value)));
+  } catch {
+    /* ignore quota errors */
+  }
+}
+
+export type ScheduleViewMode = "month" | "week";
+
+export function loadScheduleView(): ScheduleViewMode {
+  if (typeof window === "undefined") return "month";
+  const v = window.localStorage.getItem(SCHEDULE_VIEW_KEY);
+  return v === "week" ? "week" : "month";
+}
+
+export function saveScheduleView(value: ScheduleViewMode): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(SCHEDULE_VIEW_KEY, value);
   } catch {
     /* ignore quota errors */
   }

@@ -4,6 +4,7 @@ import i18n from "../i18n";
 import type {
   AIToolConfig,
   AskUserRequest,
+  CalendarSubscription,
   ChatMessage,
   CommitDiffEntry,
   GitCommit,
@@ -18,6 +19,7 @@ import type {
   RepoInfo,
   Retrospective,
   RetroType,
+  Schedule,
   UserProfile,
   WSMessage,
 } from "../types";
@@ -59,6 +61,7 @@ import { StatsPanel } from "./StatsPanel";
 import { OverviewPanel } from "./OverviewPanel";
 import { SettingsPanel } from "./SettingsPanel";
 import { RetroPanel, type RetroViewMode } from "./RetroPanel";
+import { SchedulePanel } from "./SchedulePanel";
 import { GitHubSyncTab } from "./GitHubSyncTab";
 import { ShortcutsHelpModal } from "./ShortcutsHelpModal";
 import { LifeLogTimer } from "./LifeLogTimer";
@@ -72,6 +75,7 @@ type ActiveView =
   | "overview"
   | "board"
   | "goals"
+  | "schedule"
   | "retro"
   | "stats"
   | "profile"
@@ -118,6 +122,7 @@ const NAV_ITEMS: {
   { id: "overview", icon: "⌂", group: "work" },
   { id: "board", icon: "⫴", group: "work" },
   { id: "goals", icon: "⌖", group: "work" },
+  { id: "schedule", icon: "▦", group: "work" },
   { id: "retro", icon: "↻", group: "work" },
   { id: "stats", icon: "〽", group: "work" },
   { id: "profile", icon: "◉", group: "app" },
@@ -212,6 +217,10 @@ export function App() {
   const [quotaLogPopupDismissedId, setQuotaLogPopupDismissedId] = useState<
     string | null
   >(null);
+  const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const [subscriptions, setSubscriptions] = useState<CalendarSubscription[]>(
+    [],
+  );
   const [retros, setRetros] = useState<Retrospective[]>([]);
   const [activeRetro, setActiveRetro] = useState<Retrospective | null>(null);
   const [retroStreamText, setRetroStreamText] = useState("");
@@ -549,6 +558,12 @@ export function App() {
           ...prev,
           [msg.requestId]: msg.logs,
         }));
+        break;
+      case "schedule_sync":
+        setSchedules(msg.schedules);
+        break;
+      case "subscription_sync":
+        setSubscriptions(msg.subscriptions);
         break;
     }
   }, [showError]);
@@ -1395,6 +1410,13 @@ export function App() {
             githubRepos={githubRepos}
             onRequestRepoList={handleRequestRepoList}
             githubAuthOk={!!githubStatus?.authOk}
+          />
+        ) : activeView === "schedule" ? (
+          <SchedulePanel
+            schedules={schedules}
+            subscriptions={subscriptions}
+            send={send}
+            dayBoundaryHour={dayBoundaryHour}
           />
         ) : activeView === "retro" ? (
           <RetroPanel

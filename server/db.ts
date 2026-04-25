@@ -78,6 +78,23 @@ export function initDb(db: Database = getDb()): void {
       memo TEXT NOT NULL DEFAULT ''
     );
     CREATE INDEX IF NOT EXISTS idx_quota_logs_started ON quota_logs(started_at);
+    CREATE TABLE IF NOT EXISTS schedules (
+      id TEXT PRIMARY KEY,
+      sort_order INTEGER NOT NULL,
+      source TEXT NOT NULL DEFAULT 'manual',
+      subscription_id TEXT NOT NULL DEFAULT '',
+      external_uid TEXT NOT NULL DEFAULT '',
+      start_at TEXT NOT NULL,
+      end_at TEXT NOT NULL,
+      data TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_schedules_start ON schedules(start_at);
+    CREATE INDEX IF NOT EXISTS idx_schedules_subscription ON schedules(subscription_id);
+    CREATE TABLE IF NOT EXISTS calendar_subscriptions (
+      id TEXT PRIMARY KEY,
+      sort_order INTEGER NOT NULL,
+      data TEXT NOT NULL
+    );
   `);
 }
 
