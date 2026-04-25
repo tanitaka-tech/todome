@@ -27,7 +27,29 @@ interface Props {
   onUpdateAIConfig: (config: AIToolConfig) => void;
   dayBoundaryHour: number;
   onDayBoundaryHourChange: (hour: number) => void;
+  timezone: string;
+  onTimezoneChange: (tz: string) => void;
 }
+
+// IANA TZ の代表的なものだけ列挙。"" は「自動 (ブラウザ/サーバーの実 TZ)」。
+// 必要になったら拡張する。
+const TIMEZONE_OPTIONS: { value: string; label: string }[] = [
+  { value: "", label: "Auto" },
+  { value: "Asia/Tokyo", label: "Asia/Tokyo (JST)" },
+  { value: "Asia/Seoul", label: "Asia/Seoul (KST)" },
+  { value: "Asia/Shanghai", label: "Asia/Shanghai (CST)" },
+  { value: "Asia/Singapore", label: "Asia/Singapore (SGT)" },
+  { value: "Asia/Kolkata", label: "Asia/Kolkata (IST)" },
+  { value: "Australia/Sydney", label: "Australia/Sydney (AEST/AEDT)" },
+  { value: "Europe/London", label: "Europe/London (GMT/BST)" },
+  { value: "Europe/Paris", label: "Europe/Paris (CET/CEST)" },
+  { value: "Europe/Berlin", label: "Europe/Berlin (CET/CEST)" },
+  { value: "America/New_York", label: "America/New_York (EST/EDT)" },
+  { value: "America/Chicago", label: "America/Chicago (CST/CDT)" },
+  { value: "America/Denver", label: "America/Denver (MST/MDT)" },
+  { value: "America/Los_Angeles", label: "America/Los_Angeles (PST/PDT)" },
+  { value: "UTC", label: "UTC" },
+];
 
 interface AIToolDef {
   id: string;
@@ -273,6 +295,8 @@ export function SettingsPanel({
   onUpdateAIConfig,
   dayBoundaryHour,
   onDayBoundaryHourChange,
+  timezone,
+  onTimezoneChange,
 }: Props) {
   const { t } = useTranslation("settings");
   const toggleTool = (toolId: string, enabled: boolean) => {
@@ -396,6 +420,30 @@ export function SettingsPanel({
                 {Array.from({ length: 24 }, (_, i) => i).map((h) => (
                   <option key={h} value={h}>
                     {String(h).padStart(2, "0")}:00
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="settings-row">
+              <div>
+                <div className="settings-row-label">
+                  {t("timezone", "タイムゾーン")}
+                </div>
+                <div className="settings-row-desc">
+                  {t(
+                    "timezoneDesc",
+                    "iCloud カレンダー等の繰り返しイベント展開で使う TZ。Auto はサーバーの環境 TZ を使います。",
+                  )}
+                </div>
+              </div>
+              <select
+                className="detail-prop-select"
+                value={timezone}
+                onChange={(e) => onTimezoneChange(e.target.value)}
+              >
+                {TIMEZONE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
                   </option>
                 ))}
               </select>

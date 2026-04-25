@@ -1,4 +1,5 @@
 import { buildGitHubStatus } from "../github/sync.ts";
+import { buildCalDAVStatus } from "./handlers/caldav.ts";
 import { loadAIConfig } from "../storage/aiConfig.ts";
 import { loadAppConfig } from "../storage/appConfig.ts";
 import { loadGoals } from "../storage/goals.ts";
@@ -59,6 +60,7 @@ export async function sendInitialState(
       subscriptions: session.subscriptions,
     })],
     ["github_status", async () => await buildGitHubStatus()],
+    ["caldav_status", () => ({ type: "caldav_status", status: buildCalDAVStatus() })],
   ];
 
   for (const [name, produce] of steps) {

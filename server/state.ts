@@ -37,6 +37,7 @@ export function createSessionState(): SessionState {
       balanceWheel: [],
       actionPrinciples: [],
       wantToDo: [],
+      timezone: "",
     },
     schedules: [],
     subscriptions: [],

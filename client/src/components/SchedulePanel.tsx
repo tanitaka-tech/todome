@@ -7,7 +7,12 @@ import {
   useState,
 } from "react";
 import { useTranslation } from "react-i18next";
-import type { CalendarSubscription, Schedule } from "../types";
+import type {
+  CalDAVCalendarChoice,
+  CalDAVStatus,
+  CalendarSubscription,
+  Schedule,
+} from "../types";
 import { nowLocalIso } from "../types";
 import {
   loadScheduleView,
@@ -31,6 +36,9 @@ interface Props {
   subscriptions: CalendarSubscription[];
   send: (data: unknown) => void;
   dayBoundaryHour: number;
+  caldavStatus: CalDAVStatus | null;
+  caldavCalendars: CalDAVCalendarChoice[];
+  caldavCalendarsError: string;
 }
 
 interface EditorState {
@@ -88,6 +96,9 @@ export function SchedulePanel({
   subscriptions,
   send,
   dayBoundaryHour: _dayBoundaryHour,
+  caldavStatus,
+  caldavCalendars,
+  caldavCalendarsError,
 }: Props) {
   const { t, i18n: i18nInst } = useTranslation("schedule");
   const lang = i18nInst.language;
@@ -429,6 +440,9 @@ export function SchedulePanel({
           subscriptions={subscriptions}
           send={send}
           onClose={() => setShowSubscriptions(false)}
+          caldavStatus={caldavStatus}
+          caldavCalendars={caldavCalendars}
+          caldavCalendarsError={caldavCalendarsError}
         />
       )}
     </div>

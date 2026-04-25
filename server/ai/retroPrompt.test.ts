@@ -31,6 +31,7 @@ function makeProfile(partial: Partial<UserProfile> = {}): UserProfile {
     balanceWheel: [],
     actionPrinciples: [],
     wantToDo: [],
+    timezone: "",
     ...partial,
   };
 }
