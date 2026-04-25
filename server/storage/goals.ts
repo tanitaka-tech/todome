@@ -9,7 +9,16 @@ export function loadGoals(): Goal[] {
   const rows = getDb()
     .prepare("SELECT data FROM goals ORDER BY sort_order")
     .all() as Row[];
-  return rows.map((r) => JSON.parse(r.data) as Goal);
+  // 壊れた1行で全ロードを諦めない。kanban.ts の loadTasks と同じ方針。
+  const goals: Goal[] = [];
+  for (const r of rows) {
+    try {
+      goals.push(JSON.parse(r.data) as Goal);
+    } catch (err) {
+      console.warn("[storage/goals] skip malformed row:", err);
+    }
+  }
+  return goals;
 }
 
 export function saveGoals(goals: Goal[]): void {

@@ -198,6 +198,46 @@ describe("タスクのアップサート挙動", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 壊れた JSON 行が混入しても、他のタスクが消えない
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("loadTasks — 壊れた JSON 行をスキップして他を返す", () => {
+  it("1行が壊れた JSON でも他の行はロードされる", () => {
+    const db = getDb();
+    db.prepare("INSERT INTO kanban_tasks (id, sort_order, data) VALUES (?, ?, ?)").run(
+      "ok1",
+      0,
+      JSON.stringify(makeTask({ id: "ok1", title: "前" }))
+    );
+    db.prepare("INSERT INTO kanban_tasks (id, sort_order, data) VALUES (?, ?, ?)").run(
+      "broken",
+      1,
+      "{this is not json"
+    );
+    db.prepare("INSERT INTO kanban_tasks (id, sort_order, data) VALUES (?, ?, ?)").run(
+      "ok2",
+      2,
+      JSON.stringify(makeTask({ id: "ok2", title: "後" }))
+    );
+
+    const loaded = loadTasks();
+    expect(loaded).toHaveLength(2);
+    expect(loaded.map((t) => t.id)).toEqual(["ok1", "ok2"]);
+  });
+
+  it("壊れた行のみでもエラーにならず空配列を返す", () => {
+    const db = getDb();
+    db.prepare("INSERT INTO kanban_tasks (id, sort_order, data) VALUES (?, ?, ?)").run(
+      "broken",
+      0,
+      "{"
+    );
+    expect(() => loadTasks()).not.toThrow();
+    expect(loadTasks()).toEqual([]);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // cross-data: タスク保存が他テーブルに影響しない
 // ─────────────────────────────────────────────────────────────────────────────
 

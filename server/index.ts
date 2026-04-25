@@ -11,6 +11,16 @@ import { handleOAuthCallback } from "./ws/handlers/google.ts";
 initDb();
 registerAllHandlers();
 
+// Bun のデフォルトでは unhandled rejection / uncaught exception が握りつぶされて
+// プロセスが落ちる or 黙る。`void promise.catch(() => {})` パターンが各所にあるため、
+// 最低限ログだけは残してデバッグ可能にする。プロセスは落とさない。
+process.on("unhandledRejection", (reason) => {
+  console.error("[unhandledRejection]", reason);
+});
+process.on("uncaughtException", (err) => {
+  console.error("[uncaughtException]", err);
+});
+
 const app = new Hono();
 
 const CLIENT_DIST = join(PROJECT_ROOT, "client", "dist");
