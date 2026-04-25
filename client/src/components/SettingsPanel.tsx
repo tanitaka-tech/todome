@@ -27,6 +27,8 @@ interface Props {
   onUpdateAIConfig: (config: AIToolConfig) => void;
   dayBoundaryHour: number;
   onDayBoundaryHourChange: (hour: number) => void;
+  calendarWeekStart: 0 | 1;
+  onCalendarWeekStartChange: (weekStart: 0 | 1) => void;
   timezone: string;
   onTimezoneChange: (tz: string) => void;
 }
@@ -295,6 +297,8 @@ export function SettingsPanel({
   onUpdateAIConfig,
   dayBoundaryHour,
   onDayBoundaryHourChange,
+  calendarWeekStart,
+  onCalendarWeekStartChange,
   timezone,
   onTimezoneChange,
 }: Props) {
@@ -422,6 +426,29 @@ export function SettingsPanel({
                     {String(h).padStart(2, "0")}:00
                   </option>
                 ))}
+              </select>
+            </div>
+            <div className="settings-row">
+              <div>
+                <div className="settings-row-label">
+                  {t("calendarWeekStart", "カレンダーの週始まり")}
+                </div>
+                <div className="settings-row-desc">
+                  {t(
+                    "calendarWeekStartDesc",
+                    "月表示と週表示の先頭曜日を選びます。(デフォルト: 月曜)",
+                  )}
+                </div>
+              </div>
+              <select
+                className="detail-prop-select"
+                value={calendarWeekStart}
+                onChange={(e) =>
+                  onCalendarWeekStartChange(Number(e.target.value) === 0 ? 0 : 1)
+                }
+              >
+                <option value={1}>{t("weekStartMonday", "月曜")}</option>
+                <option value={0}>{t("weekStartSunday", "日曜")}</option>
               </select>
             </div>
             <div className="settings-row">

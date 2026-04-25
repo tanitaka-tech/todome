@@ -1,6 +1,8 @@
 import { fetchEvents } from "../../caldav/client.ts";
+import { fetchEvents as fetchGoogleEvents } from "../../google/client.ts";
 import { scheduleAutosync } from "../../github/autosync.ts";
 import { loadCalDAVConfig } from "../../storage/caldav.ts";
+import { isGoogleAccountConnected } from "../../storage/google.ts";
 import { loadProfile } from "../../storage/profile.ts";
 import {
   loadSchedules,
@@ -82,8 +84,8 @@ export const subscriptionAdd: Handler = async (_ws, session, data) => {
   saveSubscriptions([...existing, sub]);
   scheduleAutosync();
   broadcastSubscriptions(session);
-  // CalDAV 購読は追加直後に 1 回フェッチして UI に出す
-  if (sub.provider === "caldav") {
+  // CalDAV / Google 購読は追加直後に 1 回フェッチして UI に出す
+  if (sub.provider === "caldav" || sub.provider === "google") {
     await refreshOne(sub.id, session);
   }
 };
@@ -176,14 +178,25 @@ async function refreshOne(id: string, session: SyncSession): Promise<void> {
   const target = subs.find((s) => s.id === id);
   if (!target) return;
   if (!target.enabled) return;
-  if (target.provider !== "caldav") {
-    // ICS フェッチは未実装。状態だけ idle に戻して終わる。
-    setSubscriptionState(id, { status: "idle" });
-    broadcastSubscriptions(session);
+
+  if (target.provider === "caldav") {
+    await refreshCalDAV(target, session);
     return;
   }
+  if (target.provider === "google") {
+    await refreshGoogle(target, session);
+    return;
+  }
+  // ICS フェッチは未実装。状態だけ idle に戻して終わる。
+  setSubscriptionState(id, { status: "idle" });
+  broadcastSubscriptions(session);
+}
 
-  setSubscriptionState(id, { status: "fetching", lastError: "" });
+async function refreshCalDAV(
+  target: CalendarSubscription,
+  session: SyncSession,
+): Promise<void> {
+  setSubscriptionState(target.id, { status: "fetching", lastError: "" });
   broadcastSubscriptions(session);
 
   const cfg = loadCalDAVConfig();
@@ -198,7 +211,7 @@ async function refreshOne(id: string, session: SyncSession): Promise<void> {
   });
 
   if (!result.ok) {
-    setSubscriptionState(id, {
+    setSubscriptionState(target.id, {
       status: "error",
       lastError: result.error,
       lastFetchedAt: nowLocalIso(),
@@ -219,16 +232,84 @@ async function refreshOne(id: string, session: SyncSession): Promise<void> {
     start: part.start,
     end: part.end,
     allDay: part.allDay,
-    color: "",
     rrule: part.rrule,
     recurrenceId: part.recurrenceId,
     createdAt: now,
     updatedAt: now,
     caldavObjectUrl: part.objectUrl,
     caldavEtag: part.etag,
+    googleEventId: "",
+    googleAccountId: "",
   }));
   replaceSubscriptionSchedules(target.id, schedules);
-  setSubscriptionState(id, {
+  setSubscriptionState(target.id, {
+    status: "ok",
+    lastError: "",
+    lastFetchedAt: now,
+    eventCount: schedules.length,
+  });
+  scheduleAutosync();
+  broadcastSubscriptions(session);
+  broadcastSchedules(session);
+}
+
+async function refreshGoogle(
+  target: CalendarSubscription,
+  session: SyncSession,
+): Promise<void> {
+  if (!isGoogleAccountConnected(target.googleAccountId || undefined)) {
+    setSubscriptionState(target.id, {
+      status: "error",
+      lastError: "Google に未接続です",
+      lastFetchedAt: nowLocalIso(),
+    });
+    broadcastSubscriptions(session);
+    return;
+  }
+  setSubscriptionState(target.id, { status: "fetching", lastError: "" });
+  broadcastSubscriptions(session);
+
+  const range = expandRange();
+  const result = await fetchGoogleEvents({
+    calendarId: target.googleCalendarId || target.url.replace(/^google:/, ""),
+    accountId: target.googleAccountId || undefined,
+    rangeStartMs: range.startMs,
+    rangeEndMs: range.endMs,
+  });
+
+  if (!result.ok) {
+    setSubscriptionState(target.id, {
+      status: "error",
+      lastError: result.error,
+      lastFetchedAt: nowLocalIso(),
+    });
+    broadcastSubscriptions(session);
+    return;
+  }
+
+  const now = nowLocalIso();
+  const schedules: Schedule[] = result.events.map((part, i) => ({
+    id: `${target.id}:${i}`,
+    source: "subscription",
+    subscriptionId: target.id,
+    externalUid: part.externalUid,
+    title: part.title,
+    description: part.description,
+    location: part.location,
+    start: part.start,
+    end: part.end,
+    allDay: part.allDay,
+    rrule: part.rrule,
+    recurrenceId: part.recurrenceId,
+    createdAt: now,
+    updatedAt: now,
+    caldavObjectUrl: "",
+    caldavEtag: "",
+    googleEventId: part.googleEventId,
+    googleAccountId: target.googleAccountId,
+  }));
+  replaceSubscriptionSchedules(target.id, schedules);
+  setSubscriptionState(target.id, {
     status: "ok",
     lastError: "",
     lastFetchedAt: now,
@@ -249,7 +330,7 @@ export const subscriptionRefresh: Handler = async (_ws, session, data) => {
   const subs = loadSubscriptions();
   for (const s of subs) {
     if (!s.enabled) continue;
-    if (s.provider !== "caldav") continue;
+    if (s.provider !== "caldav" && s.provider !== "google") continue;
     await refreshOne(s.id, session);
   }
 };

@@ -164,6 +164,55 @@ describe("subscription replacement isolation", () => {
   });
 });
 
+describe("normalizeSchedule provider field isolation", () => {
+  it("googleEventId set does not clear caldav fields", () => {
+    const s = normalizeSchedule({
+      id: "m1",
+      source: "manual",
+      title: "T",
+      start: "2026-04-25T09:00:00",
+      end: "2026-04-25T10:00:00",
+      caldavObjectUrl: "https://p123-caldav.icloud.com/abc.ics",
+      caldavEtag: '"abc-etag"',
+      googleEventId: "ev-google-1",
+    });
+    expect(s.caldavObjectUrl).toBe("https://p123-caldav.icloud.com/abc.ics");
+    expect(s.caldavEtag).toBe('"abc-etag"');
+    expect(s.googleEventId).toBe("ev-google-1");
+  });
+
+  it("missing googleEventId becomes empty string (no undefined)", () => {
+    const s = normalizeSchedule({
+      id: "m1",
+      source: "manual",
+      title: "T",
+      start: "2026-04-25T09:00:00",
+      end: "2026-04-25T10:00:00",
+    });
+    expect(s.googleEventId).toBe("");
+    expect(s.googleAccountId).toBe("");
+    expect(s.caldavObjectUrl).toBe("");
+    expect(s.caldavEtag).toBe("");
+  });
+
+  it("upserting a schedule with googleEventId and googleAccountId persists it round-trip", () => {
+    const s = normalizeSchedule({
+      id: "g1",
+      source: "manual",
+      title: "G",
+      start: "2026-04-25T09:00:00",
+      end: "2026-04-25T10:00:00",
+      googleEventId: "abc123",
+      googleAccountId: "work@example.com",
+    });
+    upsertManualSchedule(s);
+    const all = loadSchedules();
+    expect(all).toHaveLength(1);
+    expect(all[0]?.googleEventId).toBe("abc123");
+    expect(all[0]?.googleAccountId).toBe("work@example.com");
+  });
+});
+
 describe("loadSchedules robustness", () => {
   it("skips rows with corrupt JSON without dropping valid rows", () => {
     upsertManualSchedule(makeManual({ id: "m1", title: "Good" }));

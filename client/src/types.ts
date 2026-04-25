@@ -287,6 +287,7 @@ export interface AIToolConfig {
 
 export interface AppConfig {
   dayBoundaryHour: number;
+  calendarWeekStart: 0 | 1;
 }
 
 // --- Retrospective ---
@@ -549,12 +550,20 @@ export interface Schedule {
   updatedAt: string;
   caldavObjectUrl: string;
   caldavEtag: string;
+  /** Google Calendar に push した場合の event ID。空なら未 push。 */
+  googleEventId: string;
+  /** Google Calendar に push / fetch したアカウント ID。空なら旧データ。 */
+  googleAccountId: string;
 }
 
 export type SubscriptionStatus = "idle" | "fetching" | "ok" | "error";
 
-/** "ics" = 公開 iCal URL を GET で取得。"caldav" = iCloud などの CalDAV サーバから取得。 */
-export type SubscriptionProvider = "ics" | "caldav";
+/**
+ * "ics" = 公開 iCal URL を GET で取得。
+ * "caldav" = iCloud などの CalDAV サーバから取得。
+ * "google" = Google Calendar API v3 から取得。
+ */
+export type SubscriptionProvider = "ics" | "caldav" | "google";
 
 export interface CalendarSubscription {
   id: string;
@@ -570,6 +579,10 @@ export interface CalendarSubscription {
   updatedAt: string;
   provider: SubscriptionProvider;
   caldavCalendarId: string;
+  /** provider="google" のときの Google Calendar API calendarId。 */
+  googleCalendarId: string;
+  /** provider="google" のときの接続済み Google アカウント ID。 */
+  googleAccountId: string;
 }
 
 export interface CalDAVStatus {
@@ -590,6 +603,41 @@ export interface CalDAVCalendarChoice {
   ctag: string;
 }
 
+export interface GoogleStatus {
+  connected: boolean;
+  /** client_id / client_secret が保存済みかどうか (接続前の判定用)。 */
+  hasCredentials: boolean;
+  accountEmail: string;
+  connectedAt: string;
+  lastError: string;
+  writeTargetCalendarId: string;
+  writeTargetCalendarName: string;
+  writeTargetCalendarColor: string;
+  activeAccountId: string;
+  accounts: GoogleAccountStatus[];
+  /** Google Cloud Console に登録するリダイレクト URI。UI に表示してユーザーに完全一致を促す。 */
+  redirectUri: string;
+}
+
+export interface GoogleAccountStatus {
+  id: string;
+  accountEmail: string;
+  connectedAt: string;
+  writeTargetCalendarId: string;
+  writeTargetCalendarName: string;
+  writeTargetCalendarColor: string;
+}
+
+export interface GoogleCalendarChoice {
+  /** Google Calendar API の calendarId (例: "primary" や "xxx@group.calendar.google.com")。 */
+  id: string;
+  displayName: string;
+  description: string;
+  color: string;
+  primary: boolean;
+  accountId: string;
+}
+
 export const DEFAULT_SUBSCRIPTION_COLORS: readonly string[] = [
   "#3b82f6",
   "#ec4899",
@@ -604,6 +652,8 @@ export const DEFAULT_SCHEDULE_COLOR = "#0ea5e9";
 export interface ScheduleColorContext {
   /** CalDAV 接続済みなら、書き込み先カレンダーの色 (#RRGGBB)。"" 可。 */
   writeTargetColor: string;
+  /** Google 接続済みなら、書き込み先カレンダーの色。"" 可。 */
+  googleWriteTargetColor: string;
   /** テーマアクセント色。書き込み先未設定の manual イベントで使う。 */
   themeAccent: string;
 }
@@ -611,8 +661,10 @@ export interface ScheduleColorContext {
 /**
  * Schedule の表示色を解決する。
  * - subscription 由来 → そのカレンダーの色
- * - manual + 書き込み先設定あり → 書き込み先カレンダー色
- * - manual + 書き込み先未設定 → テーマアクセント色
+ * - manual + push 済み (caldav/google) → その書き込み先カレンダー色
+ * - manual + 未 push + caldav 書き込み先設定あり → caldav 書き込み先色
+ * - manual + 未 push + google 書き込み先設定あり → google 書き込み先色
+ * - それ以外 → テーマアクセント色
  */
 export function scheduleColor(
   schedule: Schedule,
@@ -624,7 +676,14 @@ export function scheduleColor(
     if (sub?.color) return sub.color;
     return DEFAULT_SCHEDULE_COLOR;
   }
+  if (schedule.googleEventId && ctx.googleWriteTargetColor) {
+    return ctx.googleWriteTargetColor;
+  }
+  if (schedule.caldavObjectUrl && ctx.writeTargetColor) {
+    return ctx.writeTargetColor;
+  }
   if (ctx.writeTargetColor) return ctx.writeTargetColor;
+  if (ctx.googleWriteTargetColor) return ctx.googleWriteTargetColor;
   if (ctx.themeAccent) return ctx.themeAccent;
   return DEFAULT_SCHEDULE_COLOR;
 }
@@ -702,4 +761,11 @@ export type WSMessage =
       type: "caldav_calendars";
       calendars: CalDAVCalendarChoice[];
       error: string;
-    };
+    }
+  | { type: "google_status"; status: GoogleStatus }
+  | {
+      type: "google_calendars";
+      calendars: GoogleCalendarChoice[];
+      error: string;
+    }
+  | { type: "google_authorize_url"; url: string };

@@ -19,6 +19,7 @@ export const GITHUB_CONFIG_PATH = join(DATA_DIR, "github_config.json");
 export const AI_CONFIG_PATH = join(DATA_DIR, "ai_config.json");
 export const APP_CONFIG_PATH = join(DATA_DIR, "app_config.json");
 export const CALDAV_CONFIG_PATH = join(DATA_DIR, "caldav_config.json");
+export const GOOGLE_CONFIG_PATH = join(DATA_DIR, "google_config.json");
 
 export const PORT = Number(process.env.TODOME_BACKEND_PORT ?? 3002);
 

@@ -9,6 +9,15 @@ import {
   caldavStatusRequest,
 } from "./caldav.ts";
 import {
+  googleConnectStart,
+  googleDisconnect,
+  googleListCalendars,
+  googleSetActiveAccount,
+  googleSetCredentials,
+  googleSetWriteTarget,
+  googleStatusRequest,
+} from "./google.ts";
+import {
   githubCommitDiff,
   githubLink,
   githubListCommits,
@@ -123,5 +132,12 @@ export function registerAllHandlers(): void {
   registerHandler("caldav_disconnect", caldavDisconnect);
   registerHandler("caldav_list_calendars", caldavListCalendars);
   registerHandler("caldav_set_write_target", caldavSetWriteTarget);
+  registerHandler("google_status_request", googleStatusRequest);
+  registerHandler("google_set_credentials", googleSetCredentials);
+  registerHandler("google_connect_start", googleConnectStart);
+  registerHandler("google_disconnect", googleDisconnect);
+  registerHandler("google_set_active_account", googleSetActiveAccount);
+  registerHandler("google_list_calendars", googleListCalendars);
+  registerHandler("google_set_write_target", googleSetWriteTarget);
   registerHandler("message", message);
 }
