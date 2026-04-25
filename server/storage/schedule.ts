@@ -136,5 +136,7 @@ export function normalizeSchedule(raw: Partial<Schedule>): Schedule {
     updatedAt: String(raw.updatedAt ?? ""),
     caldavObjectUrl: String(raw.caldavObjectUrl ?? ""),
     caldavEtag: String(raw.caldavEtag ?? ""),
+    googleEventId: String(raw.googleEventId ?? ""),
+    googleAccountId: String(raw.googleAccountId ?? ""),
   };
 }

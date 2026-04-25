@@ -39,6 +39,8 @@ function emptySchedule(opts: {
     updatedAt: now,
     caldavObjectUrl: "",
     caldavEtag: "",
+    googleEventId: "",
+    googleAccountId: "",
   };
 }
 

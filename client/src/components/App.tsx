@@ -7,6 +7,8 @@ import type {
   CalDAVCalendarChoice,
   CalDAVStatus,
   CalendarSubscription,
+  GoogleCalendarChoice,
+  GoogleStatus,
   ChatMessage,
   CommitDiffEntry,
   GitCommit,
@@ -229,6 +231,11 @@ export function App() {
     [],
   );
   const [caldavCalendarsError, setCaldavCalendarsError] = useState("");
+  const [googleStatus, setGoogleStatus] = useState<GoogleStatus | null>(null);
+  const [googleCalendars, setGoogleCalendars] = useState<GoogleCalendarChoice[]>(
+    [],
+  );
+  const [googleCalendarsError, setGoogleCalendarsError] = useState("");
   const [retros, setRetros] = useState<Retrospective[]>([]);
   const [activeRetro, setActiveRetro] = useState<Retrospective | null>(null);
   const [retroStreamText, setRetroStreamText] = useState("");
@@ -243,6 +250,7 @@ export function App() {
   const [dayBoundaryHour, setDayBoundaryHourState] = useState<number>(() =>
     loadDayBoundaryHour(),
   );
+  const [calendarWeekStart, setCalendarWeekStartState] = useState<0 | 1>(1);
   const [lifeLogsByRetroId, setLifeLogsByRetroId] = useState<
     Record<string, LifeLog[]>
   >({});
@@ -416,6 +424,7 @@ export function App() {
         break;
       case "app_config_sync": {
         const serverHour = msg.config.dayBoundaryHour;
+        const serverWeekStart = msg.config.calendarWeekStart === 0 ? 0 : 1;
         if (!dayBoundaryHourMigratedRef.current) {
           dayBoundaryHourMigratedRef.current = true;
           const localHour = loadDayBoundaryHour();
@@ -431,6 +440,7 @@ export function App() {
           }
         }
         setDayBoundaryHourState(serverHour);
+        setCalendarWeekStartState(serverWeekStart);
         saveDayBoundaryHour(serverHour);
         break;
       }
@@ -583,6 +593,17 @@ export function App() {
         setCaldavCalendars(msg.calendars);
         setCaldavCalendarsError(msg.error);
         break;
+      case "google_status":
+        setGoogleStatus(msg.status);
+        break;
+      case "google_calendars":
+        setGoogleCalendars(msg.calendars);
+        setGoogleCalendarsError(msg.error);
+        break;
+      case "google_authorize_url":
+        // 認可ページを別タブで開く。コールバック後はサーバが google_status を broadcast する。
+        window.open(msg.url, "_blank", "noopener,noreferrer");
+        break;
     }
   }, [showError]);
 
@@ -721,6 +742,14 @@ export function App() {
       setDayBoundaryHourState(clamped);
       saveDayBoundaryHour(clamped);
       send({ type: "app_config_update", config: { dayBoundaryHour: clamped } });
+    },
+    [send],
+  );
+
+  const setCalendarWeekStart = useCallback(
+    (value: 0 | 1) => {
+      setCalendarWeekStartState(value);
+      send({ type: "app_config_update", config: { calendarWeekStart: value } });
     },
     [send],
   );
@@ -1435,9 +1464,13 @@ export function App() {
             subscriptions={subscriptions}
             send={send}
             dayBoundaryHour={dayBoundaryHour}
+            calendarWeekStart={calendarWeekStart}
             caldavStatus={caldavStatus}
             caldavCalendars={caldavCalendars}
             caldavCalendarsError={caldavCalendarsError}
+            googleStatus={googleStatus}
+            googleCalendars={googleCalendars}
+            googleCalendarsError={googleCalendarsError}
             themeAccent={themeAccent}
           />
         ) : activeView === "retro" ? (
@@ -1490,6 +1523,8 @@ export function App() {
             onUpdateAIConfig={handleUpdateAIConfig}
             dayBoundaryHour={dayBoundaryHour}
             onDayBoundaryHourChange={setDayBoundaryHour}
+            calendarWeekStart={calendarWeekStart}
+            onCalendarWeekStartChange={setCalendarWeekStart}
             timezone={profile.timezone}
             onTimezoneChange={(tz) => {
               const next = { ...profile, timezone: tz };

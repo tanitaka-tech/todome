@@ -6,12 +6,14 @@ import type {
   ScheduleColorContext,
 } from "../types";
 import { scheduleColor, sortSchedulesByStart } from "../types";
+import { getHolidayName, isDayOff } from "../holiday";
 
 interface Props {
   anchor: Date;
   schedules: Schedule[];
   subscriptions: CalendarSubscription[];
   colorContext: ScheduleColorContext;
+  calendarWeekStart: 0 | 1;
   onEventClick: (schedule: Schedule) => void;
   onSlotClick: (start: string, end: string, allDay: boolean) => void;
 }
@@ -30,10 +32,14 @@ function formatLocalDate(d: Date): string {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 }
 
-function buildMonthGrid(anchor: Date): DayCell[] {
+function weekdayOffset(day: number, weekStart: 0 | 1): number {
+  return (day - weekStart + 7) % 7;
+}
+
+function buildMonthGrid(anchor: Date, weekStart: 0 | 1): DayCell[] {
   const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
   const start = new Date(first);
-  start.setDate(start.getDate() - first.getDay());
+  start.setDate(start.getDate() - weekdayOffset(first.getDay(), weekStart));
   const cells: DayCell[] = [];
   for (let i = 0; i < 42; i++) {
     const d = new Date(start);
@@ -52,12 +58,21 @@ export function ScheduleMonthView({
   schedules,
   subscriptions,
   colorContext,
+  calendarWeekStart,
   onEventClick,
   onSlotClick,
 }: Props) {
   const { t } = useTranslation("schedule");
 
-  const cells = useMemo(() => buildMonthGrid(anchor), [anchor]);
+  const cells = useMemo(
+    () => buildMonthGrid(anchor, calendarWeekStart),
+    [anchor, calendarWeekStart],
+  );
+  const weekdays = useMemo(
+    () =>
+      Array.from({ length: 7 }, (_, i) => (calendarWeekStart + i) % 7),
+    [calendarWeekStart],
+  );
   const sorted = useMemo(() => sortSchedulesByStart(schedules), [schedules]);
   const todayIso = formatLocalDate(new Date());
 
@@ -84,7 +99,7 @@ export function ScheduleMonthView({
   return (
     <div className="schedule-month">
       <div className="schedule-month-weekdays">
-        {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+        {weekdays.map((i) => (
           <div key={i} className="schedule-month-weekday">
             {t(`wd_${i}`)}
           </div>
@@ -94,10 +109,12 @@ export function ScheduleMonthView({
         {cells.map((cell) => {
           const events = eventsByDate.get(cell.iso) ?? [];
           const isToday = cell.iso === todayIso;
+          const off = isDayOff(cell.date);
+          const holidayName = getHolidayName(cell.date);
           return (
             <div
               key={cell.iso}
-              className={`schedule-month-cell${cell.inMonth ? "" : " is-out"}${isToday ? " is-today" : ""}`}
+              className={`schedule-month-cell${cell.inMonth ? "" : " is-out"}${isToday ? " is-today" : ""}${off ? " is-off" : ""}`}
               onClick={(e) => {
                 if (e.target !== e.currentTarget) return;
                 onSlotClick(
@@ -108,6 +125,14 @@ export function ScheduleMonthView({
               }}
             >
               <div className="schedule-month-cell-head">
+                {holidayName && (
+                  <span
+                    className="schedule-month-holiday-name"
+                    title={holidayName}
+                  >
+                    {holidayName}
+                  </span>
+                )}
                 <span className="schedule-month-day-num">
                   {cell.date.getDate()}
                 </span>

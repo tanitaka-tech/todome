@@ -176,12 +176,20 @@ export interface Schedule {
   caldavObjectUrl: string;
   /** push した時の ETag。次回 PUT/DELETE の If-Match に使う（任意）。 */
   caldavEtag: string;
+  /** Google Calendar に push した場合の event ID。空なら未 push。 */
+  googleEventId: string;
+  /** Google Calendar に push / fetch したアカウント ID。空なら旧データ。 */
+  googleAccountId: string;
 }
 
 export type SubscriptionStatus = "idle" | "fetching" | "ok" | "error";
 
-/** "ics" = 公開 iCal URL を GET で取得。"caldav" = iCloud などの CalDAV サーバから取得。 */
-export type SubscriptionProvider = "ics" | "caldav";
+/**
+ * "ics" = 公開 iCal URL を GET で取得。
+ * "caldav" = iCloud などの CalDAV サーバから取得。
+ * "google" = Google Calendar API v3 から取得。
+ */
+export type SubscriptionProvider = "ics" | "caldav" | "google";
 
 export interface CalendarSubscription {
   id: string;
@@ -198,6 +206,10 @@ export interface CalendarSubscription {
   provider: SubscriptionProvider;
   /** provider="caldav" のときの iCloud カレンダー識別子 (例: ctag や displayName)。表示用。 */
   caldavCalendarId: string;
+  /** provider="google" のときの Google Calendar API calendarId (push 先解決にも使う)。 */
+  googleCalendarId: string;
+  /** provider="google" のときの接続済み Google アカウント ID。 */
+  googleAccountId: string;
 }
 
 export interface CalDAVConfig {
@@ -228,6 +240,87 @@ export interface CalDAVCalendarChoice {
   color: string;
   /** ctag があれば返す（差分検知用、現状は表示しない）。 */
   ctag: string;
+}
+
+export interface GoogleConfig {
+  /** Google Cloud Console で発行した OAuth クライアントの client_id。 */
+  clientId?: string;
+  /** 同 client_secret。 */
+  clientSecret?: string;
+  /** リフレッシュトークン。これがあれば「接続済み」とみなす。 */
+  refreshToken?: string;
+  /** 直近取得した access_token。期限切れなら refresh する。 */
+  accessToken?: string;
+  /** access_token の有効期限 (ローカル ISO)。 */
+  accessTokenExpiresAt?: string;
+  /** 接続中アカウントの email (表示用)。 */
+  accountEmail?: string;
+  /** 接続日時 (ローカル ISO)。 */
+  connectedAt?: string;
+  /** manual イベントを書き込む先の Google calendarId。"" なら書き込み無効。 */
+  writeTargetCalendarId?: string;
+  writeTargetCalendarName?: string;
+  /** 書き込み先カレンダーの色 (#RRGGBB)。 */
+  writeTargetCalendarColor?: string;
+  /** 複数 Google アカウント接続用。未設定の旧データは load 時に 1 件へ正規化する。 */
+  accounts?: GoogleAccount[];
+  activeAccountId?: string;
+}
+
+export interface GoogleAccount {
+  id: string;
+  /** 接続中アカウントの email (表示用)。 */
+  accountEmail: string;
+  /** リフレッシュトークン。これがあれば「接続済み」とみなす。 */
+  refreshToken?: string;
+  /** 直近取得した access_token。期限切れなら refresh する。 */
+  accessToken?: string;
+  /** access_token の有効期限 (ローカル ISO)。 */
+  accessTokenExpiresAt?: string;
+  /** 接続日時 (ローカル ISO)。 */
+  connectedAt?: string;
+  /** manual イベントを書き込む先の Google calendarId。"" なら書き込み無効。 */
+  writeTargetCalendarId?: string;
+  writeTargetCalendarName?: string;
+  /** 書き込み先カレンダーの色 (#RRGGBB)。 */
+  writeTargetCalendarColor?: string;
+}
+
+export interface GoogleAccountStatus {
+  id: string;
+  accountEmail: string;
+  connectedAt: string;
+  writeTargetCalendarId: string;
+  writeTargetCalendarName: string;
+  writeTargetCalendarColor: string;
+}
+
+export interface GoogleStatus {
+  connected: boolean;
+  /** client_id / client_secret が保存済みかどうか (接続前の判定用)。 */
+  hasCredentials: boolean;
+  accountEmail: string;
+  connectedAt: string;
+  lastError: string;
+  writeTargetCalendarId: string;
+  writeTargetCalendarName: string;
+  writeTargetCalendarColor: string;
+  activeAccountId: string;
+  accounts: GoogleAccountStatus[];
+  /** Google Cloud Console に登録するリダイレクト URI (UI でユーザーに見せて一致チェックさせる)。 */
+  redirectUri: string;
+}
+
+export interface GoogleCalendarChoice {
+  /** Google Calendar API の calendarId (例: "primary" や "xxx@group.calendar.google.com")。 */
+  id: string;
+  displayName: string;
+  description: string;
+  color: string;
+  /** Google からの primary フラグ。 */
+  primary: boolean;
+  /** このカレンダーを取得した接続済み Google アカウント ID。 */
+  accountId: string;
 }
 
 export interface GitHubConfig {

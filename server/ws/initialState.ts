@@ -1,5 +1,6 @@
 import { buildGitHubStatus } from "../github/sync.ts";
 import { buildCalDAVStatus } from "./handlers/caldav.ts";
+import { buildGoogleStatus } from "./handlers/google.ts";
 import { loadAIConfig } from "../storage/aiConfig.ts";
 import { loadAppConfig } from "../storage/appConfig.ts";
 import { loadGoals } from "../storage/goals.ts";
@@ -61,6 +62,7 @@ export async function sendInitialState(
     })],
     ["github_status", async () => await buildGitHubStatus()],
     ["caldav_status", () => ({ type: "caldav_status", status: buildCalDAVStatus() })],
+    ["google_status", () => ({ type: "google_status", status: buildGoogleStatus() })],
   ];
 
   for (const [name, produce] of steps) {

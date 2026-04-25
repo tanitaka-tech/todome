@@ -14,6 +14,11 @@ export const ja_settings: Record<string, string> = {
   dayBoundaryHour: "日の切り替え時刻",
   dayBoundaryHourDesc:
     "この時刻を境に「今日」が切り替わります。(デフォルト: 4:00)",
+  calendarWeekStart: "カレンダーの週始まり",
+  calendarWeekStartDesc:
+    "月表示と週表示の先頭曜日を選びます。(デフォルト: 月曜)",
+  weekStartMonday: "月曜",
+  weekStartSunday: "日曜",
   github: "GitHub連携",
   aiAgent: "AIエージェント",
   aiAgentDesc: "AIアシスタントが使えるツールを選びます。変更は次のチャット送信から反映されます。",

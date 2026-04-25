@@ -16,6 +16,11 @@ export const en_settings: Record<string, string> = {
   dayBoundaryHour: "Day cutoff",
   dayBoundaryHourDesc:
     "Treat this hour as the boundary between \"yesterday\" and \"today\". (default: 4:00)",
+  calendarWeekStart: "Calendar week starts on",
+  calendarWeekStartDesc:
+    "Choose the first weekday for month and week views. (default: Monday)",
+  weekStartMonday: "Monday",
+  weekStartSunday: "Sunday",
   github: "GitHub",
   aiAgent: "AI Agent",
   aiAgentDesc:

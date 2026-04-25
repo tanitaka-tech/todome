@@ -1,3 +1,4 @@
 {
-  "dayBoundaryHour": 4
+  "dayBoundaryHour": 4,
+  "calendarWeekStart": 1
 }
