@@ -7,7 +7,11 @@ import {
   useState,
 } from "react";
 import { useTranslation } from "react-i18next";
-import type { CalendarSubscription, Schedule } from "../types";
+import type {
+  CalendarSubscription,
+  Schedule,
+  ScheduleColorContext,
+} from "../types";
 import { scheduleColor } from "../types";
 
 interface SelectingState {
@@ -42,6 +46,7 @@ interface Props {
   anchor: Date;
   schedules: Schedule[];
   subscriptions: CalendarSubscription[];
+  colorContext: ScheduleColorContext;
   onAnchorChange: (d: Date) => void;
   onEventClick: (schedule: Schedule) => void;
   onSlotClick: (start: string, end: string, allDay: boolean) => void;
@@ -135,6 +140,7 @@ export function ScheduleWeekScroller({
   anchor,
   schedules,
   subscriptions,
+  colorContext,
   onAnchorChange,
   onEventClick,
   onSlotClick,
@@ -627,7 +633,7 @@ export function ScheduleWeekScroller({
                     key={`${s.id}-${iso}`}
                     type="button"
                     className="schedule-week-allday-event"
-                    style={{ backgroundColor: scheduleColor(s, subscriptions) }}
+                    style={{ backgroundColor: scheduleColor(s, subscriptions, colorContext) }}
                     title={s.title}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -728,7 +734,7 @@ export function ScheduleWeekScroller({
                     style={{
                       top: displayTop,
                       height: displayHeight,
-                      backgroundColor: scheduleColor(schedule, subscriptions),
+                      backgroundColor: scheduleColor(schedule, subscriptions, colorContext),
                     }}
                     title={schedule.title}
                     onMouseDown={(e) => e.stopPropagation()}

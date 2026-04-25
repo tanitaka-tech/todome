@@ -7,7 +7,12 @@ import {
   useState,
 } from "react";
 import { useTranslation } from "react-i18next";
-import type { CalendarSubscription, Schedule } from "../types";
+import type {
+  CalDAVCalendarChoice,
+  CalDAVStatus,
+  CalendarSubscription,
+  Schedule,
+} from "../types";
 import { nowLocalIso } from "../types";
 import {
   loadScheduleView,
@@ -31,6 +36,11 @@ interface Props {
   subscriptions: CalendarSubscription[];
   send: (data: unknown) => void;
   dayBoundaryHour: number;
+  caldavStatus: CalDAVStatus | null;
+  caldavCalendars: CalDAVCalendarChoice[];
+  caldavCalendarsError: string;
+  /** テーマアクセント色 (#RRGGBB)。書き込み先未設定の manual schedule の表示色。 */
+  themeAccent: string;
 }
 
 interface EditorState {
@@ -88,6 +98,10 @@ export function SchedulePanel({
   subscriptions,
   send,
   dayBoundaryHour: _dayBoundaryHour,
+  caldavStatus,
+  caldavCalendars,
+  caldavCalendarsError,
+  themeAccent,
 }: Props) {
   const { t, i18n: i18nInst } = useTranslation("schedule");
   const lang = i18nInst.language;
@@ -109,6 +123,14 @@ export function SchedulePanel({
     setViewModeState(mode);
     saveScheduleView(mode);
   }, []);
+
+  const colorContext = useMemo(
+    () => ({
+      writeTargetColor: caldavStatus?.writeTargetCalendarColor || "",
+      themeAccent,
+    }),
+    [caldavStatus?.writeTargetCalendarColor, themeAccent],
+  );
 
   const visibleSchedules = useMemo(() => {
     const enabledSubs = new Set(
@@ -158,17 +180,20 @@ export function SchedulePanel({
     }
   }, [viewMode, fireMonthScroll]);
 
-  const handleNewEvent = useCallback(() => {
-    setEditor({ mode: "create", schedule: null });
-  }, []);
-
-  const handleEventClick = useCallback((schedule: Schedule) => {
-    if (schedule.source === "subscription") {
-      setEditor({ mode: "view", schedule });
-    } else {
+  const handleEventClick = useCallback(
+    (schedule: Schedule) => {
+      if (schedule.source === "subscription") {
+        // CalDAV 購読の単発イベントなら iCloud に書き戻せるので edit モード
+        const sub = subscriptions.find((s) => s.id === schedule.subscriptionId);
+        const editable =
+          sub?.provider === "caldav" && !schedule.rrule;
+        setEditor({ mode: editable ? "edit" : "view", schedule });
+        return;
+      }
       setEditor({ mode: "edit", schedule });
-    }
-  }, []);
+    },
+    [subscriptions],
+  );
 
   const handleSlotClick = useCallback(
     (start: string, end: string, allDay: boolean) => {
@@ -193,18 +218,26 @@ export function SchedulePanel({
           source: "manual",
           subscriptionId: "",
           externalUid: "",
+          caldavObjectUrl: "",
+          caldavEtag: "",
           createdAt: now,
           updatedAt: now,
         };
         send({ type: "schedule_add", schedule: next });
       } else if (editor?.mode === "edit" && editor.schedule) {
+        const original = editor.schedule;
+        // subscription 由来なら identity / iCloud 識別子 / RRULE を維持
         const next: Schedule = {
           ...draft,
-          id: editor.schedule.id,
-          source: "manual",
-          subscriptionId: "",
-          externalUid: "",
-          createdAt: editor.schedule.createdAt,
+          id: original.id,
+          source: original.source,
+          subscriptionId: original.subscriptionId,
+          externalUid: original.externalUid,
+          caldavObjectUrl: original.caldavObjectUrl,
+          caldavEtag: original.caldavEtag,
+          rrule: original.rrule,
+          recurrenceId: original.recurrenceId,
+          createdAt: original.createdAt,
           updatedAt: now,
         };
         send({ type: "schedule_edit", schedule: next });
@@ -362,13 +395,6 @@ export function SchedulePanel({
           >
             {t("manageSubscriptions")}
           </button>
-          <button
-            type="button"
-            className="btn btn--primary"
-            onClick={handleNewEvent}
-          >
-            + {t("newEvent")}
-          </button>
         </div>
       </header>
 
@@ -385,6 +411,7 @@ export function SchedulePanel({
                   anchor={d}
                   schedules={visibleSchedules}
                   subscriptions={subscriptions}
+                  colorContext={colorContext}
                   onEventClick={handleEventClick}
                   onSlotClick={handleSlotClick}
                 />
@@ -397,6 +424,7 @@ export function SchedulePanel({
             anchor={anchor}
             schedules={visibleSchedules}
             subscriptions={subscriptions}
+            colorContext={colorContext}
             onAnchorChange={setAnchor}
             onEventClick={handleEventClick}
             onSlotClick={handleSlotClick}
@@ -410,7 +438,6 @@ export function SchedulePanel({
           key={editor.schedule?.id ?? "new"}
           mode={editor.mode}
           schedule={editor.schedule}
-          subscriptions={subscriptions}
           initialStart={editor.initialStart}
           initialEnd={editor.initialEnd}
           initialAllDay={editor.initialAllDay}
@@ -429,6 +456,9 @@ export function SchedulePanel({
           subscriptions={subscriptions}
           send={send}
           onClose={() => setShowSubscriptions(false)}
+          caldavStatus={caldavStatus}
+          caldavCalendars={caldavCalendars}
+          caldavCalendarsError={caldavCalendarsError}
         />
       )}
     </div>

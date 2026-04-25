@@ -4,6 +4,8 @@ import i18n from "../i18n";
 import type {
   AIToolConfig,
   AskUserRequest,
+  CalDAVCalendarChoice,
+  CalDAVStatus,
   CalendarSubscription,
   ChatMessage,
   CommitDiffEntry,
@@ -31,7 +33,7 @@ import {
   nowLocalIso,
   totalSeconds,
 } from "../types";
-import { applyTheme, getInitialTheme, type ThemeName } from "../theme";
+import { applyTheme, getInitialTheme, getThemeAccent, type ThemeName } from "../theme";
 import {
   applyLanguage,
   getInitialLanguage,
@@ -86,6 +88,7 @@ const EMPTY_PROFILE: UserProfile = {
   balanceWheel: [],
   actionPrinciples: [],
   wantToDo: [],
+  timezone: "",
 };
 
 const PRAISE_MESSAGES = [
@@ -221,6 +224,11 @@ export function App() {
   const [subscriptions, setSubscriptions] = useState<CalendarSubscription[]>(
     [],
   );
+  const [caldavStatus, setCaldavStatus] = useState<CalDAVStatus | null>(null);
+  const [caldavCalendars, setCaldavCalendars] = useState<CalDAVCalendarChoice[]>(
+    [],
+  );
+  const [caldavCalendarsError, setCaldavCalendarsError] = useState("");
   const [retros, setRetros] = useState<Retrospective[]>([]);
   const [activeRetro, setActiveRetro] = useState<Retrospective | null>(null);
   const [retroStreamText, setRetroStreamText] = useState("");
@@ -274,6 +282,9 @@ export function App() {
   useEffect(() => {
     applyTheme(theme);
   }, [theme]);
+
+  // 各テーマの --accent と同期した値（書き込み先未設定の manual イベントの表示色）。
+  const themeAccent = useMemo(() => getThemeAccent(theme), [theme]);
 
   useEffect(() => {
     applyLanguage(language);
@@ -564,6 +575,13 @@ export function App() {
         break;
       case "subscription_sync":
         setSubscriptions(msg.subscriptions);
+        break;
+      case "caldav_status":
+        setCaldavStatus(msg.status);
+        break;
+      case "caldav_calendars":
+        setCaldavCalendars(msg.calendars);
+        setCaldavCalendarsError(msg.error);
         break;
     }
   }, [showError]);
@@ -1417,6 +1435,10 @@ export function App() {
             subscriptions={subscriptions}
             send={send}
             dayBoundaryHour={dayBoundaryHour}
+            caldavStatus={caldavStatus}
+            caldavCalendars={caldavCalendars}
+            caldavCalendarsError={caldavCalendarsError}
+            themeAccent={themeAccent}
           />
         ) : activeView === "retro" ? (
           <RetroPanel
@@ -1468,6 +1490,12 @@ export function App() {
             onUpdateAIConfig={handleUpdateAIConfig}
             dayBoundaryHour={dayBoundaryHour}
             onDayBoundaryHourChange={setDayBoundaryHour}
+            timezone={profile.timezone}
+            onTimezoneChange={(tz) => {
+              const next = { ...profile, timezone: tz };
+              setProfile(next);
+              send({ type: "profile_update", profile: next });
+            }}
           />
         )}
         </ViewTransition>

@@ -76,6 +76,8 @@ export interface UserProfile {
   balanceWheel: BalanceWheelCategory[];
   actionPrinciples: BalanceWheelItem[];
   wantToDo: BalanceWheelItem[];
+  /** IANA タイムゾーン (例: "Asia/Tokyo")。"" ならブラウザ/サーバー解決の TZ にフォールバック。 */
+  timezone: string;
 }
 
 // --- Helpers ---
@@ -541,14 +543,18 @@ export interface Schedule {
   start: string; // ローカル ISO "YYYY-MM-DDTHH:mm:ss"
   end: string;
   allDay: boolean;
-  color: string; // "" = subscription / デフォルト色を使う
   rrule: string;
   recurrenceId: string;
   createdAt: string;
   updatedAt: string;
+  caldavObjectUrl: string;
+  caldavEtag: string;
 }
 
 export type SubscriptionStatus = "idle" | "fetching" | "ok" | "error";
+
+/** "ics" = 公開 iCal URL を GET で取得。"caldav" = iCloud などの CalDAV サーバから取得。 */
+export type SubscriptionProvider = "ics" | "caldav";
 
 export interface CalendarSubscription {
   id: string;
@@ -562,6 +568,26 @@ export interface CalendarSubscription {
   eventCount: number;
   createdAt: string;
   updatedAt: string;
+  provider: SubscriptionProvider;
+  caldavCalendarId: string;
+}
+
+export interface CalDAVStatus {
+  connected: boolean;
+  appleId: string;
+  connectedAt: string;
+  lastError: string;
+  writeTargetCalendarUrl: string;
+  writeTargetCalendarName: string;
+  writeTargetCalendarColor: string;
+}
+
+export interface CalDAVCalendarChoice {
+  url: string;
+  displayName: string;
+  description: string;
+  color: string;
+  ctag: string;
 }
 
 export const DEFAULT_SUBSCRIPTION_COLORS: readonly string[] = [
@@ -575,15 +601,31 @@ export const DEFAULT_SUBSCRIPTION_COLORS: readonly string[] = [
 
 export const DEFAULT_SCHEDULE_COLOR = "#0ea5e9";
 
+export interface ScheduleColorContext {
+  /** CalDAV 接続済みなら、書き込み先カレンダーの色 (#RRGGBB)。"" 可。 */
+  writeTargetColor: string;
+  /** テーマアクセント色。書き込み先未設定の manual イベントで使う。 */
+  themeAccent: string;
+}
+
+/**
+ * Schedule の表示色を解決する。
+ * - subscription 由来 → そのカレンダーの色
+ * - manual + 書き込み先設定あり → 書き込み先カレンダー色
+ * - manual + 書き込み先未設定 → テーマアクセント色
+ */
 export function scheduleColor(
   schedule: Schedule,
   subscriptions: CalendarSubscription[],
+  ctx: ScheduleColorContext,
 ): string {
-  if (schedule.color) return schedule.color;
   if (schedule.source === "subscription" && schedule.subscriptionId) {
     const sub = subscriptions.find((s) => s.id === schedule.subscriptionId);
     if (sub?.color) return sub.color;
+    return DEFAULT_SCHEDULE_COLOR;
   }
+  if (ctx.writeTargetColor) return ctx.writeTargetColor;
+  if (ctx.themeAccent) return ctx.themeAccent;
   return DEFAULT_SCHEDULE_COLOR;
 }
 
@@ -654,4 +696,10 @@ export type WSMessage =
   | { type: "quota_streak_sync"; streaks: QuotaStreak[] }
   | { type: "quota_log_range_sync"; requestId: string; logs: QuotaLog[] }
   | { type: "schedule_sync"; schedules: Schedule[] }
-  | { type: "subscription_sync"; subscriptions: CalendarSubscription[] };
+  | { type: "subscription_sync"; subscriptions: CalendarSubscription[] }
+  | { type: "caldav_status"; status: CalDAVStatus }
+  | {
+      type: "caldav_calendars";
+      calendars: CalDAVCalendarChoice[];
+      error: string;
+    };

@@ -1,12 +1,17 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import type { CalendarSubscription, Schedule } from "../types";
+import type {
+  CalendarSubscription,
+  Schedule,
+  ScheduleColorContext,
+} from "../types";
 import { scheduleColor, sortSchedulesByStart } from "../types";
 
 interface Props {
   anchor: Date;
   schedules: Schedule[];
   subscriptions: CalendarSubscription[];
+  colorContext: ScheduleColorContext;
   onEventClick: (schedule: Schedule) => void;
   onSlotClick: (start: string, end: string, allDay: boolean) => void;
 }
@@ -46,6 +51,7 @@ export function ScheduleMonthView({
   anchor,
   schedules,
   subscriptions,
+  colorContext,
   onEventClick,
   onSlotClick,
 }: Props) {
@@ -108,7 +114,7 @@ export function ScheduleMonthView({
               </div>
               <div className="schedule-month-events">
                 {events.slice(0, 4).map((s) => {
-                  const color = scheduleColor(s, subscriptions);
+                  const color = scheduleColor(s, subscriptions, colorContext);
                   const time = s.allDay
                     ? ""
                     : (s.start || "").slice(11, 16);

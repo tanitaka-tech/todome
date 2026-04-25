@@ -21,8 +21,19 @@ life_activities (...)
 life_logs (...)
 quotas (...)
 quota_logs (...)
+schedules (id TEXT PRIMARY KEY, sort_order INTEGER, source TEXT, subscription_id TEXT, external_uid TEXT, start_at TEXT, end_at TEXT, data TEXT)
+calendar_subscriptions (id TEXT PRIMARY KEY, sort_order INTEGER, data TEXT)
 ```
 ネストしたフィールド (`kpis`, `timeLogs`, `balanceWheel` など) は `data` 列内で JSON 保持。
+
+### 設定ファイル (`data/` 直下、いずれも平文 JSON)
+
+| ファイル | 内容 |
+|---|---|
+| `github_config.json` | GitHub 同期先 owner/repo / autoSync / lastSyncAt |
+| `ai_config.json` | AI ツール許可リスト + モデル設定 |
+| `app_config.json` | `dayBoundaryHour` などのアプリ設定 |
+| `caldav_config.json` | iCloud (CalDAV) 接続情報 — `appleId` / `appPassword` / `connectedAt`。**App用パスワードを平文で保管**するため、`data/` の権限管理に注意。切断時に削除される。 |
 
 ## データ構造
 
@@ -47,15 +58,34 @@ kpis: KPI[]   // {id, name, unit: "number"|"percent", targetValue, currentValue}
 ```
 全 KPI が `currentValue >= targetValue` になると `syncGoalAchievement()` (`server/domain/goal.ts`) が `achieved` を自動更新する。
 
-### 3. UserProfile (`client/src/types.ts:70`)
+### 3. UserProfile (`client/src/types.ts:74`)
 ```
 currentState           // 現在の状態 (テキスト)
-balanceWheel[]         // {id, name, ideals: {id, text}[]}
+balanceWheel[]         // {id, name, score, icon}
 actionPrinciples[]     // {id, text}[]
 wantToDo[]             // {id, text}[]
+timezone               // IANA TZ ("" ならサーバ/ブラウザの環境TZ)
 ```
 
-### 4. Chat / AI 関連 (クライアントのみ)
+### 4. Schedule / CalendarSubscription (`client/src/types.ts:533` 付近)
+```
+Schedule:
+  id, source: "manual" | "subscription"
+  subscriptionId, externalUid     // subscription 由来の場合のみ
+  title, description, location
+  start, end                      // ローカル ISO "YYYY-MM-DDTHH:mm:ss" (Zなし)
+  allDay, color, rrule, recurrenceId
+
+CalendarSubscription:
+  id, name, url, color, enabled
+  provider: "ics" | "caldav"
+  caldavCalendarId                // provider=caldav のとき表示用
+  status: "idle"|"fetching"|"ok"|"error", lastFetchedAt, lastError, eventCount
+```
+
+`source="subscription"` の Schedule は `subscriptionRefresh` ハンドラが `replaceSubscriptionSchedules()` で **全置換** する（差分更新ではない）。CalDAV の RRULE / EXDATE / RECURRENCE-ID は `server/caldav/client.ts` の `parseAndExpand()` で **過去90日 〜 未来365日** の範囲に展開される。
+
+### 5. Chat / AI 関連 (クライアントのみ)
 `ChatMessage`, `AskUserRequest`, ストリーミング中の `streamText` / `thinkingText` — React state のみ。
 
 ## データ更新フロー

@@ -60,6 +60,8 @@ export interface UserProfile {
   balanceWheel: BalanceWheelCategory[];
   actionPrinciples: BalanceWheelItem[];
   wantToDo: BalanceWheelItem[];
+  /** IANA タイムゾーン (例: "Asia/Tokyo")。"" ならサーバー解決の TZ にフォールバック。 */
+  timezone: string;
 }
 
 export type LifeCategory = "rest" | "play" | "routine" | "other";
@@ -166,14 +168,20 @@ export interface Schedule {
   start: string;
   end: string;
   allDay: boolean;
-  color: string;
   rrule: string;
   recurrenceId: string;
   createdAt: string;
   updatedAt: string;
+  /** manual schedule を iCloud に push した場合の DAV オブジェクト URL。空なら未 push。 */
+  caldavObjectUrl: string;
+  /** push した時の ETag。次回 PUT/DELETE の If-Match に使う（任意）。 */
+  caldavEtag: string;
 }
 
 export type SubscriptionStatus = "idle" | "fetching" | "ok" | "error";
+
+/** "ics" = 公開 iCal URL を GET で取得。"caldav" = iCloud などの CalDAV サーバから取得。 */
+export type SubscriptionProvider = "ics" | "caldav";
 
 export interface CalendarSubscription {
   id: string;
@@ -187,6 +195,39 @@ export interface CalendarSubscription {
   eventCount: number;
   createdAt: string;
   updatedAt: string;
+  provider: SubscriptionProvider;
+  /** provider="caldav" のときの iCloud カレンダー識別子 (例: ctag や displayName)。表示用。 */
+  caldavCalendarId: string;
+}
+
+export interface CalDAVConfig {
+  appleId?: string;
+  appPassword?: string;
+  connectedAt?: string;
+  /** manual イベントを書き込む先のカレンダー URL。"" なら書き込み無効。 */
+  writeTargetCalendarUrl?: string;
+  writeTargetCalendarName?: string;
+  /** 書き込み先カレンダーの色 (#RRGGBB)。 */
+  writeTargetCalendarColor?: string;
+}
+
+export interface CalDAVStatus {
+  connected: boolean;
+  appleId: string;
+  connectedAt: string;
+  lastError: string;
+  writeTargetCalendarUrl: string;
+  writeTargetCalendarName: string;
+  writeTargetCalendarColor: string;
+}
+
+export interface CalDAVCalendarChoice {
+  url: string;
+  displayName: string;
+  description: string;
+  color: string;
+  /** ctag があれば返す（差分検知用、現状は表示しない）。 */
+  ctag: string;
 }
 
 export interface GitHubConfig {

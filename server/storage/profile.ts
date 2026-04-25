@@ -6,10 +6,22 @@ export const DEFAULT_PROFILE: UserProfile = {
   balanceWheel: [],
   actionPrinciples: [],
   wantToDo: [],
+  timezone: "",
 };
 
 interface Row {
   data: string;
+}
+
+function normalizeProfile(raw: unknown): UserProfile {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Partial<UserProfile>;
+  return {
+    currentState: typeof r.currentState === "string" ? r.currentState : "",
+    balanceWheel: Array.isArray(r.balanceWheel) ? r.balanceWheel : [],
+    actionPrinciples: Array.isArray(r.actionPrinciples) ? r.actionPrinciples : [],
+    wantToDo: Array.isArray(r.wantToDo) ? r.wantToDo : [],
+    timezone: typeof r.timezone === "string" ? r.timezone : "",
+  };
 }
 
 export function loadProfile(): UserProfile {
@@ -17,7 +29,11 @@ export function loadProfile(): UserProfile {
     .prepare("SELECT data FROM profile WHERE id = 1")
     .get() as Row | undefined;
   if (!row) return { ...DEFAULT_PROFILE };
-  return JSON.parse(row.data) as UserProfile;
+  try {
+    return normalizeProfile(JSON.parse(row.data));
+  } catch {
+    return { ...DEFAULT_PROFILE };
+  }
 }
 
 export function saveProfile(profile: UserProfile): void {
@@ -37,8 +53,9 @@ export function applyProfileUpdate(
   if (typeof updates.currentState === "string") {
     next.currentState = updates.currentState;
   }
-  if (Array.isArray(updates.balanceWheel)) next.balanceWheel = updates.balanceWheel;
-  if (Array.isArray(updates.actionPrinciples)) next.actionPrinciples = updates.actionPrinciples;
-  if (Array.isArray(updates.wantToDo)) next.wantToDo = updates.wantToDo;
+  if (Array.isArray(updates.balanceWheel)) next.balanceWheel = updates.balanceWheel as UserProfile["balanceWheel"];
+  if (Array.isArray(updates.actionPrinciples)) next.actionPrinciples = updates.actionPrinciples as UserProfile["actionPrinciples"];
+  if (Array.isArray(updates.wantToDo)) next.wantToDo = updates.wantToDo as UserProfile["wantToDo"];
+  if (typeof updates.timezone === "string") next.timezone = updates.timezone;
   return next;
 }
