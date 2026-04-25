@@ -35,9 +35,11 @@ test.describe("全画面の遷移", () => {
     await expect(
       page.getByRole("heading", { name: "振り返り", level: 1 }),
     ).toBeVisible();
-    const tabs = page.locator(".retro-tab");
-    await expect(tabs).toHaveCount(4);
-    await expect(tabs).toContainText(["日", "週", "月", "年"]);
+    const period = page.locator(".retro-tabs .period-dropdown");
+    await period.locator(".period-dropdown-button").click();
+    const options = period.locator(".period-dropdown-item");
+    await expect(options).toHaveCount(4);
+    await expect(options).toContainText(["日", "週", "月", "年"]);
   });
 
   test("統計: ページタイトル", async ({ page }) => {
@@ -59,6 +61,6 @@ test.describe("全画面の遷移", () => {
     await expect(
       page.getByRole("heading", { name: "設定", level: 1 }),
     ).toBeVisible();
-    await expect(page.locator(".theme-option")).toHaveCount(12);
+    await expect(page.locator(".theme-groups .theme-option")).toHaveCount(12);
   });
 });
