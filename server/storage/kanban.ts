@@ -9,12 +9,21 @@ export function loadTasks(): KanbanTask[] {
   const rows = getDb()
     .prepare("SELECT data FROM kanban_tasks ORDER BY sort_order")
     .all() as Row[];
-  return rows.map((r) => {
-    const t = JSON.parse(r.data) as KanbanTask;
-    if (t.kpiId === undefined) t.kpiId = "";
-    t.kpiContributed = Boolean(t.kpiContributed);
-    return t;
-  });
+  // 1行でも JSON.parse が失敗すると map() ごと throw して全タスクが消えるため、
+  // 壊れた行はスキップして残りを返す。GitHub sync で外部要因でも DB が入れ替わる構成上、
+  // 1行不正で UI が空白になるのを避ける。
+  const tasks: KanbanTask[] = [];
+  for (const r of rows) {
+    try {
+      const t = JSON.parse(r.data) as KanbanTask;
+      if (t.kpiId === undefined) t.kpiId = "";
+      t.kpiContributed = Boolean(t.kpiContributed);
+      tasks.push(t);
+    } catch (err) {
+      console.warn("[storage/kanban] skip malformed row:", err);
+    }
+  }
+  return tasks;
 }
 
 export function saveTasks(tasks: KanbanTask[]): void {
