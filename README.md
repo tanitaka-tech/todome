@@ -9,6 +9,7 @@
 - **統計ダッシュボード** — 目標別作業時間の円グラフ、日/月/年の推移棒グラフ
 - **プロフィール定義** — 現在の状態、バランスホイール、行動指針、やりたいことをAIコンテキストに反映
 - **GitHub連携** — 端末間でのデータを共有 & 目標にリポジトリを紐付けてAIコンテキストに反映 ([利用規約との関係](docs/github-sync-compliance.md))
+- **iCloudカレンダー連携 (CalDAV)** — Apple ID と App用パスワードで接続し、iCloud のカレンダーをスケジュールタブに読み込み（読み取り専用、RRULE 展開対応）
 
 | Kanban形式でのタスク管理 | タスク管理をAIにお任せ | 目標もタスクもAIに相談 |
 |:---:|:---:|:---:|
@@ -76,6 +77,21 @@ cp .env.example .env
 | `ANTHROPIC_API_KEY` | (未設定) | Anthropic API Key。`claude login` 済みなら不要。 |
 | `TODOME_DATA_DIR` | `./data` | SQLite DB・GitHub 同期状態・各種設定 JSON の保存先。 |
 | `TODOME_BACKEND_PORT` | `3002` | Bun サーバーが listen するポート。 |
+
+### データの保存場所と認証情報の取り扱い
+
+`TODOME_DATA_DIR`（デフォルト `./data`）配下に以下が保存されます。**いずれも平文**です。`data/` は `.gitignore` 済みでローカル限定ですが、暗号化はしていないので取り扱いに注意してください。
+
+| ファイル | 内容 |
+|---|---|
+| `todome.db` | Kanban / 目標 / プロフィール / 振り返り / スケジュール 等の SQLite DB |
+| `github_config.json` | GitHub 同期先リポジトリの紐付け情報（OAuth トークンは `gh` CLI 側に保存） |
+| `ai_config.json` | AI ツール許可リストとモデル設定 |
+| `app_config.json` | 日の境界時刻などのアプリ設定 |
+| `caldav_config.json` | **iCloud (CalDAV) の Apple ID と App用パスワード**。接続切断時に削除されます。 |
+| `repo/` | GitHub 連携時に clone されるリポジトリ（DB はここに切り替わる） |
+
+iCloud 連携を使う場合は [appleid.apple.com](https://appleid.apple.com) で **App用パスワード** を発行してください。Apple ID の本パスワードは絶対に入力しないでください。
 
 ### 3. 依存関係をインストール
 

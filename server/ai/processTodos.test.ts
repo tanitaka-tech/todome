@@ -37,6 +37,7 @@ function makeProfile(partial: Partial<UserProfile> = {}): UserProfile {
     balanceWheel: [],
     actionPrinciples: [{ id: "p1", text: "小さく始める" }],
     wantToDo: [{ id: "w1", text: "読書" }],
+    timezone: "",
     ...partial,
   };
 }

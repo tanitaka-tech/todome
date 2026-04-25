@@ -54,3 +54,25 @@ export function applyTheme(theme: ThemeName) {
 export function isDarkTheme(theme: ThemeName): boolean {
   return DARK_THEMES.includes(theme);
 }
+
+// 各テーマの --accent 値（style.css と同期）。
+// CSS から動的に読み出す方法もあるが、useEffect 内 setState を避けるために
+// テーマ名ベースで同期計算できるようマップで保持する。
+const THEME_ACCENT: Record<ThemeName, string> = {
+  dark: "#8a5ff0",
+  midnight: "#4c8bf5",
+  forest: "#4ade80",
+  sunset: "#f472b6",
+  ocean: "#22d3ee",
+  slate: "#94a3b8",
+  beige: "#9a5b2f",
+  paper: "#111827",
+  mint: "#15803d",
+  rose: "#be185d",
+  sky: "#0369a1",
+  sand: "#a16207",
+};
+
+export function getThemeAccent(theme: ThemeName): string {
+  return THEME_ACCENT[theme] ?? "#6366f1";
+}

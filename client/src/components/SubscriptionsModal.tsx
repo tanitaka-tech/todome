@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { CalendarSubscription, SubscriptionStatus } from "../types";
+import type {
+  CalDAVCalendarChoice,
+  CalDAVStatus,
+  CalendarSubscription,
+  SubscriptionStatus,
+} from "../types";
 import {
   DEFAULT_SUBSCRIPTION_COLORS,
   nowLocalIso,
@@ -10,6 +15,9 @@ interface Props {
   subscriptions: CalendarSubscription[];
   send: (data: unknown) => void;
   onClose: () => void;
+  caldavStatus: CalDAVStatus | null;
+  caldavCalendars: CalDAVCalendarChoice[];
+  caldavCalendarsError: string;
 }
 
 function generateId(): string {
@@ -31,11 +39,20 @@ export function SubscriptionsModal({
   subscriptions,
   send,
   onClose,
+  caldavStatus,
+  caldavCalendars,
+  caldavCalendarsError,
 }: Props) {
   const { t } = useTranslation("schedule");
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [error, setError] = useState("");
+
+  // iCloud connect form。接続成功するとフォーム自体が unmount されるので、
+  // 入力値の明示クリアは不要。
+  const [appleId, setAppleId] = useState("");
+  const [appPassword, setAppPassword] = useState("");
+  const [calendarsOpen, setCalendarsOpen] = useState(false);
 
   const handleAdd = () => {
     const trimmedUrl = url.trim();
@@ -56,6 +73,8 @@ export function SubscriptionsModal({
       eventCount: 0,
       createdAt: now,
       updatedAt: now,
+      provider: "ics",
+      caldavCalendarId: "",
     };
     send({ type: "subscription_add", subscription: sub });
     setName("");
@@ -77,6 +96,62 @@ export function SubscriptionsModal({
   const handleRefresh = (id?: string) => {
     send({ type: "subscription_refresh", subscriptionId: id ?? "" });
   };
+
+  const handleConnect = () => {
+    if (!appleId.trim() || !appPassword.trim()) return;
+    send({
+      type: "caldav_connect",
+      appleId: appleId.trim(),
+      appPassword: appPassword.trim(),
+    });
+  };
+
+  const handleDisconnect = () => {
+    if (!confirm(t("caldavDisconnectConfirm"))) return;
+    send({ type: "caldav_disconnect" });
+  };
+
+  const handleListCalendars = () => {
+    send({ type: "caldav_list_calendars" });
+    setCalendarsOpen(true);
+  };
+
+  const handleSetWriteTarget = (
+    url: string,
+    name: string,
+    color: string,
+  ) => {
+    send({
+      type: "caldav_set_write_target",
+      calendarUrl: url,
+      calendarName: name,
+      calendarColor: color,
+    });
+  };
+
+  const handleSubscribeCalendar = (cal: CalDAVCalendarChoice) => {
+    // 同じ url が既にあれば追加しない
+    if (subscriptions.some((s) => s.url === cal.url)) return;
+    const now = nowLocalIso();
+    const sub: CalendarSubscription = {
+      id: generateId(),
+      name: cal.displayName || cal.url,
+      url: cal.url,
+      color: cal.color || pickColor(subscriptions),
+      enabled: true,
+      lastFetchedAt: "",
+      lastError: "",
+      status: "idle",
+      eventCount: 0,
+      createdAt: now,
+      updatedAt: now,
+      provider: "caldav",
+      caldavCalendarId: cal.displayName || "",
+    };
+    send({ type: "subscription_add", subscription: sub });
+  };
+
+  const subscribedUrls = new Set(subscriptions.map((s) => s.url));
 
   return (
     <div
@@ -103,32 +178,203 @@ export function SubscriptionsModal({
           </button>
         </header>
 
-        <p className="subscriptions-modal-help">{t("subscriptionsHelp")}</p>
+        {/* iCloud (CalDAV) 連携セクション */}
+        <section className="subscriptions-section">
+          <h3 className="subscriptions-section-title">{t("caldavTitle")}</h3>
+          {caldavStatus?.connected ? (
+            <div className="caldav-connected">
+              <div className="caldav-connected-row">
+                <span className="caldav-status-badge">{t("caldavConnected")}</span>
+                <span className="caldav-account">{caldavStatus.appleId}</span>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={handleListCalendars}
+                >
+                  {t("caldavListCalendars")}
+                </button>
+                <button
+                  type="button"
+                  className="btn schedule-editor-delete"
+                  onClick={handleDisconnect}
+                >
+                  {t("caldavDisconnect")}
+                </button>
+              </div>
+              <div className="caldav-write-target-row">
+                <label className="caldav-write-target-label">
+                  {t("caldavWriteTarget")}
+                </label>
+                <select
+                  className="detail-prop-select"
+                  value={caldavStatus.writeTargetCalendarUrl}
+                  onChange={(e) => {
+                    const url = e.target.value;
+                    const cal = caldavCalendars.find((c) => c.url === url);
+                    handleSetWriteTarget(
+                      url,
+                      cal?.displayName || "",
+                      cal?.color || "",
+                    );
+                  }}
+                  onFocus={() => {
+                    // 一覧未取得ならフォーカス時に取得
+                    if (caldavCalendars.length === 0) handleListCalendars();
+                  }}
+                >
+                  <option value="">{t("caldavWriteTargetNone")}</option>
+                  {caldavStatus.writeTargetCalendarUrl &&
+                    !caldavCalendars.some(
+                      (c) => c.url === caldavStatus.writeTargetCalendarUrl,
+                    ) && (
+                      <option value={caldavStatus.writeTargetCalendarUrl}>
+                        {caldavStatus.writeTargetCalendarName ||
+                          caldavStatus.writeTargetCalendarUrl}
+                      </option>
+                    )}
+                  {caldavCalendars.map((cal) => (
+                    <option key={cal.url} value={cal.url}>
+                      {cal.displayName}
+                    </option>
+                  ))}
+                </select>
+                <span className="caldav-write-target-hint">
+                  {t("caldavWriteTargetHint")}
+                </span>
+              </div>
+              {caldavStatus.lastError && (
+                <div className="schedule-editor-error">
+                  {caldavStatus.lastError}
+                </div>
+              )}
+              {calendarsOpen && (
+                <div className="caldav-calendar-list">
+                  {caldavCalendarsError && (
+                    <div className="schedule-editor-error">
+                      {caldavCalendarsError}
+                    </div>
+                  )}
+                  {caldavCalendars.length === 0 && !caldavCalendarsError ? (
+                    <div className="subscriptions-modal-help">
+                      {t("caldavCalendarsLoading")}
+                    </div>
+                  ) : (
+                    <ul>
+                      {caldavCalendars.map((cal) => {
+                        const subscribed = subscribedUrls.has(cal.url);
+                        return (
+                          <li key={cal.url} className="caldav-calendar-row">
+                            <span
+                              className="caldav-calendar-color"
+                              style={{
+                                background:
+                                  cal.color || DEFAULT_SUBSCRIPTION_COLORS[0],
+                              }}
+                            />
+                            <div className="caldav-calendar-name">
+                              {cal.displayName}
+                              {cal.description && (
+                                <span className="caldav-calendar-desc">
+                                  {" "}— {cal.description}
+                                </span>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              className="btn btn--primary"
+                              disabled={subscribed}
+                              onClick={() => handleSubscribeCalendar(cal)}
+                            >
+                              {subscribed
+                                ? t("caldavAlreadyAdded")
+                                : t("caldavAddCalendar")}
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="caldav-connect-form">
+              <p className="subscriptions-modal-help">{t("caldavHelp")}</p>
+              <a
+                className="caldav-issue-link"
+                href="https://account.apple.com/account/manage"
+                target="_blank"
+                rel="noreferrer noopener"
+              >
+                {t("caldavIssueLink")}
+              </a>
+              <label className="schedule-editor-field">
+                <span>{t("caldavAppleId")}</span>
+                <input
+                  type="email"
+                  autoComplete="username"
+                  value={appleId}
+                  onChange={(e) => setAppleId(e.target.value)}
+                  placeholder="example@icloud.com"
+                />
+              </label>
+              <label className="schedule-editor-field">
+                <span>{t("caldavAppPassword")}</span>
+                <input
+                  type="password"
+                  autoComplete="current-password"
+                  value={appPassword}
+                  onChange={(e) => setAppPassword(e.target.value)}
+                  placeholder="xxxx-xxxx-xxxx-xxxx"
+                />
+              </label>
+              {caldavStatus?.lastError && (
+                <div className="schedule-editor-error">
+                  {caldavStatus.lastError}
+                </div>
+              )}
+              <button
+                type="button"
+                className="btn btn--primary"
+                onClick={handleConnect}
+                disabled={!appleId.trim() || !appPassword.trim()}
+              >
+                {t("caldavConnect")}
+              </button>
+            </div>
+          )}
+        </section>
 
-        <div className="subscriptions-add">
-          <label className="schedule-editor-field">
-            <span>{t("subFieldName")}</span>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="My calendar"
-            />
-          </label>
-          <label className="schedule-editor-field">
-            <span>{t("subFieldUrl")}</span>
-            <input
-              type="url"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://calendar.google.com/calendar/ical/.../basic.ics"
-            />
-          </label>
-          {error && <div className="schedule-editor-error">{error}</div>}
-          <button type="button" className="btn btn--primary" onClick={handleAdd}>
-            + {t("addSubscription")}
-          </button>
-        </div>
+        {/* 公開 iCal URL 購読セクション */}
+        <section className="subscriptions-section">
+          <h3 className="subscriptions-section-title">{t("icsTitle")}</h3>
+          <p className="subscriptions-modal-help">{t("subscriptionsHelp")}</p>
+
+          <div className="subscriptions-add">
+            <label className="schedule-editor-field">
+              <span>{t("subFieldName")}</span>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="My calendar"
+              />
+            </label>
+            <label className="schedule-editor-field">
+              <span>{t("subFieldUrl")}</span>
+              <input
+                type="url"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="https://calendar.google.com/calendar/ical/.../basic.ics"
+              />
+            </label>
+            {error && <div className="schedule-editor-error">{error}</div>}
+            <button type="button" className="btn btn--primary" onClick={handleAdd}>
+              + {t("addSubscription")}
+            </button>
+          </div>
+        </section>
 
         <ul className="subscriptions-list">
           {subscriptions.map((sub) => (
@@ -149,6 +395,9 @@ export function SubscriptionsModal({
                     handleEdit({ ...sub, name: e.target.value })
                   }
                 />
+                <span className={`subscriptions-provider subscriptions-provider--${sub.provider}`}>
+                  {sub.provider === "caldav" ? t("providerCaldav") : t("providerIcs")}
+                </span>
                 <label className="subscriptions-item-enabled">
                   <input
                     type="checkbox"
