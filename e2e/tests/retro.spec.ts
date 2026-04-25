@@ -9,17 +9,23 @@ test.describe("振り返り", () => {
 
   test("4タブを切り替えると開始ボタンのタイトルが変わる", async ({ page }) => {
     const start = page.locator(".retro-start-title");
+    const period = page.locator(".retro-tabs .period-dropdown");
+    const trigger = period.locator(".period-dropdown-button");
 
-    await page.locator(".retro-tab", { hasText: "日" }).click();
+    await trigger.click();
+    await period.locator(".period-dropdown-item", { hasText: "日" }).click();
     await expect(start).toContainText("日次振り返り");
 
-    await page.locator(".retro-tab", { hasText: "週" }).click();
+    await trigger.click();
+    await period.locator(".period-dropdown-item", { hasText: "週" }).click();
     await expect(start).toContainText("週次振り返り");
 
-    await page.locator(".retro-tab", { hasText: "月" }).click();
+    await trigger.click();
+    await period.locator(".period-dropdown-item", { hasText: "月" }).click();
     await expect(start).toContainText("月次振り返り");
 
-    await page.locator(".retro-tab", { hasText: "年" }).click();
+    await trigger.click();
+    await period.locator(".period-dropdown-item", { hasText: "年" }).click();
     await expect(start).toContainText("年次振り返り");
   });
 
