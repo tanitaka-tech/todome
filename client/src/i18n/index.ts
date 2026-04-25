@@ -30,6 +30,8 @@ import { ja_lifeLog } from "./locales/ja/lifeLog";
 import { en_lifeLog } from "./locales/en/lifeLog";
 import { ja_quota } from "./locales/ja/quota";
 import { en_quota } from "./locales/en/quota";
+import { ja_schedule } from "./locales/ja/schedule";
+import { en_schedule } from "./locales/en/schedule";
 
 const STORAGE_KEY = "todome.language";
 
@@ -60,6 +62,7 @@ void i18n.use(initReactI18next).init({
       shortcuts: ja_shortcuts,
       lifeLog: ja_lifeLog,
       quota: ja_quota,
+      schedule: ja_schedule,
     },
     en: {
       common: en_common,
@@ -77,6 +80,7 @@ void i18n.use(initReactI18next).init({
       shortcuts: en_shortcuts,
       lifeLog: en_lifeLog,
       quota: en_quota,
+      schedule: en_schedule,
     },
   },
   lng: initialLang(),
@@ -98,6 +102,7 @@ void i18n.use(initReactI18next).init({
     "shortcuts",
     "lifeLog",
     "quota",
+    "schedule",
   ],
   interpolation: {
     escapeValue: false,
