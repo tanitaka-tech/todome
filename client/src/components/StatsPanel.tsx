@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useTick } from "../hooks/useTick";
 import type { Goal, KanbanTask, TimeLog } from "../types";
 import { formatDuration, formatLocalIso } from "../types";
+import { PeriodDropdown } from "./PeriodDropdown";
 
 interface Props {
   tasks: KanbanTask[];
@@ -716,17 +717,14 @@ export function StatsPanel({ tasks, goals }: Props) {
           <div className="widget col-6 stats-visual-card">
             <div className="widget-head">
               <span className="widget-title">{t("sectionTimeTrend")}</span>
-              <div className="stats-period-tabs">
-                {(["day", "month", "year"] as const).map((p) => (
-                  <button
-                    key={p}
-                    className={`stats-period-tab ${period === p ? "stats-period-tab--active" : ""}`}
-                    onClick={() => setPeriod(p)}
-                  >
-                    {periodLabels[p]}
-                  </button>
-                ))}
-              </div>
+              <PeriodDropdown
+                value={period}
+                onChange={setPeriod}
+                options={(["day", "month", "year"] as const).map((p) => ({
+                  value: p,
+                  label: periodLabels[p],
+                }))}
+              />
             </div>
             <div className="widget-body">
               <BarChart

@@ -14,6 +14,7 @@ import { isTaskCompletedInPeriod } from "../types";
 import { RetroSession } from "./RetroSession";
 import { RetroCalendar } from "./RetroCalendar";
 import { useModalClose } from "../hooks/useModalClose";
+import { PeriodDropdown } from "./PeriodDropdown";
 
 export type RetroViewMode = "list" | "calendar";
 
@@ -275,15 +276,14 @@ export function RetroPanel({
       </div>
 
       <div className="retro-tabs">
-        {RETRO_TABS.map((tb) => (
-          <button
-            key={tb.id}
-            className={`retro-tab ${tab === tb.id ? "retro-tab--active" : ""}`}
-            onClick={() => setTab(tb.id)}
-          >
-            {t(tb.labelKey)}
-          </button>
-        ))}
+        <PeriodDropdown
+          value={tab}
+          onChange={setTab}
+          options={RETRO_TABS.map((tb) => ({
+            value: tb.id,
+            label: t(tb.labelKey),
+          }))}
+        />
       </div>
 
       <div className="page-body">

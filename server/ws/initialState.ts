@@ -15,6 +15,8 @@ import {
   loadTodayQuotaLogs,
 } from "../storage/quota.ts";
 import { loadRetros } from "../storage/retro.ts";
+import { loadSchedules } from "../storage/schedule.ts";
+import { loadSubscriptions } from "../storage/subscription.ts";
 import type { AppWebSocket, SessionState } from "../state.ts";
 import { sendTo } from "./broadcast.ts";
 
@@ -22,6 +24,8 @@ export function loadSessionState(session: SessionState): void {
   session.kanbanTasks = loadTasks();
   session.goals = loadGoals();
   session.profile = loadProfile();
+  session.schedules = loadSchedules();
+  session.subscriptions = loadSubscriptions();
 }
 
 // 初期同期は複数ストレージ / 外部コマンドを直列に叩くため、いずれか 1 段が
@@ -48,6 +52,11 @@ export async function sendInitialState(
     ["quota_streak", () => ({
       type: "quota_streak_sync",
       streaks: computeAllQuotaStreaks(loadQuotas(), loadAllQuotaLogs()),
+    })],
+    ["schedule", () => ({ type: "schedule_sync", schedules: session.schedules })],
+    ["subscription", () => ({
+      type: "subscription_sync",
+      subscriptions: session.subscriptions,
     })],
     ["github_status", async () => await buildGitHubStatus()],
   ];
