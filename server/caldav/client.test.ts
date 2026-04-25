@@ -135,6 +135,53 @@ describe("parseAndExpand", () => {
     expect(events.length).toBe(2);
   });
 
+  test("IcsBlock を渡すと objectUrl/etag が各 occurrence に伝播する", () => {
+    const ics = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "BEGIN:VEVENT",
+      "UID:url-prop-001",
+      "SUMMARY:Has URL",
+      "DTSTART:20260420T010000Z",
+      "DTEND:20260420T020000Z",
+      "RRULE:FREQ=DAILY;COUNT=2",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n");
+    const events = parseAndExpand(
+      [
+        {
+          data: ics,
+          objectUrl: "https://caldav.example/cal/uid-001.ics",
+          etag: '"abc123"',
+        },
+      ],
+      {
+        tzid: TZ,
+        rangeStartMs: PAST,
+        rangeEndMs: FUTURE,
+      },
+    );
+    expect(events.length).toBe(2);
+    for (const e of events) {
+      expect(e.objectUrl).toBe("https://caldav.example/cal/uid-001.ics");
+      expect(e.etag).toBe('"abc123"');
+    }
+  });
+
+  test("string[] を渡すと objectUrl/etag は空文字になる (後方互換)", () => {
+    const ics =
+      "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:legacy\r\nSUMMARY:Legacy\r\nDTSTART:20260420T010000Z\r\nDTEND:20260420T020000Z\r\nEND:VEVENT\r\nEND:VCALENDAR";
+    const events = parseAndExpand([ics], {
+      tzid: TZ,
+      rangeStartMs: PAST,
+      rangeEndMs: FUTURE,
+    });
+    expect(events.length).toBe(1);
+    expect(events[0]!.objectUrl).toBe("");
+    expect(events[0]!.etag).toBe("");
+  });
+
   test("壊れたブロックは無視され、健全なブロックは返る", () => {
     const broken = "NOT VALID ICS DATA";
     const valid = [

@@ -159,6 +159,18 @@ function setSubscriptionState(
   return merged;
 }
 
+/**
+ * subscription を 1 件 refresh して broadcast までやる。
+ * 別ハンドラ (schedule edit/delete) から「書き戻した直後にローカルにも反映したい」
+ * ときに呼ぶ。session を持たないので最新を読み直して全体 broadcast する。
+ */
+export async function refreshSubscriptionAndBroadcast(
+  id: string,
+): Promise<void> {
+  const dummy: SyncSession = { subscriptions: [], schedules: [] };
+  await refreshOne(id, dummy);
+}
+
 async function refreshOne(id: string, session: SyncSession): Promise<void> {
   const subs = loadSubscriptions();
   const target = subs.find((s) => s.id === id);
@@ -212,8 +224,8 @@ async function refreshOne(id: string, session: SyncSession): Promise<void> {
     recurrenceId: part.recurrenceId,
     createdAt: now,
     updatedAt: now,
-    caldavObjectUrl: "",
-    caldavEtag: "",
+    caldavObjectUrl: part.objectUrl,
+    caldavEtag: part.etag,
   }));
   replaceSubscriptionSchedules(target.id, schedules);
   setSubscriptionState(id, {
