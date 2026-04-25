@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "emoji-picker-react": "^4.18.0",
-    "i18next": "^26.0.6",
+    "i18next": "^26.0.7",
     "react": "^19.3.0-canary-142cfde8-20260422",
     "react-dom": "^19.3.0-canary-142cfde8-20260422",
     "react-i18next": "^17.0.4",
