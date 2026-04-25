@@ -8179,6 +8179,26 @@ body {
   font-weight: 500;
 }
 
+.caldav-write-target-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0 0;
+}
+
+.caldav-write-target-label {
+  font-size: 0.85rem;
+  color: var(--fg);
+  font-weight: 500;
+}
+
+.caldav-write-target-hint {
+  font-size: 0.78rem;
+  color: var(--fg-muted);
+  flex: 1 1 100%;
+}
+
 .caldav-calendar-list {
   border: 1px solid var(--border);
   border-radius: 6px;

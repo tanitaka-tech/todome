@@ -135,5 +135,7 @@ export function normalizeSchedule(raw: Partial<Schedule>): Schedule {
     recurrenceId: String(raw.recurrenceId ?? ""),
     createdAt: String(raw.createdAt ?? ""),
     updatedAt: String(raw.updatedAt ?? ""),
+    caldavObjectUrl: String(raw.caldavObjectUrl ?? ""),
+    caldavEtag: String(raw.caldavEtag ?? ""),
   };
 }

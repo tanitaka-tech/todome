@@ -40,6 +40,8 @@ function emptySchedule(opts: {
     recurrenceId: "",
     createdAt: now,
     updatedAt: now,
+    caldavObjectUrl: "",
+    caldavEtag: "",
   };
 }
 

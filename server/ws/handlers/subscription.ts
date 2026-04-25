@@ -212,6 +212,8 @@ async function refreshOne(id: string, session: SyncSession): Promise<void> {
     recurrenceId: part.recurrenceId,
     createdAt: now,
     updatedAt: now,
+    caldavObjectUrl: "",
+    caldavEtag: "",
   }));
   replaceSubscriptionSchedules(target.id, schedules);
   setSubscriptionState(id, {

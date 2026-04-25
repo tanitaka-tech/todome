@@ -548,6 +548,8 @@ export interface Schedule {
   recurrenceId: string;
   createdAt: string;
   updatedAt: string;
+  caldavObjectUrl: string;
+  caldavEtag: string;
 }
 
 export type SubscriptionStatus = "idle" | "fetching" | "ok" | "error";
@@ -576,6 +578,8 @@ export interface CalDAVStatus {
   appleId: string;
   connectedAt: string;
   lastError: string;
+  writeTargetCalendarUrl: string;
+  writeTargetCalendarName: string;
 }
 
 export interface CalDAVCalendarChoice {

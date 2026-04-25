@@ -5,6 +5,7 @@ import {
   caldavConnect,
   caldavDisconnect,
   caldavListCalendars,
+  caldavSetWriteTarget,
   caldavStatusRequest,
 } from "./caldav.ts";
 import {
@@ -121,5 +122,6 @@ export function registerAllHandlers(): void {
   registerHandler("caldav_connect", caldavConnect);
   registerHandler("caldav_disconnect", caldavDisconnect);
   registerHandler("caldav_list_calendars", caldavListCalendars);
+  registerHandler("caldav_set_write_target", caldavSetWriteTarget);
   registerHandler("message", message);
 }
