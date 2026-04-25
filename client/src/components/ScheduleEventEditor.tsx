@@ -1,15 +1,13 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { CalendarSubscription, Schedule } from "../types";
+import type { Schedule } from "../types";
 import { nowLocalIso } from "../types";
-import { DEFAULT_SCHEDULE_COLOR, scheduleColor } from "../types";
 
 export type EditorMode = "create" | "edit" | "view";
 
 interface Props {
   mode: EditorMode;
   schedule: Schedule | null;
-  subscriptions: CalendarSubscription[];
   initialStart?: string;
   initialEnd?: string;
   initialAllDay?: boolean;
@@ -35,7 +33,6 @@ function emptySchedule(opts: {
     start: opts.start,
     end: opts.end,
     allDay: opts.allDay,
-    color: "",
     rrule: "",
     recurrenceId: "",
     createdAt: now,
@@ -44,6 +41,8 @@ function emptySchedule(opts: {
     caldavEtag: "",
   };
 }
+
+
 
 function toInputDate(iso: string): string {
   return iso ? iso.slice(0, 10) : "";
@@ -81,7 +80,6 @@ function defaultEnd(start: string): string {
 export function ScheduleEventEditor({
   mode,
   schedule,
-  subscriptions,
   initialStart,
   initialEnd,
   initialAllDay,
@@ -159,7 +157,6 @@ export function ScheduleEventEditor({
     });
   };
 
-  const liveColor = draft.color || scheduleColor(draft, subscriptions) || DEFAULT_SCHEDULE_COLOR;
 
   return (
     <div
@@ -276,24 +273,6 @@ export function ScheduleEventEditor({
               onChange={(e) => update("description", e.target.value)}
             />
           </label>
-
-          {!isView && (
-            <label className="schedule-editor-field schedule-editor-field--color">
-              <span>{t("fieldColor")}</span>
-              <input
-                type="color"
-                value={liveColor}
-                onChange={(e) => update("color", e.target.value)}
-              />
-              <button
-                type="button"
-                className="btn schedule-editor-reset"
-                onClick={() => update("color", "")}
-              >
-                Reset
-              </button>
-            </label>
-          )}
 
           {draft.rrule && (
             <div className="schedule-editor-field">

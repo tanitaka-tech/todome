@@ -23,6 +23,7 @@ export function buildCalDAVStatus(lastError = ""): CalDAVStatus {
     lastError,
     writeTargetCalendarUrl: cfg.writeTargetCalendarUrl ?? "",
     writeTargetCalendarName: cfg.writeTargetCalendarName ?? "",
+    writeTargetCalendarColor: cfg.writeTargetCalendarColor ?? "",
   };
 }
 
@@ -74,11 +75,13 @@ export const caldavDisconnect: Handler = async () => {
 export const caldavSetWriteTarget: Handler = async (_ws, _session, data) => {
   const url = String(data.calendarUrl ?? "").trim();
   const name = String(data.calendarName ?? "").trim();
+  const color = String(data.calendarColor ?? "").trim();
   const cfg = loadCalDAVConfig();
   saveCalDAVConfig({
     ...cfg,
     writeTargetCalendarUrl: url,
     writeTargetCalendarName: name,
+    writeTargetCalendarColor: color,
   });
   broadcast({ type: "caldav_status", status: buildCalDAVStatus() });
 };

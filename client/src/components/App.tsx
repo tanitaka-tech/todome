@@ -33,7 +33,7 @@ import {
   nowLocalIso,
   totalSeconds,
 } from "../types";
-import { applyTheme, getInitialTheme, type ThemeName } from "../theme";
+import { applyTheme, getInitialTheme, getThemeAccent, type ThemeName } from "../theme";
 import {
   applyLanguage,
   getInitialLanguage,
@@ -282,6 +282,9 @@ export function App() {
   useEffect(() => {
     applyTheme(theme);
   }, [theme]);
+
+  // 各テーマの --accent と同期した値（書き込み先未設定の manual イベントの表示色）。
+  const themeAccent = useMemo(() => getThemeAccent(theme), [theme]);
 
   useEffect(() => {
     applyLanguage(language);
@@ -1435,6 +1438,7 @@ export function App() {
             caldavStatus={caldavStatus}
             caldavCalendars={caldavCalendars}
             caldavCalendarsError={caldavCalendarsError}
+            themeAccent={themeAccent}
           />
         ) : activeView === "retro" ? (
           <RetroPanel

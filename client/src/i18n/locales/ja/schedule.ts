@@ -21,7 +21,6 @@ export const ja_schedule: Record<string, string> = {
   fieldStart: "開始",
   fieldEnd: "終了",
   fieldAllDay: "終日",
-  fieldColor: "色",
   fieldRrule: "繰り返し",
   save: "保存",
   cancel: "キャンセル",
