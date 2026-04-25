@@ -153,6 +153,42 @@ export interface AIToolConfig {
   thinkingEffort: ThinkingEffort;
 }
 
+export type ScheduleSource = "manual" | "subscription";
+
+export interface Schedule {
+  id: string;
+  source: ScheduleSource;
+  subscriptionId: string;
+  externalUid: string;
+  title: string;
+  description: string;
+  location: string;
+  start: string;
+  end: string;
+  allDay: boolean;
+  color: string;
+  rrule: string;
+  recurrenceId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type SubscriptionStatus = "idle" | "fetching" | "ok" | "error";
+
+export interface CalendarSubscription {
+  id: string;
+  name: string;
+  url: string;
+  color: string;
+  enabled: boolean;
+  lastFetchedAt: string;
+  lastError: string;
+  status: SubscriptionStatus;
+  eventCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface GitHubConfig {
   linked?: boolean;
   owner?: string;

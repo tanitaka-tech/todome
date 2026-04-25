@@ -10,6 +10,8 @@ import {
 import { loadGoals } from "../storage/goals.ts";
 import { loadTasks } from "../storage/kanban.ts";
 import { loadProfile } from "../storage/profile.ts";
+import { loadSchedules } from "../storage/schedule.ts";
+import { loadSubscriptions } from "../storage/subscription.ts";
 import { sendTo } from "./broadcast.ts";
 import { MESSAGE_HANDLERS } from "./dispatch.ts";
 import { loadSessionState, sendInitialState } from "./initialState.ts";
@@ -48,6 +50,8 @@ export const wsHandlers = {
       ws.data.session.kanbanTasks = loadTasks();
       ws.data.session.goals = loadGoals();
       ws.data.session.profile = loadProfile();
+      ws.data.session.schedules = loadSchedules();
+      ws.data.session.subscriptions = loadSubscriptions();
     }
     const type = typeof data.type === "string" ? data.type : "";
 
