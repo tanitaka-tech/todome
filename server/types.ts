@@ -60,6 +60,8 @@ export interface UserProfile {
   balanceWheel: BalanceWheelCategory[];
   actionPrinciples: BalanceWheelItem[];
   wantToDo: BalanceWheelItem[];
+  /** IANA タイムゾーン (例: "Asia/Tokyo")。"" ならサーバー解決の TZ にフォールバック。 */
+  timezone: string;
 }
 
 export type LifeCategory = "rest" | "play" | "routine" | "other";
@@ -175,6 +177,9 @@ export interface Schedule {
 
 export type SubscriptionStatus = "idle" | "fetching" | "ok" | "error";
 
+/** "ics" = 公開 iCal URL を GET で取得。"caldav" = iCloud などの CalDAV サーバから取得。 */
+export type SubscriptionProvider = "ics" | "caldav";
+
 export interface CalendarSubscription {
   id: string;
   name: string;
@@ -187,6 +192,31 @@ export interface CalendarSubscription {
   eventCount: number;
   createdAt: string;
   updatedAt: string;
+  provider: SubscriptionProvider;
+  /** provider="caldav" のときの iCloud カレンダー識別子 (例: ctag や displayName)。表示用。 */
+  caldavCalendarId: string;
+}
+
+export interface CalDAVConfig {
+  appleId?: string;
+  appPassword?: string;
+  connectedAt?: string;
+}
+
+export interface CalDAVStatus {
+  connected: boolean;
+  appleId: string;
+  connectedAt: string;
+  lastError: string;
+}
+
+export interface CalDAVCalendarChoice {
+  url: string;
+  displayName: string;
+  description: string;
+  color: string;
+  /** ctag があれば返す（差分検知用、現状は表示しない）。 */
+  ctag: string;
 }
 
 export interface GitHubConfig {

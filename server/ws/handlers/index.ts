@@ -2,6 +2,12 @@ import { registerHandler } from "../dispatch.ts";
 import { aiConfigUpdate } from "./aiConfig.ts";
 import { appConfigUpdate } from "./appConfig.ts";
 import {
+  caldavConnect,
+  caldavDisconnect,
+  caldavListCalendars,
+  caldavStatusRequest,
+} from "./caldav.ts";
+import {
   githubCommitDiff,
   githubLink,
   githubListCommits,
@@ -111,5 +117,9 @@ export function registerAllHandlers(): void {
   registerHandler("subscription_edit", subscriptionEdit);
   registerHandler("subscription_delete", subscriptionDelete);
   registerHandler("subscription_refresh", subscriptionRefresh);
+  registerHandler("caldav_status_request", caldavStatusRequest);
+  registerHandler("caldav_connect", caldavConnect);
+  registerHandler("caldav_disconnect", caldavDisconnect);
+  registerHandler("caldav_list_calendars", caldavListCalendars);
   registerHandler("message", message);
 }

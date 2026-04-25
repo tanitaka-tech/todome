@@ -76,6 +76,8 @@ export interface UserProfile {
   balanceWheel: BalanceWheelCategory[];
   actionPrinciples: BalanceWheelItem[];
   wantToDo: BalanceWheelItem[];
+  /** IANA タイムゾーン (例: "Asia/Tokyo")。"" ならブラウザ/サーバー解決の TZ にフォールバック。 */
+  timezone: string;
 }
 
 // --- Helpers ---
@@ -550,6 +552,9 @@ export interface Schedule {
 
 export type SubscriptionStatus = "idle" | "fetching" | "ok" | "error";
 
+/** "ics" = 公開 iCal URL を GET で取得。"caldav" = iCloud などの CalDAV サーバから取得。 */
+export type SubscriptionProvider = "ics" | "caldav";
+
 export interface CalendarSubscription {
   id: string;
   name: string;
@@ -562,6 +567,23 @@ export interface CalendarSubscription {
   eventCount: number;
   createdAt: string;
   updatedAt: string;
+  provider: SubscriptionProvider;
+  caldavCalendarId: string;
+}
+
+export interface CalDAVStatus {
+  connected: boolean;
+  appleId: string;
+  connectedAt: string;
+  lastError: string;
+}
+
+export interface CalDAVCalendarChoice {
+  url: string;
+  displayName: string;
+  description: string;
+  color: string;
+  ctag: string;
 }
 
 export const DEFAULT_SUBSCRIPTION_COLORS: readonly string[] = [
@@ -654,4 +676,10 @@ export type WSMessage =
   | { type: "quota_streak_sync"; streaks: QuotaStreak[] }
   | { type: "quota_log_range_sync"; requestId: string; logs: QuotaLog[] }
   | { type: "schedule_sync"; schedules: Schedule[] }
-  | { type: "subscription_sync"; subscriptions: CalendarSubscription[] };
+  | { type: "subscription_sync"; subscriptions: CalendarSubscription[] }
+  | { type: "caldav_status"; status: CalDAVStatus }
+  | {
+      type: "caldav_calendars";
+      calendars: CalDAVCalendarChoice[];
+      error: string;
+    };
