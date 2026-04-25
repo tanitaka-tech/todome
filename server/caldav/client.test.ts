@@ -1,5 +1,29 @@
 import { describe, expect, test } from "bun:test";
-import { parseAndExpand } from "./client.ts";
+import { buildVEventIcs, localIsoToUtcMs, parseAndExpand } from "./client.ts";
+import type { Schedule } from "../types.ts";
+
+function makeSchedule(partial: Partial<Schedule> = {}): Schedule {
+  return {
+    id: "evt-1",
+    source: "manual",
+    subscriptionId: "",
+    externalUid: "",
+    title: "Title",
+    description: "",
+    location: "",
+    start: "2026-04-25T10:00:00",
+    end: "2026-04-25T11:00:00",
+    allDay: false,
+    color: "",
+    rrule: "",
+    recurrenceId: "",
+    createdAt: "2026-04-25T09:00:00",
+    updatedAt: "2026-04-25T09:00:00",
+    caldavObjectUrl: "",
+    caldavEtag: "",
+    ...partial,
+  };
+}
 
 const TZ = "Asia/Tokyo";
 const PAST = Date.parse("2026-01-01T00:00:00Z");
@@ -149,6 +173,87 @@ describe("parseAndExpand", () => {
     ].join("\r\n");
     const events = expand(ics);
     expect(events.length).toBe(0);
+  });
+
+  test("localIsoToUtcMs は Asia/Tokyo を 9 時間引く", () => {
+    // 2026-04-25T10:00:00 (JST) = 2026-04-25T01:00:00Z
+    const ms = localIsoToUtcMs("2026-04-25T10:00:00", "Asia/Tokyo");
+    expect(new Date(ms).toISOString()).toBe("2026-04-25T01:00:00.000Z");
+  });
+
+  test("localIsoToUtcMs は America/Los_Angeles (DST下) を 7 時間足す", () => {
+    // 2026-04-25 は PDT (UTC-7)
+    const ms = localIsoToUtcMs("2026-04-25T10:00:00", "America/Los_Angeles");
+    expect(new Date(ms).toISOString()).toBe("2026-04-25T17:00:00.000Z");
+  });
+
+  test("buildVEventIcs: 時刻イベントは UTC に変換した DTSTART/DTEND を出す", () => {
+    const ics = buildVEventIcs(
+      makeSchedule({
+        title: "Meeting",
+        description: "agenda\nsecond line",
+        location: "Tokyo",
+      }),
+      "Asia/Tokyo",
+      "uid-001@todome",
+    );
+    expect(ics).toContain("BEGIN:VEVENT");
+    expect(ics).toContain("UID:uid-001@todome");
+    expect(ics).toContain("DTSTART:20260425T010000Z");
+    expect(ics).toContain("DTEND:20260425T020000Z");
+    expect(ics).toContain("SUMMARY:Meeting");
+    // 改行は \n にエスケープされる
+    expect(ics).toContain("DESCRIPTION:agenda\\nsecond line");
+    expect(ics).toContain("LOCATION:Tokyo");
+    expect(ics).toContain("END:VEVENT");
+    // 改行は CRLF
+    expect(ics).toContain("\r\n");
+  });
+
+  test("buildVEventIcs: 全日イベントは VALUE=DATE で DTEND は exclusive 化", () => {
+    const ics = buildVEventIcs(
+      makeSchedule({
+        allDay: true,
+        // todome は inclusive で end を持つ → ICS では翌日に
+        start: "2026-04-25T00:00:00",
+        end: "2026-04-25T00:00:00",
+        title: "Holiday",
+      }),
+      "Asia/Tokyo",
+      "uid-allday@todome",
+    );
+    expect(ics).toContain("DTSTART;VALUE=DATE:20260425");
+    expect(ics).toContain("DTEND;VALUE=DATE:20260426");
+  });
+
+  test("buildVEventIcs: 文字列のセミコロン/カンマ/バックスラッシュをエスケープ", () => {
+    const ics = buildVEventIcs(
+      makeSchedule({ title: "a,b;c\\d", description: "" }),
+      "Asia/Tokyo",
+      "uid-esc",
+    );
+    expect(ics).toContain("SUMMARY:a\\,b\\;c\\\\d");
+  });
+
+  test("buildVEventIcs: ラウンドトリップで parseAndExpand が同じ時刻に戻せる", () => {
+    const ics = buildVEventIcs(
+      makeSchedule({
+        title: "Round",
+        start: "2026-04-25T10:00:00",
+        end: "2026-04-25T11:00:00",
+      }),
+      "Asia/Tokyo",
+      "uid-rt",
+    );
+    const events = parseAndExpand([ics], {
+      tzid: "Asia/Tokyo",
+      rangeStartMs: Date.parse("2026-01-01T00:00:00Z"),
+      rangeEndMs: Date.parse("2027-01-01T00:00:00Z"),
+    });
+    expect(events.length).toBe(1);
+    expect(events[0]!.start).toBe("2026-04-25T10:00:00");
+    expect(events[0]!.end).toBe("2026-04-25T11:00:00");
+    expect(events[0]!.summary).toBe("Round");
   });
 
   test("全日イベント (DATE) は allDay=true になる", () => {

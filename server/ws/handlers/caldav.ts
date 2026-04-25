@@ -21,6 +21,8 @@ export function buildCalDAVStatus(lastError = ""): CalDAVStatus {
     appleId: cfg.appleId ?? "",
     connectedAt: cfg.connectedAt ?? "",
     lastError,
+    writeTargetCalendarUrl: cfg.writeTargetCalendarUrl ?? "",
+    writeTargetCalendarName: cfg.writeTargetCalendarName ?? "",
   };
 }
 
@@ -67,6 +69,18 @@ export const caldavDisconnect: Handler = async () => {
   clearCalDAVConfig();
   broadcast({ type: "caldav_status", status: buildCalDAVStatus() });
   broadcastSubscriptionsAndSchedules();
+};
+
+export const caldavSetWriteTarget: Handler = async (_ws, _session, data) => {
+  const url = String(data.calendarUrl ?? "").trim();
+  const name = String(data.calendarName ?? "").trim();
+  const cfg = loadCalDAVConfig();
+  saveCalDAVConfig({
+    ...cfg,
+    writeTargetCalendarUrl: url,
+    writeTargetCalendarName: name,
+  });
+  broadcast({ type: "caldav_status", status: buildCalDAVStatus() });
 };
 
 export const caldavListCalendars: Handler = async (ws) => {

@@ -173,6 +173,10 @@ export interface Schedule {
   recurrenceId: string;
   createdAt: string;
   updatedAt: string;
+  /** manual schedule を iCloud に push した場合の DAV オブジェクト URL。空なら未 push。 */
+  caldavObjectUrl: string;
+  /** push した時の ETag。次回 PUT/DELETE の If-Match に使う（任意）。 */
+  caldavEtag: string;
 }
 
 export type SubscriptionStatus = "idle" | "fetching" | "ok" | "error";
@@ -201,6 +205,9 @@ export interface CalDAVConfig {
   appleId?: string;
   appPassword?: string;
   connectedAt?: string;
+  /** manual イベントを書き込む先のカレンダー URL。"" なら書き込み無効。 */
+  writeTargetCalendarUrl?: string;
+  writeTargetCalendarName?: string;
 }
 
 export interface CalDAVStatus {
@@ -208,6 +215,8 @@ export interface CalDAVStatus {
   appleId: string;
   connectedAt: string;
   lastError: string;
+  writeTargetCalendarUrl: string;
+  writeTargetCalendarName: string;
 }
 
 export interface CalDAVCalendarChoice {

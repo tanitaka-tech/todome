@@ -116,6 +116,14 @@ export function SubscriptionsModal({
     setCalendarsOpen(true);
   };
 
+  const handleSetWriteTarget = (url: string, name: string) => {
+    send({
+      type: "caldav_set_write_target",
+      calendarUrl: url,
+      calendarName: name,
+    });
+  };
+
   const handleSubscribeCalendar = (cal: CalDAVCalendarChoice) => {
     // 同じ url が既にあれば追加しない
     if (subscriptions.some((s) => s.url === cal.url)) return;
@@ -188,6 +196,50 @@ export function SubscriptionsModal({
                   {t("caldavDisconnect")}
                 </button>
               </div>
+              <div className="caldav-write-target-row">
+                <label className="caldav-write-target-label">
+                  {t("caldavWriteTarget")}
+                </label>
+                <select
+                  className="detail-prop-select"
+                  value={caldavStatus.writeTargetCalendarUrl}
+                  onChange={(e) => {
+                    const url = e.target.value;
+                    const name =
+                      caldavCalendars.find((c) => c.url === url)?.displayName ||
+                      "";
+                    handleSetWriteTarget(url, name);
+                  }}
+                  onFocus={() => {
+                    // 一覧未取得ならフォーカス時に取得
+                    if (caldavCalendars.length === 0) handleListCalendars();
+                  }}
+                >
+                  <option value="">{t("caldavWriteTargetNone")}</option>
+                  {caldavStatus.writeTargetCalendarUrl &&
+                    !caldavCalendars.some(
+                      (c) => c.url === caldavStatus.writeTargetCalendarUrl,
+                    ) && (
+                      <option value={caldavStatus.writeTargetCalendarUrl}>
+                        {caldavStatus.writeTargetCalendarName ||
+                          caldavStatus.writeTargetCalendarUrl}
+                      </option>
+                    )}
+                  {caldavCalendars.map((cal) => (
+                    <option key={cal.url} value={cal.url}>
+                      {cal.displayName}
+                    </option>
+                  ))}
+                </select>
+                <span className="caldav-write-target-hint">
+                  {t("caldavWriteTargetHint")}
+                </span>
+              </div>
+              {caldavStatus.lastError && (
+                <div className="schedule-editor-error">
+                  {caldavStatus.lastError}
+                </div>
+              )}
               {calendarsOpen && (
                 <div className="caldav-calendar-list">
                   {caldavCalendarsError && (
