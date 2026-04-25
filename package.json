@@ -7,7 +7,8 @@
     "dev": "bun --watch server/index.ts",
     "start": "bun server/index.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "bun test server"
+    "test": "bun test server",
+    "check": "bun run typecheck && cd client && npx tsc -b && npm run lint && cd .. && bun run test"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.1.11",
