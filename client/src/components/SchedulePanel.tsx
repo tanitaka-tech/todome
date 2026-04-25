@@ -173,13 +173,20 @@ export function SchedulePanel({
     setEditor({ mode: "create", schedule: null });
   }, []);
 
-  const handleEventClick = useCallback((schedule: Schedule) => {
-    if (schedule.source === "subscription") {
-      setEditor({ mode: "view", schedule });
-    } else {
+  const handleEventClick = useCallback(
+    (schedule: Schedule) => {
+      if (schedule.source === "subscription") {
+        // CalDAV 購読の単発イベントなら iCloud に書き戻せるので edit モード
+        const sub = subscriptions.find((s) => s.id === schedule.subscriptionId);
+        const editable =
+          sub?.provider === "caldav" && !schedule.rrule;
+        setEditor({ mode: editable ? "edit" : "view", schedule });
+        return;
+      }
       setEditor({ mode: "edit", schedule });
-    }
-  }, []);
+    },
+    [subscriptions],
+  );
 
   const handleSlotClick = useCallback(
     (start: string, end: string, allDay: boolean) => {
@@ -204,18 +211,26 @@ export function SchedulePanel({
           source: "manual",
           subscriptionId: "",
           externalUid: "",
+          caldavObjectUrl: "",
+          caldavEtag: "",
           createdAt: now,
           updatedAt: now,
         };
         send({ type: "schedule_add", schedule: next });
       } else if (editor?.mode === "edit" && editor.schedule) {
+        const original = editor.schedule;
+        // subscription 由来なら identity / iCloud 識別子 / RRULE を維持
         const next: Schedule = {
           ...draft,
-          id: editor.schedule.id,
-          source: "manual",
-          subscriptionId: "",
-          externalUid: "",
-          createdAt: editor.schedule.createdAt,
+          id: original.id,
+          source: original.source,
+          subscriptionId: original.subscriptionId,
+          externalUid: original.externalUid,
+          caldavObjectUrl: original.caldavObjectUrl,
+          caldavEtag: original.caldavEtag,
+          rrule: original.rrule,
+          recurrenceId: original.recurrenceId,
+          createdAt: original.createdAt,
           updatedAt: now,
         };
         send({ type: "schedule_edit", schedule: next });

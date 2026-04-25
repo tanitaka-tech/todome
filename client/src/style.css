@@ -7906,6 +7906,14 @@ body {
   padding: 2px 10px;
 }
 
+.schedule-editor-icloud-badge {
+  font-size: 0.75rem;
+  background: #2563eb;
+  color: #fff;
+  border-radius: 999px;
+  padding: 2px 10px;
+}
+
 .schedule-editor-body {
   padding: 14px 18px;
   display: flex;

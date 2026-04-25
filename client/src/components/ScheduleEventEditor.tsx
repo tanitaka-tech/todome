@@ -177,9 +177,15 @@ export function ScheduleEventEditor({
         <header className="schedule-editor-header">
           <h2>{titleLabel}</h2>
           {schedule?.source === "subscription" && (
-            <span className="schedule-editor-readonly-badge">
-              {t("readOnlyBadge")}
-            </span>
+            isView ? (
+              <span className="schedule-editor-readonly-badge">
+                {t("readOnlyBadge")}
+              </span>
+            ) : (
+              <span className="schedule-editor-icloud-badge">
+                {t("icloudWriteBackBadge")}
+              </span>
+            )
           )}
         </header>
 

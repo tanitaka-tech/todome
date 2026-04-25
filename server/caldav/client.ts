@@ -155,6 +155,16 @@ interface RawEvent {
   location: string;
   rrule: string;
   recurrenceId: string;
+  /** この occurrence の元になった ICS ファイルの DAV URL（書き戻し時に PUT/DELETE で使う）。 */
+  objectUrl: string;
+  /** その ICS ファイルの ETag（任意、If-Match 用）。 */
+  etag: string;
+}
+
+export interface IcsBlock {
+  data: string;
+  objectUrl: string;
+  etag: string;
 }
 
 function pushEvent(
@@ -165,6 +175,8 @@ function pushEvent(
   tzid: string,
   rrule: string,
   recurrenceId: string,
+  objectUrl: string,
+  etag: string,
 ): void {
   const allDay = startTime.isDate;
   const startIso = allDay ? dateOnlyIso(startTime) : timeToLocalIso(startTime, tzid);
@@ -190,6 +202,8 @@ function pushEvent(
     location: ev.location || "",
     rrule,
     recurrenceId,
+    objectUrl,
+    etag,
   });
 }
 
@@ -197,6 +211,8 @@ function expandSingleEvent(
   master: ICAL.Event,
   opts: ExpandOptions,
   out: RawEvent[],
+  objectUrl: string,
+  etag: string,
 ): void {
   const max = opts.maxOccurrences ?? 500;
   const rruleProp = master.component.getFirstPropertyValue("rrule");
@@ -208,7 +224,7 @@ function expandSingleEvent(
     const endMs = master.endDate.toJSDate().getTime();
     if (endMs < opts.rangeStartMs) return;
     if (startMs > opts.rangeEndMs) return;
-    pushEvent(out, master, master.startDate, master.endDate, opts.tzid, "", "");
+    pushEvent(out, master, master.startDate, master.endDate, opts.tzid, "", "", objectUrl, etag);
     return;
   }
 
@@ -227,7 +243,7 @@ function expandSingleEvent(
         : "";
       // exception で上書きされている場合 details.item は exception イベント
       const item = details.item;
-      pushEvent(out, item, details.startDate, details.endDate, opts.tzid, rruleStr, recId);
+      pushEvent(out, item, details.startDate, details.endDate, opts.tzid, rruleStr, recId, objectUrl, etag);
       count += 1;
     }
     next = iter.next();
@@ -237,13 +253,18 @@ function expandSingleEvent(
 /**
  * VCALENDAR テキスト 1 件以上をパースして、指定範囲内の occurrence を全部
  * RawEvent にして返す。RRULE / EXDATE / RECURRENCE-ID は ical.js が解釈。
+ *
+ * 入力は文字列の配列 (objectUrl/etag は空) でも IcsBlock の配列でも受け付ける。
  */
 export function parseAndExpand(
-  icsBlocks: string[],
+  icsBlocks: ReadonlyArray<string | IcsBlock>,
   opts: ExpandOptions,
 ): RawEvent[] {
   const out: RawEvent[] = [];
-  for (const ics of icsBlocks) {
+  for (const block of icsBlocks) {
+    const ics = typeof block === "string" ? block : block.data;
+    const objectUrl = typeof block === "string" ? "" : block.objectUrl;
+    const etag = typeof block === "string" ? "" : block.etag;
     if (!ics) continue;
     let jcal: unknown;
     try {
@@ -278,7 +299,7 @@ export function parseAndExpand(
         exceptions: exceptionEvents,
       });
       try {
-        expandSingleEvent(master, opts, out);
+        expandSingleEvent(master, opts, out, objectUrl, etag);
       } catch {
         // 1 件の壊れたイベントで全体を落とさない
       }
@@ -295,20 +316,26 @@ interface FetchOptions {
   tzid: string;
 }
 
+export interface FetchedSchedulePart {
+  externalUid: string;
+  title: string;
+  description: string;
+  location: string;
+  start: string;
+  end: string;
+  allDay: boolean;
+  rrule: string;
+  recurrenceId: string;
+  /** この occurrence の元 ICS ファイルの DAV URL（書き戻し用）。 */
+  objectUrl: string;
+  /** その ICS ファイルの ETag。 */
+  etag: string;
+}
+
 export interface FetchResult {
   ok: boolean;
   error: string;
-  schedules: Omit<
-    Schedule,
-    | "id"
-    | "source"
-    | "subscriptionId"
-    | "color"
-    | "createdAt"
-    | "updatedAt"
-    | "caldavObjectUrl"
-    | "caldavEtag"
-  >[];
+  schedules: FetchedSchedulePart[];
 }
 
 /**
@@ -333,10 +360,14 @@ export async function fetchEvents(opts: FetchOptions): Promise<FetchResult> {
         end: new Date(opts.rangeEndMs).toISOString(),
       },
     });
-    const ics = objs
-      .map((o) => (typeof o.data === "string" ? o.data : ""))
-      .filter(Boolean);
-    const expanded = parseAndExpand(ics, {
+    const blocks: IcsBlock[] = objs
+      .filter((o) => typeof o.data === "string" && o.data)
+      .map((o) => ({
+        data: o.data as string,
+        objectUrl: o.url ?? "",
+        etag: typeof o.etag === "string" ? o.etag : "",
+      }));
+    const expanded = parseAndExpand(blocks, {
       tzid: opts.tzid,
       rangeStartMs: opts.rangeStartMs,
       rangeEndMs: opts.rangeEndMs,
@@ -355,6 +386,8 @@ export async function fetchEvents(opts: FetchOptions): Promise<FetchResult> {
         allDay: e.allDay,
         rrule: e.rrule,
         recurrenceId: e.recurrenceId,
+        objectUrl: e.objectUrl,
+        etag: e.etag,
       })),
     };
   } catch (err) {
