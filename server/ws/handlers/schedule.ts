@@ -59,6 +59,14 @@ type WriteTarget =
   | { provider: "google"; calendarId: string; accountId: string }
   | null;
 
+function hasValidScheduleRange(schedule: Schedule): boolean {
+  if (!schedule.start || !schedule.end) return false;
+  if (schedule.allDay) {
+    return schedule.end.slice(0, 10) >= schedule.start.slice(0, 10);
+  }
+  return schedule.end > schedule.start;
+}
+
 /** 書き戻しに使うカレンダーを決定する。
  * - manual:
  *    - schedule.caldavObjectUrl があれば caldav (既存 push 先を維持)
@@ -166,6 +174,7 @@ async function maybePushToCloud(schedule: Schedule): Promise<void> {
         externalUid: result.uid || schedule.externalUid,
       });
       upsertManualSchedule(updated);
+      scheduleAutosync();
     }
     notifyCaldavError("");
     return;
@@ -197,6 +206,7 @@ async function maybePushToCloud(schedule: Schedule): Promise<void> {
       externalUid: result.uid || schedule.externalUid,
     });
     upsertManualSchedule(updated);
+    scheduleAutosync();
   }
   notifyGoogleError("");
 }
@@ -269,7 +279,7 @@ export const scheduleAdd: Handler = async (_ws, session, data) => {
   const now = nowLocalIso();
   const schedule = normalizeSchedule({
     ...raw,
-    id: raw.id ? String(raw.id) : shortId(),
+    id: shortId(),
     source: "manual",
     subscriptionId: "",
     externalUid: "",
@@ -277,10 +287,10 @@ export const scheduleAdd: Handler = async (_ws, session, data) => {
     caldavEtag: "",
     googleEventId: "",
     googleAccountId: "",
-    createdAt: raw.createdAt ? String(raw.createdAt) : now,
+    createdAt: now,
     updatedAt: now,
   });
-  if (!schedule.start || !schedule.end) return;
+  if (!hasValidScheduleRange(schedule)) return;
   upsertManualSchedule(schedule);
   scheduleAutosync();
   broadcastSchedules(session);
@@ -319,9 +329,10 @@ export const scheduleEdit: Handler = async (_ws, session, data) => {
       googleAccountId: existing.googleAccountId,
       rrule: existing.rrule,
       recurrenceId: existing.recurrenceId,
+      createdAt: existing.createdAt,
       updatedAt: nowLocalIso(),
     });
-    if (!merged.start || !merged.end) return;
+    if (!hasValidScheduleRange(merged)) return;
     await maybePushToCloud(merged);
     // 書き戻し成功で cloud は更新済み → 即 refresh してローカル DB / クライアント表示を反映
     await refreshSubscriptionAndBroadcast(existing.subscriptionId);
@@ -330,7 +341,9 @@ export const scheduleEdit: Handler = async (_ws, session, data) => {
 
   // manual の編集
   const incoming = normalizeSchedule({
+    ...existing,
     ...raw,
+    id: existing.id,
     source: "manual",
     subscriptionId: "",
     externalUid: existing.externalUid,
@@ -338,9 +351,10 @@ export const scheduleEdit: Handler = async (_ws, session, data) => {
     caldavEtag: existing.caldavEtag,
     googleEventId: existing.googleEventId,
     googleAccountId: existing.googleAccountId,
+    createdAt: existing.createdAt,
     updatedAt: nowLocalIso(),
   });
-  if (!incoming.start || !incoming.end) return;
+  if (!hasValidScheduleRange(incoming)) return;
   upsertManualSchedule(incoming);
   scheduleAutosync();
   broadcastSchedules(session);

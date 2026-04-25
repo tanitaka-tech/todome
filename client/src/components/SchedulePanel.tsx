@@ -198,10 +198,10 @@ export function SchedulePanel({
   const handleEventClick = useCallback(
     (schedule: Schedule) => {
       if (schedule.source === "subscription") {
-        // CalDAV 購読の単発イベントなら iCloud に書き戻せるので edit モード
         const sub = subscriptions.find((s) => s.id === schedule.subscriptionId);
         const editable =
-          sub?.provider === "caldav" && !schedule.rrule;
+          (sub?.provider === "caldav" || sub?.provider === "google") &&
+          !schedule.rrule;
         setEditor({ mode: editable ? "edit" : "view", schedule });
         return;
       }
@@ -243,7 +243,6 @@ export function SchedulePanel({
         send({ type: "schedule_add", schedule: next });
       } else if (editor?.mode === "edit" && editor.schedule) {
         const original = editor.schedule;
-        // subscription 由来なら identity / iCloud 識別子 / RRULE を維持
         const next: Schedule = {
           ...draft,
           id: original.id,
