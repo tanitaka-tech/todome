@@ -17,6 +17,7 @@ import {
 } from "../../state.ts";
 import { loadTasks } from "../../storage/kanban.ts";
 import type { Goal, KanbanTask } from "../../types.ts";
+import { formatLocalIso } from "../../utils/time.ts";
 import {
   kanbanAdd,
   kanbanDelete,
@@ -144,6 +145,19 @@ describe("kanbanAdd handler", () => {
     expect(t.column).toBe("todo");
     expect(t.estimatedMinutes).toBe(0);
   });
+
+  it("不正な column / estimatedMinutes は保存前に正規化される", async () => {
+    await kanbanAdd(ctx.ws, ctx.session, {
+      title: "不正入力",
+      column: "blocked",
+      estimatedMinutes: -30,
+    });
+
+    const t = ctx.session.kanbanTasks[0]!;
+    expect(t.column).toBe("todo");
+    expect(t.estimatedMinutes).toBe(0);
+    expect(loadTasks()[0]!.column).toBe("todo");
+  });
 });
 
 describe("kanbanMove handler", () => {
@@ -250,6 +264,17 @@ describe("kanbanMove handler", () => {
     expect(ctx.session.kanbanTasks[0]!.column).toBe("todo");
     expect(ctx.sent.map((m) => m.type)).toContain("kanban_sync");
   });
+
+  it("不正な column が指定されても既存列を壊さない", async () => {
+    ctx.session.kanbanTasks.push(
+      makeTask({ id: "t1", title: "残るタスク", column: "in_progress" })
+    );
+
+    await kanbanMove(ctx.ws, ctx.session, { taskId: "t1", column: "blocked" });
+
+    expect(ctx.session.kanbanTasks[0]!.column).toBe("in_progress");
+    expect(loadTasks()[0]!.column).toBe("in_progress");
+  });
 });
 
 describe("kanbanEdit handler", () => {
@@ -326,6 +351,93 @@ describe("kanbanEdit handler", () => {
     expect(t.timeSpent).toBe(900);
     expect(t.kpiContributed).toBe(true);
     expect(ctx.session.goals[0]!.kpis[0]!.currentValue).toBe(900);
+  });
+
+  it("不正な数値・timeLogs は保存前に正規化される", async () => {
+    ctx.session.kanbanTasks.push(
+      makeTask({
+        id: "t1",
+        title: "タスク",
+        estimatedMinutes: 10,
+        timeSpent: 120,
+      })
+    );
+
+    await kanbanEdit(ctx.ws, ctx.session, {
+      taskId: "t1",
+      estimatedMinutes: Number.NaN,
+      timeSpent: -60,
+      timeLogs: [
+        { start: "2026-04-25T09:00:00", end: "2026-04-25T09:10:00", duration: 600.9 },
+        { start: "invalid", duration: 30 },
+        "not-a-log",
+      ],
+    });
+
+    const t = ctx.session.kanbanTasks[0]!;
+    expect(t.estimatedMinutes).toBe(0);
+    expect(t.timeSpent).toBe(0);
+    expect(t.timeLogs).toEqual([
+      {
+        start: "2026-04-25T09:00:00",
+        end: "2026-04-25T09:10:00",
+        duration: 600,
+      },
+    ]);
+  });
+
+  it("タイマー開始時、他タスクの実行中タイマーはサーバー側でも停止される", async () => {
+    const startedAt = formatLocalIso(new Date(Date.now() - 60_000));
+    const target = makeTask({ id: "target", title: "開始する", column: "todo" });
+    const running = makeTask({
+      id: "running",
+      title: "止める",
+      column: "in_progress",
+      timerStartedAt: startedAt,
+      timeSpent: 30,
+    });
+    const untouched = makeTask({
+      id: "untouched",
+      title: "無関係",
+      column: "todo",
+      timeSpent: 10,
+    });
+    ctx.session.kanbanTasks = [target, running, untouched];
+
+    await kanbanEdit(ctx.ws, ctx.session, {
+      taskId: "target",
+      timerStartedAt: formatLocalIso(new Date()),
+    });
+
+    const byId = new Map(ctx.session.kanbanTasks.map((t) => [t.id, t]));
+    expect(byId.get("target")!.timerStartedAt).not.toBe("");
+    expect(byId.get("running")!.timerStartedAt).toBe("");
+    expect(byId.get("running")!.timeSpent).toBeGreaterThanOrEqual(30);
+    expect(byId.get("running")!.timeLogs).toHaveLength(1);
+    expect(byId.get("untouched")!.timeSpent).toBe(10);
+  });
+
+  it("存在しない taskId の timerStartedAt では既存タイマーを止めない", async () => {
+    const startedAt = formatLocalIso(new Date(Date.now() - 60_000));
+    ctx.session.kanbanTasks = [
+      makeTask({
+        id: "running",
+        title: "実行中",
+        column: "in_progress",
+        timerStartedAt: startedAt,
+        timeSpent: 30,
+      }),
+    ];
+
+    await kanbanEdit(ctx.ws, ctx.session, {
+      taskId: "ghost",
+      timerStartedAt: formatLocalIso(new Date()),
+    });
+
+    const running = ctx.session.kanbanTasks[0]!;
+    expect(running.timerStartedAt).toBe(startedAt);
+    expect(running.timeSpent).toBe(30);
+    expect(running.timeLogs).toEqual([]);
   });
 });
 
