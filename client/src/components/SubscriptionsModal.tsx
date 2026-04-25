@@ -116,11 +116,16 @@ export function SubscriptionsModal({
     setCalendarsOpen(true);
   };
 
-  const handleSetWriteTarget = (url: string, name: string) => {
+  const handleSetWriteTarget = (
+    url: string,
+    name: string,
+    color: string,
+  ) => {
     send({
       type: "caldav_set_write_target",
       calendarUrl: url,
       calendarName: name,
+      calendarColor: color,
     });
   };
 
@@ -205,10 +210,12 @@ export function SubscriptionsModal({
                   value={caldavStatus.writeTargetCalendarUrl}
                   onChange={(e) => {
                     const url = e.target.value;
-                    const name =
-                      caldavCalendars.find((c) => c.url === url)?.displayName ||
-                      "";
-                    handleSetWriteTarget(url, name);
+                    const cal = caldavCalendars.find((c) => c.url === url);
+                    handleSetWriteTarget(
+                      url,
+                      cal?.displayName || "",
+                      cal?.color || "",
+                    );
                   }}
                   onFocus={() => {
                     // 一覧未取得ならフォーカス時に取得

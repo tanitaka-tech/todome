@@ -168,7 +168,6 @@ export interface Schedule {
   start: string;
   end: string;
   allDay: boolean;
-  color: string;
   rrule: string;
   recurrenceId: string;
   createdAt: string;
@@ -208,6 +207,8 @@ export interface CalDAVConfig {
   /** manual イベントを書き込む先のカレンダー URL。"" なら書き込み無効。 */
   writeTargetCalendarUrl?: string;
   writeTargetCalendarName?: string;
+  /** 書き込み先カレンダーの色 (#RRGGBB)。 */
+  writeTargetCalendarColor?: string;
 }
 
 export interface CalDAVStatus {
@@ -217,6 +218,7 @@ export interface CalDAVStatus {
   lastError: string;
   writeTargetCalendarUrl: string;
   writeTargetCalendarName: string;
+  writeTargetCalendarColor: string;
 }
 
 export interface CalDAVCalendarChoice {

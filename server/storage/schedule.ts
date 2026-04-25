@@ -130,7 +130,6 @@ export function normalizeSchedule(raw: Partial<Schedule>): Schedule {
     start: String(raw.start ?? ""),
     end: String(raw.end ?? ""),
     allDay: Boolean(raw.allDay),
-    color: String(raw.color ?? ""),
     rrule: String(raw.rrule ?? ""),
     recurrenceId: String(raw.recurrenceId ?? ""),
     createdAt: String(raw.createdAt ?? ""),

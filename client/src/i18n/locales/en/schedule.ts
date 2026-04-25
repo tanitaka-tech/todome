@@ -20,7 +20,6 @@ export const en_schedule: Record<string, string> = {
   fieldStart: "Starts",
   fieldEnd: "Ends",
   fieldAllDay: "All-day",
-  fieldColor: "Color",
   fieldRrule: "Recurrence",
   save: "Save",
   cancel: "Cancel",

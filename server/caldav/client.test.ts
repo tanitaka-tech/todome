@@ -14,7 +14,6 @@ function makeSchedule(partial: Partial<Schedule> = {}): Schedule {
     start: "2026-04-25T10:00:00",
     end: "2026-04-25T11:00:00",
     allDay: false,
-    color: "",
     rrule: "",
     recurrenceId: "",
     createdAt: "2026-04-25T09:00:00",

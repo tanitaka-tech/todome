@@ -39,6 +39,8 @@ interface Props {
   caldavStatus: CalDAVStatus | null;
   caldavCalendars: CalDAVCalendarChoice[];
   caldavCalendarsError: string;
+  /** テーマアクセント色 (#RRGGBB)。書き込み先未設定の manual schedule の表示色。 */
+  themeAccent: string;
 }
 
 interface EditorState {
@@ -99,6 +101,7 @@ export function SchedulePanel({
   caldavStatus,
   caldavCalendars,
   caldavCalendarsError,
+  themeAccent,
 }: Props) {
   const { t, i18n: i18nInst } = useTranslation("schedule");
   const lang = i18nInst.language;
@@ -120,6 +123,14 @@ export function SchedulePanel({
     setViewModeState(mode);
     saveScheduleView(mode);
   }, []);
+
+  const colorContext = useMemo(
+    () => ({
+      writeTargetColor: caldavStatus?.writeTargetCalendarColor || "",
+      themeAccent,
+    }),
+    [caldavStatus?.writeTargetCalendarColor, themeAccent],
+  );
 
   const visibleSchedules = useMemo(() => {
     const enabledSubs = new Set(
@@ -168,10 +179,6 @@ export function SchedulePanel({
       scrollerRef.current?.scrollByDays(7);
     }
   }, [viewMode, fireMonthScroll]);
-
-  const handleNewEvent = useCallback(() => {
-    setEditor({ mode: "create", schedule: null });
-  }, []);
 
   const handleEventClick = useCallback(
     (schedule: Schedule) => {
@@ -388,13 +395,6 @@ export function SchedulePanel({
           >
             {t("manageSubscriptions")}
           </button>
-          <button
-            type="button"
-            className="btn btn--primary"
-            onClick={handleNewEvent}
-          >
-            + {t("newEvent")}
-          </button>
         </div>
       </header>
 
@@ -411,6 +411,7 @@ export function SchedulePanel({
                   anchor={d}
                   schedules={visibleSchedules}
                   subscriptions={subscriptions}
+                  colorContext={colorContext}
                   onEventClick={handleEventClick}
                   onSlotClick={handleSlotClick}
                 />
@@ -423,6 +424,7 @@ export function SchedulePanel({
             anchor={anchor}
             schedules={visibleSchedules}
             subscriptions={subscriptions}
+            colorContext={colorContext}
             onAnchorChange={setAnchor}
             onEventClick={handleEventClick}
             onSlotClick={handleSlotClick}
@@ -436,7 +438,6 @@ export function SchedulePanel({
           key={editor.schedule?.id ?? "new"}
           mode={editor.mode}
           schedule={editor.schedule}
-          subscriptions={subscriptions}
           initialStart={editor.initialStart}
           initialEnd={editor.initialEnd}
           initialAllDay={editor.initialAllDay}
