@@ -3,9 +3,11 @@ import { APP_CONFIG_PATH } from "../config.ts";
 
 export interface AppConfig {
   dayBoundaryHour: number;
+  calendarWeekStart: number;
 }
 
 const DEFAULT_DAY_BOUNDARY_HOUR = 4;
+const DEFAULT_CALENDAR_WEEK_START = 1;
 
 let cache: AppConfig | null = null;
 
@@ -15,12 +17,23 @@ function clampBoundaryHour(raw: unknown): number {
   return n;
 }
 
+function normalizeCalendarWeekStart(raw: unknown): number {
+  const n = Number(raw);
+  return n === 0 || n === 1 ? n : DEFAULT_CALENDAR_WEEK_START;
+}
+
 export function normalizeAppConfig(raw: unknown): AppConfig {
   if (!raw || typeof raw !== "object") {
-    return { dayBoundaryHour: DEFAULT_DAY_BOUNDARY_HOUR };
+    return {
+      dayBoundaryHour: DEFAULT_DAY_BOUNDARY_HOUR,
+      calendarWeekStart: DEFAULT_CALENDAR_WEEK_START,
+    };
   }
   const cfg = raw as Record<string, unknown>;
-  return { dayBoundaryHour: clampBoundaryHour(cfg.dayBoundaryHour) };
+  return {
+    dayBoundaryHour: clampBoundaryHour(cfg.dayBoundaryHour),
+    calendarWeekStart: normalizeCalendarWeekStart(cfg.calendarWeekStart),
+  };
 }
 
 export function loadAppConfig(): AppConfig {
@@ -44,6 +57,9 @@ export function saveAppConfig(partial: unknown): AppConfig {
     const p = partial as Record<string, unknown>;
     if ("dayBoundaryHour" in p) {
       merged.dayBoundaryHour = clampBoundaryHour(p.dayBoundaryHour);
+    }
+    if ("calendarWeekStart" in p) {
+      merged.calendarWeekStart = normalizeCalendarWeekStart(p.calendarWeekStart);
     }
   }
   cache = merged;

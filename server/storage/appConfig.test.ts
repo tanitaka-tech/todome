@@ -27,14 +27,26 @@ afterAll(() => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("normalizeAppConfig — 正規化 (純粋関数)", () => {
-  it("null / undefined はデフォルト (4時) に正規化される", () => {
-    expect(normalizeAppConfig(null)).toEqual({ dayBoundaryHour: 4 });
-    expect(normalizeAppConfig(undefined)).toEqual({ dayBoundaryHour: 4 });
+  it("null / undefined はデフォルト (4時・月曜始まり) に正規化される", () => {
+    expect(normalizeAppConfig(null)).toEqual({
+      dayBoundaryHour: 4,
+      calendarWeekStart: 1,
+    });
+    expect(normalizeAppConfig(undefined)).toEqual({
+      dayBoundaryHour: 4,
+      calendarWeekStart: 1,
+    });
   });
 
   it("プリミティブ値はデフォルトに正規化される", () => {
-    expect(normalizeAppConfig(42)).toEqual({ dayBoundaryHour: 4 });
-    expect(normalizeAppConfig("string")).toEqual({ dayBoundaryHour: 4 });
+    expect(normalizeAppConfig(42)).toEqual({
+      dayBoundaryHour: 4,
+      calendarWeekStart: 1,
+    });
+    expect(normalizeAppConfig("string")).toEqual({
+      dayBoundaryHour: 4,
+      calendarWeekStart: 1,
+    });
   });
 
   it("dayBoundaryHour が 0〜23 の整数ならそのまま通す", () => {
@@ -64,7 +76,14 @@ describe("normalizeAppConfig — 正規化 (純粋関数)", () => {
 
   it("余分なキーは無視される", () => {
     const result = normalizeAppConfig({ dayBoundaryHour: 6, extra: "ignored" });
-    expect(result).toEqual({ dayBoundaryHour: 6 });
+    expect(result).toEqual({ dayBoundaryHour: 6, calendarWeekStart: 1 });
+  });
+
+  it("calendarWeekStart は 0(日曜) と 1(月曜) だけ通す", () => {
+    expect(normalizeAppConfig({ calendarWeekStart: 0 }).calendarWeekStart).toBe(0);
+    expect(normalizeAppConfig({ calendarWeekStart: 1 }).calendarWeekStart).toBe(1);
+    expect(normalizeAppConfig({ calendarWeekStart: 2 }).calendarWeekStart).toBe(1);
+    expect(normalizeAppConfig({ calendarWeekStart: "abc" }).calendarWeekStart).toBe(1);
   });
 });
 
@@ -75,13 +94,13 @@ describe("normalizeAppConfig — 正規化 (純粋関数)", () => {
 describe("loadAppConfig / saveAppConfig — 永続化", () => {
   it("設定ファイルがない場合はデフォルトを返す", () => {
     const cfg = loadAppConfig();
-    expect(cfg).toEqual({ dayBoundaryHour: 4 });
+    expect(cfg).toEqual({ dayBoundaryHour: 4, calendarWeekStart: 1 });
   });
 
   it("保存した値を復元できる", () => {
-    saveAppConfig({ dayBoundaryHour: 7 });
+    saveAppConfig({ dayBoundaryHour: 7, calendarWeekStart: 0 });
     resetAppConfigCache();
-    expect(loadAppConfig()).toEqual({ dayBoundaryHour: 7 });
+    expect(loadAppConfig()).toEqual({ dayBoundaryHour: 7, calendarWeekStart: 0 });
   });
 
   it("既存値を部分的に上書きできる", () => {
@@ -91,9 +110,10 @@ describe("loadAppConfig / saveAppConfig — 永続化", () => {
   });
 
   it("partial が dayBoundaryHour を持たなければ既存値を保持する", () => {
-    saveAppConfig({ dayBoundaryHour: 8 });
+    saveAppConfig({ dayBoundaryHour: 8, calendarWeekStart: 0 });
     const result = saveAppConfig({ otherField: "value" });
     expect(result.dayBoundaryHour).toBe(8);
+    expect(result.calendarWeekStart).toBe(0);
   });
 
   it("partial に非オブジェクトを渡しても既存値を保持する", () => {
@@ -111,7 +131,7 @@ describe("loadAppConfig / saveAppConfig — 永続化", () => {
   it("壊れた JSON ファイルはデフォルト値にフォールバックする", () => {
     writeFileSync(APP_CONFIG_PATH, "{ not valid json");
     resetAppConfigCache();
-    expect(loadAppConfig()).toEqual({ dayBoundaryHour: 4 });
+    expect(loadAppConfig()).toEqual({ dayBoundaryHour: 4, calendarWeekStart: 1 });
   });
 
   it("getDayBoundaryHour は現在のキャッシュ値を返す", () => {

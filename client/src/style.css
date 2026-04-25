@@ -51,6 +51,11 @@ html[data-theme="dark"] {
   --bubble-asst-bg: #23253a;
   --bubble-asst-fg: var(--fg);
   --code-bg: rgba(255, 255, 255, 0.06);
+  --schedule-month-day-bg: var(--bg);
+  --schedule-month-day-out-bg: var(--schedule-month-day-bg);
+  --schedule-month-day-off-bg: var(--day-off-bg);
+  --day-off-bg: var(--surface-hover);
+  --day-holiday-fg: var(--fg-muted);
 }
 
 /* ---------- Midnight (deep blue dark) ---------- */
@@ -7431,7 +7436,7 @@ body {
 }
 
 .schedule-month-cell {
-  background: var(--bg);
+  background: var(--schedule-month-day-bg);
   display: flex;
   flex-direction: column;
   padding: 4px 4px 6px;
@@ -7440,7 +7445,7 @@ body {
 }
 
 .schedule-month-cell.is-out {
-  background: var(--surface);
+  background: var(--schedule-month-day-out-bg);
   color: var(--fg-muted);
 }
 
@@ -7451,11 +7456,25 @@ body {
   padding: 1px 8px;
 }
 
+.schedule-month-cell.is-off { background: var(--schedule-month-day-off-bg); }
+
 .schedule-month-cell-head {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
+  gap: 4px;
   font-size: 0.85rem;
   pointer-events: none;
+}
+
+.schedule-month-holiday-name {
+  font-size: 0.65rem;
+  color: var(--day-holiday-fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .schedule-month-day-num {
@@ -7702,6 +7721,18 @@ body {
   padding: 1px 10px;
 }
 
+.schedule-week-day-head.is-off { background: var(--day-off-bg); }
+
+.schedule-week-holiday-name {
+  display: block;
+  font-size: 0.65rem;
+  color: var(--day-holiday-fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
+}
+
 .schedule-week-allday-cell {
   min-height: 28px;
   padding: 2px 4px;
@@ -7715,6 +7746,8 @@ body {
 .schedule-week-allday-cell:last-child {
   border-right: none;
 }
+
+.schedule-week-allday-cell.is-off { background: var(--day-off-bg); }
 
 .schedule-week-allday-event {
   appearance: none;
@@ -7759,6 +7792,8 @@ body {
 .schedule-week-day-col:last-child {
   border-right: none;
 }
+
+.schedule-week-day-col.is-off { background: var(--day-off-bg); }
 
 .schedule-week-hour-cell {
   border-bottom: 1px solid var(--border);
@@ -8163,6 +8198,33 @@ body {
   gap: 10px;
 }
 
+.google-setup-links {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 4px 0 8px;
+}
+
+.google-redirect-uri {
+  margin: 6px 0 4px;
+}
+
+.google-redirect-uri-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.google-redirect-uri-row input {
+  flex: 1 1 auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.8rem;
+}
+
+.google-redirect-uri-row .btn {
+  flex: 0 0 auto;
+}
+
 .caldav-connected-row {
   display: flex;
   align-items: center;
@@ -8249,6 +8311,29 @@ body {
 .caldav-calendar-desc {
   color: var(--fg-muted);
   font-size: 0.8rem;
+}
+
+.calendar-subscription-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 92px;
+  color: var(--fg-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+}
+
+.calendar-subscription-toggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.calendar-subscription-toggle:has(input:checked) {
+  color: var(--fg);
 }
 
 .subscriptions-provider {

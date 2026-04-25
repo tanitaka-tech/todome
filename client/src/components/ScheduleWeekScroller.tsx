@@ -13,6 +13,7 @@ import type {
   ScheduleColorContext,
 } from "../types";
 import { scheduleColor } from "../types";
+import { getHolidayName, isDayOff } from "../holiday";
 
 interface SelectingState {
   dayIso: string;
@@ -47,6 +48,7 @@ interface Props {
   schedules: Schedule[];
   subscriptions: CalendarSubscription[];
   colorContext: ScheduleColorContext;
+  calendarWeekStart: 0 | 1;
   onAnchorChange: (d: Date) => void;
   onEventClick: (schedule: Schedule) => void;
   onSlotClick: (start: string, end: string, allDay: boolean) => void;
@@ -83,9 +85,10 @@ function formatLocalDate(d: Date): string {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 }
 
-function startOfWeek(d: Date): Date {
+function startOfWeek(d: Date, weekStart: 0 | 1): Date {
   const r = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
-  r.setDate(r.getDate() - d.getDay());
+  const day = (d.getDay() - weekStart + 7) % 7;
+  r.setDate(r.getDate() - day);
   return r;
 }
 
@@ -95,8 +98,8 @@ function shiftDays(d: Date, n: number): Date {
   return r;
 }
 
-function buildInitialDayList(anchor: Date): Date[] {
-  const ws = startOfWeek(anchor);
+function buildInitialDayList(anchor: Date, weekStart: 0 | 1): Date[] {
+  const ws = startOfWeek(anchor, weekStart);
   const first = shiftDays(ws, -DAYS_BEFORE);
   return Array.from({ length: TOTAL_DAYS }, (_, i) => shiftDays(first, i));
 }
@@ -141,6 +144,7 @@ export function ScheduleWeekScroller({
   schedules,
   subscriptions,
   colorContext,
+  calendarWeekStart,
   onAnchorChange,
   onEventClick,
   onSlotClick,
@@ -177,7 +181,7 @@ export function ScheduleWeekScroller({
 
   const [dayWidth, setDayWidth] = useState<number>(MIN_DAY_WIDTH);
   const [dayList, setDayList] = useState<Date[]>(() =>
-    buildInitialDayList(anchor),
+    buildInitialDayList(anchor, calendarWeekStart),
   );
   // 現在時刻 (1分ごとに更新)。今ライン (Apple Calendar 風) の描画に使う。
   const [nowDate, setNowDate] = useState<Date>(() => new Date());
@@ -195,7 +199,7 @@ export function ScheduleWeekScroller({
     const el = containerRef.current;
     if (!el) return;
     if (dayWidth <= 0) return;
-    const anchorIso = formatLocalDate(startOfWeek(anchor));
+    const anchorIso = formatLocalDate(startOfWeek(anchor, calendarWeekStart));
     const idx = dayList.findIndex((d) => formatLocalDate(d) === anchorIso);
     if (idx < 0) return;
     skipScrollRef.current = true;
@@ -219,7 +223,7 @@ export function ScheduleWeekScroller({
       skipScrollRef.current = false;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dayWidth, dayList]);
+  }, [dayWidth, dayList, calendarWeekStart]);
 
   // ResizeObserver で 1 日幅をビューポートから算出
   useLayoutEffect(() => {
@@ -241,11 +245,11 @@ export function ScheduleWeekScroller({
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    const targetIso = formatLocalDate(startOfWeek(anchor));
+    const targetIso = formatLocalDate(startOfWeek(anchor, calendarWeekStart));
     if (lastEmittedAnchorIsoRef.current === targetIso) return; // 自分が出した変更
     let idx = dayList.findIndex((d) => formatLocalDate(d) === targetIso);
     if (idx < 0) {
-      const next = buildInitialDayList(anchor);
+      const next = buildInitialDayList(anchor, calendarWeekStart);
       // 親 anchor が現リストの範囲外に飛んだとき (今日ボタン等) のみリスト再構築。
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setDayList(next);
@@ -268,7 +272,7 @@ export function ScheduleWeekScroller({
     setTimeout(() => {
       skipScrollRef.current = false;
     }, 600);
-  }, [anchor, dayList, dayWidth]);
+  }, [anchor, dayList, dayWidth, calendarWeekStart]);
 
   // ref で外部 (SchedulePanel) から N 日分スクロールを呼べるようにする。
   // smooth scroll 中に連打されても上書きされず累積する。target が現在の
@@ -353,10 +357,11 @@ export function ScheduleWeekScroller({
     const leftIdx = Math.round(el.scrollLeft / dayWidth);
     const day = dayList[Math.max(0, leftIdx)];
     if (day) {
-      const wsIso = formatLocalDate(startOfWeek(day));
+      const weekStart = startOfWeek(day, calendarWeekStart);
+      const wsIso = formatLocalDate(weekStart);
       if (wsIso !== lastEmittedAnchorIsoRef.current) {
         lastEmittedAnchorIsoRef.current = wsIso;
-        onAnchorChangeRef.current(startOfWeek(day));
+        onAnchorChangeRef.current(weekStart);
       }
     }
     // 端到達でリスト拡張
@@ -594,13 +599,23 @@ export function ScheduleWeekScroller({
           {dayList.map((d) => {
             const iso = formatLocalDate(d);
             const isToday = iso === todayIso;
+            const off = isDayOff(d);
+            const holidayName = getHolidayName(d);
             return (
               <div
                 key={`head-${iso}`}
-                className={`schedule-week-day-head${isToday ? " is-today" : ""}`}
+                className={`schedule-week-day-head${isToday ? " is-today" : ""}${off ? " is-off" : ""}`}
               >
                 <div className="schedule-week-wd">{t(`wd_${d.getDay()}`)}</div>
                 <div className="schedule-week-dnum">{d.getDate()}</div>
+                {holidayName && (
+                  <div
+                    className="schedule-week-holiday-name"
+                    title={holidayName}
+                  >
+                    {holidayName}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -619,10 +634,11 @@ export function ScheduleWeekScroller({
           {dayList.map((d) => {
             const iso = formatLocalDate(d);
             const items = allDayByDay.get(iso) ?? [];
+            const off = isDayOff(d);
             return (
               <div
                 key={`ad-${iso}`}
-                className="schedule-week-allday-cell"
+                className={`schedule-week-allday-cell${off ? " is-off" : ""}`}
                 onClick={(e) => {
                   if (e.target !== e.currentTarget) return;
                   onSlotClick(`${iso}T00:00:00`, `${iso}T00:00:00`, true);
@@ -679,6 +695,7 @@ export function ScheduleWeekScroller({
         >
           {dayList.map((d) => {
           const iso = formatLocalDate(d);
+          const off = isDayOff(d);
           const events = timedByDay.get(iso) ?? [];
           const isSelectingThisCol = selecting && selecting.dayIso === iso;
           let selBox: { top: number; height: number; label: string } | null = null;
@@ -699,7 +716,7 @@ export function ScheduleWeekScroller({
                 if (el) dayColMapRef.current.set(iso, el);
                 else dayColMapRef.current.delete(iso);
               }}
-              className="schedule-week-day-col"
+              className={`schedule-week-day-col${off ? " is-off" : ""}`}
               onMouseDown={(e) => handleColMouseDown(e, iso)}
             >
               {HOURS.map((h) => (

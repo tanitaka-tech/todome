@@ -70,7 +70,14 @@ export function normalizeSubscription(
     eventCount: typeof raw.eventCount === "number" ? raw.eventCount : 0,
     createdAt: String(raw.createdAt ?? ""),
     updatedAt: String(raw.updatedAt ?? ""),
-    provider: raw.provider === "caldav" ? "caldav" : "ics",
+    provider:
+      raw.provider === "caldav"
+        ? "caldav"
+        : raw.provider === "google"
+          ? "google"
+          : "ics",
     caldavCalendarId: String(raw.caldavCalendarId ?? ""),
+    googleCalendarId: String(raw.googleCalendarId ?? ""),
+    googleAccountId: String(raw.googleAccountId ?? ""),
   };
 }
