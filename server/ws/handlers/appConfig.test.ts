@@ -85,6 +85,15 @@ describe("appConfigUpdate handler", () => {
     expect(sync).toMatchObject({ config: { dayBoundaryHour: 4 } });
   });
 
+  it("calendarWeekStart を正規化して broadcast する", async () => {
+    const { ws, session } = makeRequester();
+
+    await appConfigUpdate(ws, session, { config: { calendarWeekStart: 0 } });
+
+    const sync = sent.find((m) => m.type === "app_config_sync");
+    expect(sync).toMatchObject({ config: { calendarWeekStart: 0 } });
+  });
+
   it("config 未指定時は空オブジェクト扱いでデフォルト値が broadcast される", async () => {
     const { ws, session } = makeRequester();
 

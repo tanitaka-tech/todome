@@ -20,6 +20,8 @@ function makeSchedule(partial: Partial<Schedule> = {}): Schedule {
     updatedAt: "2026-04-25T09:00:00",
     caldavObjectUrl: "",
     caldavEtag: "",
+    googleEventId: "",
+    googleAccountId: "",
     ...partial,
   };
 }

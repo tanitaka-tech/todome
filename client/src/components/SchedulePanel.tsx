@@ -11,6 +11,8 @@ import type {
   CalDAVCalendarChoice,
   CalDAVStatus,
   CalendarSubscription,
+  GoogleCalendarChoice,
+  GoogleStatus,
   Schedule,
 } from "../types";
 import { nowLocalIso } from "../types";
@@ -36,9 +38,13 @@ interface Props {
   subscriptions: CalendarSubscription[];
   send: (data: unknown) => void;
   dayBoundaryHour: number;
+  calendarWeekStart: 0 | 1;
   caldavStatus: CalDAVStatus | null;
   caldavCalendars: CalDAVCalendarChoice[];
   caldavCalendarsError: string;
+  googleStatus: GoogleStatus | null;
+  googleCalendars: GoogleCalendarChoice[];
+  googleCalendarsError: string;
   /** テーマアクセント色 (#RRGGBB)。書き込み先未設定の manual schedule の表示色。 */
   themeAccent: string;
 }
@@ -59,8 +65,8 @@ function startOfMonth(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0);
 }
 
-function startOfWeek(d: Date): Date {
-  const day = d.getDay();
+function startOfWeek(d: Date, weekStart: 0 | 1): Date {
+  const day = (d.getDay() - weekStart + 7) % 7;
   const r = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
   r.setDate(r.getDate() - day);
   return r;
@@ -98,9 +104,13 @@ export function SchedulePanel({
   subscriptions,
   send,
   dayBoundaryHour: _dayBoundaryHour,
+  calendarWeekStart,
   caldavStatus,
   caldavCalendars,
   caldavCalendarsError,
+  googleStatus,
+  googleCalendars,
+  googleCalendarsError,
   themeAccent,
 }: Props) {
   const { t, i18n: i18nInst } = useTranslation("schedule");
@@ -127,9 +137,14 @@ export function SchedulePanel({
   const colorContext = useMemo(
     () => ({
       writeTargetColor: caldavStatus?.writeTargetCalendarColor || "",
+      googleWriteTargetColor: googleStatus?.writeTargetCalendarColor || "",
       themeAccent,
     }),
-    [caldavStatus?.writeTargetCalendarColor, themeAccent],
+    [
+      caldavStatus?.writeTargetCalendarColor,
+      googleStatus?.writeTargetCalendarColor,
+      themeAccent,
+    ],
   );
 
   const visibleSchedules = useMemo(() => {
@@ -220,6 +235,8 @@ export function SchedulePanel({
           externalUid: "",
           caldavObjectUrl: "",
           caldavEtag: "",
+          googleEventId: "",
+          googleAccountId: "",
           createdAt: now,
           updatedAt: now,
         };
@@ -235,6 +252,8 @@ export function SchedulePanel({
           externalUid: original.externalUid,
           caldavObjectUrl: original.caldavObjectUrl,
           caldavEtag: original.caldavEtag,
+          googleEventId: original.googleEventId,
+          googleAccountId: original.googleAccountId,
           rrule: original.rrule,
           recurrenceId: original.recurrenceId,
           createdAt: original.createdAt,
@@ -366,8 +385,8 @@ export function SchedulePanel({
       if (!d) return "";
       return formatYearMonth(startOfMonth(d), lang);
     }
-    return formatWeekRange(startOfWeek(anchor), lang);
-  }, [viewMode, pages, scrollIdx, anchor, lang]);
+    return formatWeekRange(startOfWeek(anchor, calendarWeekStart), lang);
+  }, [viewMode, pages, scrollIdx, anchor, lang, calendarWeekStart]);
 
   return (
     <div className="schedule-panel">
@@ -412,6 +431,7 @@ export function SchedulePanel({
                   schedules={visibleSchedules}
                   subscriptions={subscriptions}
                   colorContext={colorContext}
+                  calendarWeekStart={calendarWeekStart}
                   onEventClick={handleEventClick}
                   onSlotClick={handleSlotClick}
                 />
@@ -420,11 +440,13 @@ export function SchedulePanel({
           </div>
         ) : (
           <ScheduleWeekScroller
+            key={calendarWeekStart}
             ref={scrollerRef}
             anchor={anchor}
             schedules={visibleSchedules}
             subscriptions={subscriptions}
             colorContext={colorContext}
+            calendarWeekStart={calendarWeekStart}
             onAnchorChange={setAnchor}
             onEventClick={handleEventClick}
             onSlotClick={handleSlotClick}
@@ -459,6 +481,9 @@ export function SchedulePanel({
           caldavStatus={caldavStatus}
           caldavCalendars={caldavCalendars}
           caldavCalendarsError={caldavCalendarsError}
+          googleStatus={googleStatus}
+          googleCalendars={googleCalendars}
+          googleCalendarsError={googleCalendarsError}
         />
       )}
     </div>

@@ -71,8 +71,40 @@ export const ja_schedule: Record<string, string> = {
   caldavCalendarsLoading: "カレンダーを取得しています…",
   caldavAddCalendar: "+ 追加",
   caldavAlreadyAdded: "追加済み",
+  calendarToggleAdd: "未追加",
+  calendarToggleAdded: "追加済み",
   // セクション分け
   icsTitle: "公開 iCal URL を購読",
   providerIcs: "iCal",
   providerCaldav: "iCloud",
+  providerGoogle: "Google",
+  // Google Calendar
+  googleTitle: "Google カレンダー連携",
+  googleHelp:
+    "Google Cloud Console で次の3つを設定してください。①「ライブラリ」から Google Calendar API を有効化 ②「OAuth 同意画面」のテストユーザーに自分のアカウントを追加 ③「認証情報」で OAuth クライアント (Web アプリケーション) を作成し、下記のリダイレクト URI を完全一致で登録。client_id と client_secret は data/google_config.json に平文で保存されます。",
+  googleRedirectUriLabel: "登録するリダイレクト URI",
+  googleRedirectUriCopy: "コピー",
+  googleRedirectUriCopied: "コピーしました",
+  googleIssueLink: "Google Cloud Console で OAuth クライアントを作成 ↗",
+  googleEnableApiLink: "Google Calendar API を有効化 ↗",
+  googleConsentScreenLink: "OAuth 同意画面でテストユーザーを追加 ↗",
+  googleClientId: "Client ID",
+  googleClientSecret: "Client Secret",
+  googleSaveCredentials: "認証情報を保存",
+  googleCredentialsSaved:
+    "認証情報を保存しました。「接続」を押すと別タブで Google の認可画面が開きます。",
+  googleResetCredentials: "認証情報を破棄",
+  googleConnect: "Google で接続",
+  googleAddAccount: "アカウントを追加",
+  googleConnected: "接続済み",
+  googleDisconnect: "切断",
+  googleDisconnectConfirm:
+    "Google Calendar との接続を解除し、関連する購読カレンダーと認証情報をすべて削除します。よろしいですか？",
+  googleListCalendars: "カレンダーを選ぶ",
+  googleWriteTarget: "書き込み先カレンダー",
+  googleWriteTargetNone: "書き込まない",
+  googleWriteTargetHint:
+    "todome で作った予定がこの Google カレンダーに反映されます。",
+  googleCalendarsLoading: "カレンダーを取得しています…",
+  googlePrimary: "メイン",
 };

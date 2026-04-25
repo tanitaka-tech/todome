@@ -1,6 +1,15 @@
 import { deleteManualEvent, pushManualEvent } from "../../caldav/client.ts";
+import {
+  deleteManualEvent as deleteGoogleEvent,
+  pushManualEvent as pushGoogleEvent,
+} from "../../google/client.ts";
 import { scheduleAutosync } from "../../github/autosync.ts";
 import { loadCalDAVConfig } from "../../storage/caldav.ts";
+import {
+  getGoogleAccount,
+  isGoogleAccountConnected,
+  loadGoogleConfig,
+} from "../../storage/google.ts";
 import { loadProfile } from "../../storage/profile.ts";
 import {
   deleteManualSchedule,
@@ -18,6 +27,7 @@ import { nowLocalIso } from "../../utils/time.ts";
 import { broadcast } from "../broadcast.ts";
 import type { Handler } from "../dispatch.ts";
 import { buildCalDAVStatus } from "./caldav.ts";
+import { buildGoogleStatus } from "./google.ts";
 import { refreshSubscriptionAndBroadcast } from "./subscription.ts";
 
 function broadcastSchedules(session: { schedules: Schedule[] }): void {
@@ -27,6 +37,10 @@ function broadcastSchedules(session: { schedules: Schedule[] }): void {
 
 function notifyCaldavError(message: string): void {
   broadcast({ type: "caldav_status", status: buildCalDAVStatus(message) });
+}
+
+function notifyGoogleError(message: string): void {
+  broadcast({ type: "google_status", status: buildGoogleStatus(message) });
 }
 
 function effectiveTimezone(): string {
@@ -40,90 +54,213 @@ function effectiveTimezone(): string {
   }
 }
 
-/** 書き戻しに使うカレンダー URL を決定する。
- * - manual: caldav_config.writeTargetCalendarUrl
- * - subscription (provider=caldav): その購読の url
- * - 上記以外: "" (push 不可)
+type WriteTarget =
+  | { provider: "caldav"; url: string }
+  | { provider: "google"; calendarId: string; accountId: string }
+  | null;
+
+/** 書き戻しに使うカレンダーを決定する。
+ * - manual:
+ *    - schedule.caldavObjectUrl があれば caldav (既存 push 先を維持)
+ *    - schedule.googleEventId があれば google (同上)
+ *    - どちらも未設定なら caldav の writeTarget → google の writeTarget の順で確定
+ * - subscription:
+ *    - provider="caldav" → その購読の url
+ *    - provider="google" → その購読の googleCalendarId
+ *    - ics → null (push 不可)
  */
-function pickCalendarUrl(
+function pickWriteTarget(
   schedule: Schedule,
   subs: CalendarSubscription[],
-  cfg: ReturnType<typeof loadCalDAVConfig>,
-): string {
+  caldavCfg: ReturnType<typeof loadCalDAVConfig>,
+  googleCfg: ReturnType<typeof loadGoogleConfig>,
+): WriteTarget {
   if (schedule.source === "subscription") {
     const sub = subs.find((s) => s.id === schedule.subscriptionId);
-    if (!sub) return "";
-    if (sub.provider !== "caldav") return ""; // ICS 公開URLは書き戻し不可
-    return sub.url;
+    if (!sub) return null;
+    if (sub.provider === "caldav") return { provider: "caldav", url: sub.url };
+    if (sub.provider === "google") {
+      return {
+        provider: "google",
+        calendarId: sub.googleCalendarId,
+        accountId: sub.googleAccountId || googleCfg.activeAccountId || "",
+      };
+    }
+    return null;
   }
-  return cfg.writeTargetCalendarUrl ?? "";
+  // manual: 既に push 済みならその provider に固定する
+  if (schedule.caldavObjectUrl) {
+    return caldavCfg.writeTargetCalendarUrl
+      ? { provider: "caldav", url: caldavCfg.writeTargetCalendarUrl }
+      : null;
+  }
+  if (schedule.googleEventId) {
+    const account = getGoogleAccount(schedule.googleAccountId || undefined);
+    return account?.writeTargetCalendarId
+      ? {
+          provider: "google",
+          calendarId: account.writeTargetCalendarId,
+          accountId: account.id,
+        }
+      : null;
+  }
+  // 未 push: 設定済みの書き込み先を優先採用 (両方あれば caldav 優先で既存挙動維持)
+  if (caldavCfg.writeTargetCalendarUrl) {
+    return { provider: "caldav", url: caldavCfg.writeTargetCalendarUrl };
+  }
+  const activeGoogleAccount = getGoogleAccount(googleCfg.activeAccountId || undefined);
+  if (activeGoogleAccount?.writeTargetCalendarId) {
+    return {
+      provider: "google",
+      calendarId: activeGoogleAccount.writeTargetCalendarId,
+      accountId: activeGoogleAccount.id,
+    };
+  }
+  return null;
 }
 
 async function maybePushToCloud(schedule: Schedule): Promise<void> {
-  const cfg = loadCalDAVConfig();
-  if (!cfg.appleId || !cfg.appPassword) return;
+  const caldavCfg = loadCalDAVConfig();
+  const googleCfg = loadGoogleConfig();
   const subs = loadSubscriptions();
-  const calendarUrl = pickCalendarUrl(schedule, subs, cfg);
-  if (!calendarUrl) return;
+  const target = pickWriteTarget(schedule, subs, caldavCfg, googleCfg);
+  if (!target) return;
 
-  // RRULE 展開済み occurrence の編集は単体ではサポートしない（master を上書きしてしまう）
+  // 繰り返しイベントの個別編集は未対応（master を上書きしないため）
   if (schedule.source === "subscription" && schedule.rrule) {
-    notifyCaldavError(
-      "繰り返しイベントの個別編集は未対応です（master を上書きしないため iCloud 側未反映）",
-    );
+    if (target.provider === "caldav") {
+      notifyCaldavError(
+        "繰り返しイベントの個別編集は未対応です（master を上書きしないため iCloud 側未反映）",
+      );
+    } else {
+      notifyGoogleError(
+        "繰り返しイベントの個別編集は未対応です（Google 側未反映）",
+      );
+    }
     return;
   }
 
+  if (target.provider === "caldav") {
+    if (!caldavCfg.appleId || !caldavCfg.appPassword) return;
+    const tzid = effectiveTimezone();
+    const result = await pushManualEvent({
+      cfg: caldavCfg,
+      calendarUrl: target.url,
+      schedule,
+      tzid,
+      existingObjectUrl: schedule.caldavObjectUrl || undefined,
+      existingEtag: schedule.caldavEtag || undefined,
+    });
+    if (!result.ok) {
+      console.error(
+        `[caldav] push failed for schedule ${schedule.id}: ${result.error}`,
+      );
+      notifyCaldavError(`書き込みに失敗しました: ${result.error}`);
+      return;
+    }
+    if (schedule.source === "manual") {
+      const updated: Schedule = normalizeSchedule({
+        ...schedule,
+        caldavObjectUrl: result.objectUrl,
+        caldavEtag: result.etag,
+        externalUid: result.uid || schedule.externalUid,
+      });
+      upsertManualSchedule(updated);
+    }
+    notifyCaldavError("");
+    return;
+  }
+
+  // google
+  if (!isGoogleAccountConnected(target.accountId)) return;
+  if (!target.calendarId) return;
   const tzid = effectiveTimezone();
-  const result = await pushManualEvent({
-    cfg,
-    calendarUrl,
+  const result = await pushGoogleEvent({
+    calendarId: target.calendarId,
+    accountId: target.accountId,
     schedule,
+    existingEventId: schedule.googleEventId || undefined,
     tzid,
-    existingObjectUrl: schedule.caldavObjectUrl || undefined,
-    existingEtag: schedule.caldavEtag || undefined,
   });
   if (!result.ok) {
     console.error(
-      `[caldav] push failed for schedule ${schedule.id}: ${result.error}`,
+      `[google] push failed for schedule ${schedule.id}: ${result.error}`,
     );
-    notifyCaldavError(`書き込みに失敗しました: ${result.error}`);
+    notifyGoogleError(`Google への書き込みに失敗しました: ${result.error}`);
     return;
   }
-  // manual の場合のみ DB に push 結果を書き戻す（subscription は次回 refresh で正規化される）
   if (schedule.source === "manual") {
     const updated: Schedule = normalizeSchedule({
       ...schedule,
-      caldavObjectUrl: result.objectUrl,
-      caldavEtag: result.etag,
+      googleEventId: result.eventId,
+      googleAccountId: target.accountId,
       externalUid: result.uid || schedule.externalUid,
     });
     upsertManualSchedule(updated);
   }
-  notifyCaldavError("");
+  notifyGoogleError("");
 }
 
 async function maybeDeleteFromCloud(schedule: Schedule): Promise<void> {
-  const cfg = loadCalDAVConfig();
-  if (!cfg.appleId || !cfg.appPassword) return;
-  if (!schedule.caldavObjectUrl) return;
-  // 繰り返しイベントの delete は master ごと消えるので警告
-  if (schedule.source === "subscription" && schedule.rrule) {
-    notifyCaldavError(
-      "繰り返しイベントの個別削除は未対応です（master を消すと全 occurrence が消えます）",
-    );
-    return;
+  // CalDAV 側に push 済みなら CalDAV から消す
+  if (schedule.caldavObjectUrl) {
+    const cfg = loadCalDAVConfig();
+    if (cfg.appleId && cfg.appPassword) {
+      if (schedule.source === "subscription" && schedule.rrule) {
+        notifyCaldavError(
+          "繰り返しイベントの個別削除は未対応です（master を消すと全 occurrence が消えます）",
+        );
+      } else {
+        const result = await deleteManualEvent(
+          cfg,
+          schedule.caldavObjectUrl,
+          schedule.caldavEtag,
+        );
+        if (!result.ok) {
+          console.error(
+            `[caldav] delete failed for schedule ${schedule.id}: ${result.error}`,
+          );
+          notifyCaldavError(`iCloud 側の削除に失敗しました: ${result.error}`);
+        }
+      }
+    }
   }
-  const result = await deleteManualEvent(
-    cfg,
-    schedule.caldavObjectUrl,
-    schedule.caldavEtag,
-  );
-  if (!result.ok) {
-    console.error(
-      `[caldav] delete failed for schedule ${schedule.id}: ${result.error}`,
-    );
-    notifyCaldavError(`iCloud 側の削除に失敗しました: ${result.error}`);
+
+  // Google 側に push 済みなら Google からも消す
+  if (schedule.googleEventId && isGoogleAccountConnected(schedule.googleAccountId || undefined)) {
+    if (schedule.source === "subscription" && schedule.rrule) {
+      notifyGoogleError(
+        "繰り返しイベントの個別削除は未対応です（master を消すと全 occurrence が消えます）",
+      );
+      return;
+    }
+    // 削除対象の calendarId は: subscription なら購読の calendarId、manual なら write target
+    const subs = loadSubscriptions();
+    const cfg = loadGoogleConfig();
+    let calendarId = "";
+    let accountId = schedule.googleAccountId || cfg.activeAccountId || "";
+    if (schedule.source === "subscription") {
+      const sub = subs.find((s) => s.id === schedule.subscriptionId);
+      if (sub?.provider === "google") {
+        calendarId = sub.googleCalendarId;
+        accountId = sub.googleAccountId || accountId;
+      }
+    } else {
+      const account = getGoogleAccount(accountId);
+      calendarId = account?.writeTargetCalendarId ?? "";
+    }
+    if (!calendarId) return;
+    const result = await deleteGoogleEvent({
+      calendarId,
+      accountId,
+      eventId: schedule.googleEventId,
+    });
+    if (!result.ok) {
+      console.error(
+        `[google] delete failed for schedule ${schedule.id}: ${result.error}`,
+      );
+      notifyGoogleError(`Google 側の削除に失敗しました: ${result.error}`);
+    }
   }
 }
 
@@ -138,6 +275,8 @@ export const scheduleAdd: Handler = async (_ws, session, data) => {
     externalUid: "",
     caldavObjectUrl: "",
     caldavEtag: "",
+    googleEventId: "",
+    googleAccountId: "",
     createdAt: raw.createdAt ? String(raw.createdAt) : now,
     updatedAt: now,
   });
@@ -159,10 +298,10 @@ export const scheduleEdit: Handler = async (_ws, session, data) => {
 
   if (existing.source === "subscription") {
     // subscription 由来は DB 上は次回 refresh で再生成される一時レコードなので、
-    // upsertManualSchedule では保存しない。代わりに iCloud に書き戻すだけ。
+    // upsertManualSchedule では保存しない。代わりに cloud (iCloud / Google) に書き戻すだけ。
     const subs = loadSubscriptions();
     const sub = subs.find((s) => s.id === existing.subscriptionId);
-    if (!sub || sub.provider !== "caldav") {
+    if (!sub || (sub.provider !== "caldav" && sub.provider !== "google")) {
       notifyCaldavError("この購読は書き戻しに対応していません (公開 iCal URL)");
       return;
     }
@@ -176,13 +315,15 @@ export const scheduleEdit: Handler = async (_ws, session, data) => {
       externalUid: existing.externalUid,
       caldavObjectUrl: existing.caldavObjectUrl,
       caldavEtag: existing.caldavEtag,
+      googleEventId: existing.googleEventId,
+      googleAccountId: existing.googleAccountId,
       rrule: existing.rrule,
       recurrenceId: existing.recurrenceId,
       updatedAt: nowLocalIso(),
     });
     if (!merged.start || !merged.end) return;
     await maybePushToCloud(merged);
-    // 書き戻し成功で iCloud は更新済み → 即 refresh してローカル DB / クライアント表示を反映
+    // 書き戻し成功で cloud は更新済み → 即 refresh してローカル DB / クライアント表示を反映
     await refreshSubscriptionAndBroadcast(existing.subscriptionId);
     return;
   }
@@ -195,6 +336,8 @@ export const scheduleEdit: Handler = async (_ws, session, data) => {
     externalUid: existing.externalUid,
     caldavObjectUrl: existing.caldavObjectUrl,
     caldavEtag: existing.caldavEtag,
+    googleEventId: existing.googleEventId,
+    googleAccountId: existing.googleAccountId,
     updatedAt: nowLocalIso(),
   });
   if (!incoming.start || !incoming.end) return;
@@ -215,7 +358,7 @@ export const scheduleDelete: Handler = async (_ws, session, data) => {
   if (target.source === "subscription") {
     const subs = loadSubscriptions();
     const sub = subs.find((s) => s.id === target.subscriptionId);
-    if (!sub || sub.provider !== "caldav") {
+    if (!sub || (sub.provider !== "caldav" && sub.provider !== "google")) {
       notifyCaldavError("この購読は削除に対応していません (公開 iCal URL)");
       return;
     }
