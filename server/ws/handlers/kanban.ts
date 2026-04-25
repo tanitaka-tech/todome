@@ -21,6 +21,8 @@ import type { ColumnId, KanbanTask } from "../../types.ts";
 import { broadcast, sendTo } from "../broadcast.ts";
 import type { Handler } from "../dispatch.ts";
 
+const COLUMN_IDS: readonly ColumnId[] = ["todo", "in_progress", "done"];
+
 function sendKanbanAndGoals(ws: AppWebSocket, session: SessionState): void {
   sendTo(ws, { type: "kanban_sync", tasks: session.kanbanTasks });
   sendTo(ws, { type: "goal_sync", goals: session.goals });
@@ -35,13 +37,50 @@ function broadcastTimeTrackingSync(): void {
   });
 }
 
-function assignIfPresent<K extends keyof KanbanTask>(
+function assignIfPresent(
   task: KanbanTask,
   data: Record<string, unknown>,
-  key: K
+  key: keyof KanbanTask
 ): void {
-  if (key in data) {
-    (task as unknown as Record<string, unknown>)[key as string] = data[key as string];
+  if (!(key in data)) return;
+  const value = data[key as string];
+  switch (key) {
+    case "column":
+      if (isColumnId(value)) task.column = value;
+      return;
+    case "estimatedMinutes":
+      task.estimatedMinutes = nonNegativeInteger(value);
+      return;
+    case "timeSpent":
+      task.timeSpent = nonNegativeInteger(value);
+      return;
+    case "timeLogs":
+      task.timeLogs = normalizeTimeLogs(value);
+      return;
+    case "title":
+      task.title = String(value ?? "");
+      return;
+    case "description":
+      task.description = String(value ?? "");
+      return;
+    case "memo":
+      task.memo = String(value ?? "");
+      return;
+    case "goalId":
+      task.goalId = String(value ?? "");
+      return;
+    case "kpiId":
+      task.kpiId = String(value ?? "");
+      return;
+    case "timerStartedAt":
+      task.timerStartedAt = String(value ?? "");
+      return;
+    case "completedAt":
+      task.completedAt = String(value ?? "");
+      return;
+    case "id":
+    case "kpiContributed":
+      return;
   }
 }
 
@@ -54,14 +93,66 @@ function before(task: KanbanTask): RebalanceBefore {
   };
 }
 
+function isColumnId(value: unknown): value is ColumnId {
+  return typeof value === "string" && COLUMN_IDS.includes(value as ColumnId);
+}
+
+function nonNegativeInteger(value: unknown): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.floor(n));
+}
+
+function normalizeTimeLogs(value: unknown): KanbanTask["timeLogs"] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((raw) => {
+    if (!raw || typeof raw !== "object") return [];
+    const log = raw as Record<string, unknown>;
+    if (typeof log.start !== "string" || typeof log.end !== "string") return [];
+    return [
+      {
+        start: log.start,
+        end: log.end,
+        duration: nonNegativeInteger(log.duration),
+      },
+    ];
+  });
+}
+
+function isStartingTimer(data: Record<string, unknown>): boolean {
+  return typeof data.timerStartedAt === "string" && data.timerStartedAt !== "";
+}
+
+function stopExistingTaskTimers(session: SessionState): void {
+  const beforeById = new Map(
+    session.kanbanTasks.map((task) => [task.id, before(task)] as const)
+  );
+  const stoppedIds = stopTaskTimersIfRunning(session.kanbanTasks);
+  for (const id of stoppedIds) {
+    const task = session.kanbanTasks.find((t) => t.id === id);
+    const prev = beforeById.get(id);
+    if (task && prev) rebalanceKpiContribution(task, prev, session.goals);
+  }
+}
+
+function hasTask(session: SessionState, taskId: string): boolean {
+  return session.kanbanTasks.some((task) => task.id === taskId);
+}
+
 export const kanbanMove: Handler = async (ws, session, data) => {
   const taskId = String(data.taskId ?? "");
-  const startingTimer = Boolean(data.timerStartedAt);
+  const startingTimer = isStartingTimer(data) && hasTask(session, taskId);
+  if (startingTimer) stopExistingTaskTimers(session);
   for (const task of session.kanbanTasks) {
     if (task.id !== taskId) continue;
     const prev = before(task);
-    task.column = data.column as ColumnId;
-    for (const key of ["timeSpent", "timerStartedAt", "completedAt", "timeLogs"] as const) {
+    for (const key of [
+      "column",
+      "timeSpent",
+      "timerStartedAt",
+      "completedAt",
+      "timeLogs",
+    ] as const) {
       assignIfPresent(task, data, key);
     }
     rebalanceKpiContribution(task, prev, session.goals);
@@ -83,12 +174,12 @@ export const kanbanAdd: Handler = async (ws, session, data) => {
     id: shortId(),
     title: String(data.title ?? "新しいタスク"),
     description: String(data.description ?? ""),
-    column: (data.column as ColumnId) ?? "todo",
+    column: isColumnId(data.column) ? data.column : "todo",
     memo: String(data.memo ?? ""),
     goalId: String(data.goalId ?? ""),
     kpiId: String(data.kpiId ?? ""),
     kpiContributed: false,
-    estimatedMinutes: Number(data.estimatedMinutes ?? 0),
+    estimatedMinutes: nonNegativeInteger(data.estimatedMinutes ?? 0),
     timeSpent: 0,
     timerStartedAt: "",
     completedAt: "",
@@ -118,13 +209,20 @@ export const kanbanReorder: Handler = async (ws, session, data) => {
   const moveData =
     move && typeof move === "object" ? (move as Record<string, unknown>) : null;
   const movedTaskId = String(moveData?.taskId ?? "");
-  const startingTimer = Boolean(moveData?.timerStartedAt);
+  const startingTimer =
+    moveData !== null && isStartingTimer(moveData) && hasTask(session, movedTaskId);
+  if (startingTimer) stopExistingTaskTimers(session);
   if (moveData && movedTaskId) {
     for (const task of session.kanbanTasks) {
       if (task.id !== movedTaskId) continue;
       const prev = before(task);
-      task.column = moveData.column as ColumnId;
-      for (const key of ["timeSpent", "timerStartedAt", "completedAt", "timeLogs"] as const) {
+      for (const key of [
+        "column",
+        "timeSpent",
+        "timerStartedAt",
+        "completedAt",
+        "timeLogs",
+      ] as const) {
         assignIfPresent(task, moveData, key);
       }
       rebalanceKpiContribution(task, prev, session.goals);
@@ -160,7 +258,8 @@ export const kanbanReorder: Handler = async (ws, session, data) => {
 
 export const kanbanEdit: Handler = async (ws, session, data) => {
   const taskId = String(data.taskId ?? "");
-  const startingTimer = Boolean(data.timerStartedAt);
+  const startingTimer = isStartingTimer(data) && hasTask(session, taskId);
+  if (startingTimer) stopExistingTaskTimers(session);
   for (const task of session.kanbanTasks) {
     if (task.id !== taskId) continue;
     const prev = before(task);
