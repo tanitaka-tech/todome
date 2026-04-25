@@ -25,17 +25,33 @@ export function useWebSocket(onMessage: (msg: WSMessage) => void) {
         retryDelay = 500;
         setConnected(true);
       };
-      ws.onclose = () => {
+      ws.onclose = (e) => {
         setConnected(false);
         if (disposed) return;
+        // 異常切断 (1006/1011 等) は devtools で原因追跡できるよう必ず残す。1000 は通常終了。
+        if (e.code !== 1000 && e.code !== 1001) {
+          console.warn(`[ws] closed code=${e.code} reason=${e.reason || "(none)"}`);
+        }
         retryTimer = setTimeout(connect, retryDelay);
         retryDelay = Math.min(retryDelay * 2, 5000);
       };
+      ws.onerror = (e) => {
+        // ブラウザは詳細を秘匿するため Event のみ。少なくとも発生したことはログに残す。
+        console.error("[ws] error event:", e);
+      };
       ws.onmessage = (e) => {
+        let parsed: WSMessage;
         try {
-          onMessageRef.current(JSON.parse(e.data));
-        } catch {
-          /* ignore malformed */
+          parsed = JSON.parse(e.data) as WSMessage;
+        } catch (err) {
+          console.warn("[ws] malformed JSON received:", err);
+          return;
+        }
+        // ハンドラ内のバグを silent にしない。catch しないと WebSocket が握りつぶす。
+        try {
+          onMessageRef.current(parsed);
+        } catch (err) {
+          console.error("[ws] handler threw:", err);
         }
       };
     };

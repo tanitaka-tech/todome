@@ -155,6 +155,46 @@ describe("saveGoals / loadGoals — 永続化ラウンドトリップ", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 壊れた JSON 行が混入しても、他の目標が消えない
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("loadGoals — 壊れた JSON 行をスキップして他を返す", () => {
+  it("1行が壊れた JSON でも他の行はロードされる", () => {
+    const db = getDb();
+    db.prepare("INSERT INTO goals (id, sort_order, data) VALUES (?, ?, ?)").run(
+      "ok1",
+      0,
+      JSON.stringify(makeGoal({ id: "ok1", name: "前" }))
+    );
+    db.prepare("INSERT INTO goals (id, sort_order, data) VALUES (?, ?, ?)").run(
+      "broken",
+      1,
+      "{not json"
+    );
+    db.prepare("INSERT INTO goals (id, sort_order, data) VALUES (?, ?, ?)").run(
+      "ok2",
+      2,
+      JSON.stringify(makeGoal({ id: "ok2", name: "後" }))
+    );
+
+    const loaded = loadGoals();
+    expect(loaded).toHaveLength(2);
+    expect(loaded.map((g) => g.id)).toEqual(["ok1", "ok2"]);
+  });
+
+  it("壊れた行のみでもエラーにならず空配列を返す", () => {
+    const db = getDb();
+    db.prepare("INSERT INTO goals (id, sort_order, data) VALUES (?, ?, ?)").run(
+      "broken",
+      0,
+      "{"
+    );
+    expect(() => loadGoals()).not.toThrow();
+    expect(loadGoals()).toEqual([]);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // immutability — 入力配列を変更しない
 // ─────────────────────────────────────────────────────────────────────────────
 
