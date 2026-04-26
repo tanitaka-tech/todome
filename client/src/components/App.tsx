@@ -1427,6 +1427,7 @@ export function App() {
             lifeLogs={lifeLogs}
             quotas={quotas}
             quotaLogs={quotaLogs}
+            schedules={schedules}
             dayBoundaryHour={dayBoundaryHour}
           />
         ) : activeView === "board" ? (
@@ -1488,6 +1489,7 @@ export function App() {
             lifeLogsForActiveRetro={lifeLogsForActiveRetro}
             quotas={quotas}
             quotaLogsForActiveRetro={quotaLogsForActiveRetro}
+            schedules={schedules}
             dayBoundaryHour={dayBoundaryHour}
             onStart={handleRetroStart}
             onSend={handleRetroSend}

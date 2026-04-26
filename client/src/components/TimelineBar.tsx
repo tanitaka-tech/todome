@@ -6,17 +6,26 @@ import type {
   LifeLog,
   Quota,
   QuotaLog,
+  Schedule,
 } from "../types";
-import { LIFE_CATEGORY_COLORS, formatDuration } from "../types";
+import {
+  DEFAULT_SCHEDULE_COLOR,
+  LIFE_CATEGORY_COLORS,
+  formatDuration,
+} from "../types";
 
 interface Props {
   rangeStartMs: number;
   rangeEndMs: number;
+  schedules: Schedule[];
+  /** active 計測表示用 (timerStartedAt から作る)。 */
   tasks: KanbanTask[];
+  /** active 計測表示用 (endedAt 空) + origin.id から activity 引き当て用。 */
   lifeLogs: LifeLog[];
+  /** active 計測表示用 (endedAt 空) + origin.id から quota 引き当て用。 */
+  quotaLogs?: QuotaLog[];
   lifeActivities: LifeActivity[];
   quotas?: Quota[];
-  quotaLogs?: QuotaLog[];
   /** live update用。値が変われば再描画。 */
   tick?: number;
   /** 現在時刻にスクロールするか。Overview では true、retro (過去日) では false。 */
@@ -25,9 +34,11 @@ interface Props {
   orientation?: "vertical" | "horizontal";
 }
 
+type SegmentKind = "task" | "life" | "quota" | "manual";
+
 interface Segment {
   key: string;
-  kind: "task" | "life" | "quota";
+  kind: SegmentKind;
   startMs: number;
   endMs: number;
   label: string;
@@ -63,6 +74,7 @@ function formatTimeOfDay(ms: number): string {
 export function TimelineBar({
   rangeStartMs,
   rangeEndMs,
+  schedules,
   tasks,
   lifeLogs,
   lifeActivities,
@@ -89,49 +101,76 @@ export function TimelineBar({
 
   const segments = useMemo<Segment[]>(() => {
     const out: Segment[] = [];
-    for (const task of tasks) {
-      for (const log of task.timeLogs || []) {
-        const start = Date.parse(log.start);
-        const end = Date.parse(log.end);
-        if (Number.isNaN(start) || Number.isNaN(end)) continue;
-        if (!overlaps(start, end, rangeStartMs, rangeEndMs)) continue;
-        out.push({
-          key: `t-${task.id}-${log.start}`,
-          kind: "task",
-          startMs: Math.max(start, rangeStartMs),
-          endMs: Math.min(end, rangeEndMs),
-          label: task.title,
-          sublabel: `${formatTimeOfDay(start)}–${formatTimeOfDay(end)}`,
-          color: "var(--accent)",
-          tooltip: `${task.title}\n${formatTimeOfDay(start)}–${formatTimeOfDay(end)} (${formatDuration(Math.max(0, Math.floor((end - start) / 1000)))})`,
-        });
-      }
-      if (task.timerStartedAt) {
-        const start = Date.parse(task.timerStartedAt);
-        const end = nowMs;
-        if (
-          !Number.isNaN(start) &&
-          overlaps(start, end, rangeStartMs, rangeEndMs)
-        ) {
-          out.push({
-            key: `t-${task.id}-active`,
-            kind: "task",
-            startMs: Math.max(start, rangeStartMs),
-            endMs: Math.min(end, rangeEndMs),
-            label: task.title,
-            sublabel: `${formatTimeOfDay(start)}–`,
-            color: "var(--accent)",
-            tooltip: `${task.title} (計測中)\n${formatTimeOfDay(start)}–`,
-          });
+    const activityMap = new Map(lifeActivities.map((a) => [a.id, a]));
+    const quotaMap = new Map((quotas ?? []).map((q) => [q.id, q]));
+    const lifeLogMap = new Map(lifeLogs.map((l) => [l.id, l]));
+    const quotaLogMap = new Map((quotaLogs ?? []).map((l) => [l.id, l]));
+
+    for (const sch of schedules) {
+      if (sch.allDay) continue;
+      const start = Date.parse(sch.start);
+      const end = Date.parse(sch.end);
+      if (Number.isNaN(start) || Number.isNaN(end)) continue;
+      if (!overlaps(start, end, rangeStartMs, rangeEndMs)) continue;
+      let kind: SegmentKind = "manual";
+      let label = sch.title || "(無題)";
+      let color = DEFAULT_SCHEDULE_COLOR;
+      if (sch.origin?.type === "task") {
+        kind = "task";
+        color = "var(--accent)";
+      } else if (sch.origin?.type === "lifelog") {
+        kind = "life";
+        const log = lifeLogMap.get(sch.origin.id);
+        const activity = log ? activityMap.get(log.activityId) : undefined;
+        if (activity) {
+          color = LIFE_CATEGORY_COLORS[activity.category];
+          label = `${activity.icon} ${activity.name}`;
+        } else {
+          color = LIFE_CATEGORY_COLORS.other;
         }
+      } else if (sch.origin?.type === "quota") {
+        kind = "quota";
+        color = QUOTA_SEG_COLOR;
+        const log = quotaLogMap.get(sch.origin.id);
+        const quota = log ? quotaMap.get(log.quotaId) : undefined;
+        if (quota) label = `${quota.icon} ${quota.name}`;
       }
+      out.push({
+        key: `s-${sch.id}`,
+        kind,
+        startMs: Math.max(start, rangeStartMs),
+        endMs: Math.min(end, rangeEndMs),
+        label,
+        sublabel: `${formatTimeOfDay(start)}–${formatTimeOfDay(end)}`,
+        color,
+        tooltip: `${label}\n${formatTimeOfDay(start)}–${formatTimeOfDay(end)} (${formatDuration(Math.max(0, Math.floor((end - start) / 1000)))})`,
+      });
     }
 
-    const activityMap = new Map(lifeActivities.map((a) => [a.id, a]));
+    // active 計測 (Schedule にまだ載っていない計測中のもの) を別経路で追加
+    for (const task of tasks) {
+      if (!task.timerStartedAt) continue;
+      const start = Date.parse(task.timerStartedAt);
+      const end = nowMs;
+      if (Number.isNaN(start)) continue;
+      if (!overlaps(start, end, rangeStartMs, rangeEndMs)) continue;
+      out.push({
+        key: `t-${task.id}-active`,
+        kind: "task",
+        startMs: Math.max(start, rangeStartMs),
+        endMs: Math.min(end, rangeEndMs),
+        label: task.title,
+        sublabel: `${formatTimeOfDay(start)}–`,
+        color: "var(--accent)",
+        tooltip: `${task.title} (計測中)\n${formatTimeOfDay(start)}–`,
+      });
+    }
+
     for (const log of lifeLogs) {
+      if (log.endedAt) continue;
       const start = Date.parse(log.startedAt);
-      const end = log.endedAt ? Date.parse(log.endedAt) : nowMs;
-      if (Number.isNaN(start) || Number.isNaN(end)) continue;
+      if (Number.isNaN(start)) continue;
+      const end = nowMs;
       if (!overlaps(start, end, rangeStartMs, rangeEndMs)) continue;
       const activity = activityMap.get(log.activityId);
       const color = activity
@@ -141,39 +180,40 @@ export function TimelineBar({
         ? `${activity.icon} ${activity.name}`
         : log.activityId;
       out.push({
-        key: `l-${log.id}`,
+        key: `l-${log.id}-active`,
         kind: "life",
         startMs: Math.max(start, rangeStartMs),
         endMs: Math.min(end, rangeEndMs),
         label: name,
-        sublabel: `${formatTimeOfDay(start)}–${formatTimeOfDay(end)}`,
+        sublabel: `${formatTimeOfDay(start)}– (計測中)`,
         color,
-        tooltip: `${name}\n${formatTimeOfDay(start)}–${formatTimeOfDay(end)} (${formatDuration(Math.max(0, Math.floor((end - start) / 1000)))})`,
+        tooltip: `${name} (計測中)\n${formatTimeOfDay(start)}–`,
       });
     }
 
-    const quotaMap = new Map((quotas ?? []).map((q) => [q.id, q]));
     for (const log of quotaLogs ?? []) {
+      if (log.endedAt) continue;
       const start = Date.parse(log.startedAt);
-      const end = log.endedAt ? Date.parse(log.endedAt) : nowMs;
-      if (Number.isNaN(start) || Number.isNaN(end)) continue;
+      if (Number.isNaN(start)) continue;
+      const end = nowMs;
       if (!overlaps(start, end, rangeStartMs, rangeEndMs)) continue;
       const quota = quotaMap.get(log.quotaId);
       const name = quota ? `${quota.icon} ${quota.name}` : log.quotaId;
       out.push({
-        key: `q-${log.id}`,
+        key: `q-${log.id}-active`,
         kind: "quota",
         startMs: Math.max(start, rangeStartMs),
         endMs: Math.min(end, rangeEndMs),
         label: name,
-        sublabel: `${formatTimeOfDay(start)}–${formatTimeOfDay(end)}`,
+        sublabel: `${formatTimeOfDay(start)}– (計測中)`,
         color: QUOTA_SEG_COLOR,
-        tooltip: `${name}\n${formatTimeOfDay(start)}–${formatTimeOfDay(end)} (${formatDuration(Math.max(0, Math.floor((end - start) / 1000)))})`,
+        tooltip: `${name} (計測中)\n${formatTimeOfDay(start)}–`,
       });
     }
 
     return out;
   }, [
+    schedules,
     tasks,
     lifeLogs,
     lifeActivities,
