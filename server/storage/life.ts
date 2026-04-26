@@ -115,6 +115,13 @@ export function loadLifeLogsInRange(startIso: string, endIso: string): LifeLog[]
   return rows.map(logRowToDict);
 }
 
+export function loadAllLifeLogs(): LifeLog[] {
+  const rows = getDb()
+    .prepare("SELECT * FROM life_logs ORDER BY started_at ASC")
+    .all() as LogRow[];
+  return rows.map(logRowToDict);
+}
+
 function stopAllActiveLifeLogs(now: string): void {
   getDb().prepare("UPDATE life_logs SET ended_at = ? WHERE ended_at = ''").run(now);
 }
@@ -153,13 +160,11 @@ export function deleteLifeLog(logId: string): void {
   getDb().prepare("DELETE FROM life_logs WHERE id = ?").run(logId);
 }
 
-export function stopActiveLifeLogIfAny(): string {
-  const now = nowIso();
+export function stopActiveLifeLogIfAny(): LifeLog | null {
   const db = getDb();
   const row = db
     .prepare("SELECT id FROM life_logs WHERE ended_at = '' LIMIT 1")
     .get() as { id: string } | undefined;
-  if (!row) return "";
-  db.prepare("UPDATE life_logs SET ended_at = ? WHERE ended_at = ''").run(now);
-  return row.id;
+  if (!row) return null;
+  return stopLifeLog(row.id);
 }

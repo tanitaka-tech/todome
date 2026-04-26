@@ -98,8 +98,7 @@ export function processQuotaLifeActions(todos: unknown): QuotaLifeResult {
     }
 
     if (content.trim() === QUOTA_LOG_STOP_CMD) {
-      const stoppedId = stopActiveQuotaLogIfAny();
-      result.quotaLogStopped = stoppedId !== "";
+      result.quotaLogStopped = stopActiveQuotaLogIfAny() !== null;
       continue;
     }
 
@@ -150,8 +149,7 @@ export function processQuotaLifeActions(todos: unknown): QuotaLifeResult {
     }
 
     if (content.trim() === LIFE_LOG_STOP_CMD) {
-      const stoppedId = stopActiveLifeLogIfAny();
-      result.lifeLogStopped = stoppedId !== "";
+      result.lifeLogStopped = stopActiveLifeLogIfAny() !== null;
       continue;
     }
   }

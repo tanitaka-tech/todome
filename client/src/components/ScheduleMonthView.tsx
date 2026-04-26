@@ -144,15 +144,17 @@ export function ScheduleMonthView({
                     ? ""
                     : (s.start || "").slice(11, 16);
                   const startsThisCell = (s.start || "").slice(0, 10) === cell.iso;
+                  const isVirtualActive = s.id.startsWith("virtual-active-");
                   return (
                     <button
                       key={`${s.id}-${cell.iso}`}
                       type="button"
-                      className={`schedule-month-event${s.allDay ? " is-allday" : ""}${startsThisCell ? "" : " is-cont"}`}
+                      className={`schedule-month-event${s.allDay ? " is-allday" : ""}${startsThisCell ? "" : " is-cont"}${isVirtualActive ? " is-active-virtual" : ""}`}
                       style={{ backgroundColor: color }}
                       title={s.title}
                       onClick={(e) => {
                         e.stopPropagation();
+                        if (isVirtualActive) return;
                         onEventClick(s);
                       }}
                     >

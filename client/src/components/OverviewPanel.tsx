@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useTick } from "../hooks/useTick";
 import { useTranslation } from "react-i18next";
 import { formatDate, formatDateTime } from "../i18n/format";
@@ -9,6 +9,7 @@ import type {
   LifeLog,
   Quota,
   QuotaLog,
+  Schedule,
 } from "../types";
 import {
   formatDuration,
@@ -27,6 +28,7 @@ interface Props {
   lifeLogs: LifeLog[];
   quotas: Quota[];
   quotaLogs: QuotaLog[];
+  schedules: Schedule[];
   dayBoundaryHour: number;
 }
 
@@ -200,20 +202,11 @@ export function OverviewPanel({
   lifeLogs,
   quotas,
   quotaLogs,
+  schedules,
   dayBoundaryHour,
 }: Props) {
   const { t } = useTranslation("overview");
   const _tick = useTick();
-  const [timelineOrientation, setTimelineOrientation] = useState<
-    "vertical" | "horizontal"
-  >(() => {
-    const saved = localStorage.getItem("timeline:orientation");
-    return saved === "horizontal" ? "horizontal" : "vertical";
-  });
-  const setOrientation = (o: "vertical" | "horizontal") => {
-    setTimelineOrientation(o);
-    localStorage.setItem("timeline:orientation", o);
-  };
   const todayRange = useMemo(
     () => getTodayDayRange(dayBoundaryHour),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -376,31 +369,16 @@ export function OverviewPanel({
           </div>
 
           <div className="widget col-12">
-            <div className="widget-head">
+            <div className="widget-head widget-head--flush">
               <span className="widget-title">
-                {t("sectionTimeline", "今日のタイムスケジュール")}
+                {t("sectionTimeline", "今日のスケジュール")}
               </span>
-              <div className="retro-view-toggle" role="group">
-                <button
-                  type="button"
-                  className={`retro-view-toggle-btn${timelineOrientation === "vertical" ? " retro-view-toggle-btn--active" : ""}`}
-                  onClick={() => setOrientation("vertical")}
-                >
-                  {t("timelineOrientVertical", "縦")}
-                </button>
-                <button
-                  type="button"
-                  className={`retro-view-toggle-btn${timelineOrientation === "horizontal" ? " retro-view-toggle-btn--active" : ""}`}
-                  onClick={() => setOrientation("horizontal")}
-                >
-                  {t("timelineOrientHorizontal", "横")}
-                </button>
-              </div>
             </div>
             <div className="widget-body">
               <TimelineBar
                 rangeStartMs={todayRange.startMs}
                 rangeEndMs={todayRange.endMs}
+                schedules={schedules}
                 tasks={tasks}
                 lifeLogs={lifeLogs}
                 lifeActivities={lifeActivities}
@@ -408,7 +386,6 @@ export function OverviewPanel({
                 quotaLogs={quotaLogs}
                 tick={_tick}
                 autoScrollToNow
-                orientation={timelineOrientation}
               />
             </div>
           </div>

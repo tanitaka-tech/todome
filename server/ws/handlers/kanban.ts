@@ -17,9 +17,16 @@ import {
 } from "../../storage/quota.ts";
 import { shortId } from "../../utils/shortId.ts";
 import type { AppWebSocket, SessionState } from "../../state.ts";
-import type { ColumnId, KanbanTask } from "../../types.ts";
+import type { ColumnId, KanbanTask, TimeLog } from "../../types.ts";
 import { broadcast, sendTo } from "../broadcast.ts";
 import type { Handler } from "../dispatch.ts";
+import {
+  createScheduleFromLifeLogStop,
+  createScheduleFromQuotaLogStop,
+  createScheduleFromTaskTimerStop,
+  createScheduleFromTimerLog,
+  originIdForTaskTimeLog,
+} from "./scheduleFromTimer.ts";
 
 const COLUMN_IDS: readonly ColumnId[] = ["todo", "in_progress", "done"];
 
@@ -123,7 +130,7 @@ function isStartingTimer(data: Record<string, unknown>): boolean {
   return typeof data.timerStartedAt === "string" && data.timerStartedAt !== "";
 }
 
-function stopExistingTaskTimers(session: SessionState): void {
+function stopExistingTaskTimers(session: SessionState): string[] {
   const beforeById = new Map(
     session.kanbanTasks.map((task) => [task.id, before(task)] as const)
   );
@@ -132,6 +139,17 @@ function stopExistingTaskTimers(session: SessionState): void {
     const task = session.kanbanTasks.find((t) => t.id === id);
     const prev = beforeById.get(id);
     if (task && prev) rebalanceKpiContribution(task, prev, session.goals);
+  }
+  return stoppedIds;
+}
+
+async function broadcastSchedulesForStoppedTasks(
+  session: SessionState,
+  stoppedTaskIds: string[],
+): Promise<void> {
+  for (const id of stoppedTaskIds) {
+    const task = session.kanbanTasks.find((t) => t.id === id);
+    if (task) await createScheduleFromTaskTimerStop(session, task);
   }
 }
 
@@ -142,7 +160,7 @@ function hasTask(session: SessionState, taskId: string): boolean {
 export const kanbanMove: Handler = async (ws, session, data) => {
   const taskId = String(data.taskId ?? "");
   const startingTimer = isStartingTimer(data) && hasTask(session, taskId);
-  if (startingTimer) stopExistingTaskTimers(session);
+  const stoppedTaskIds = startingTimer ? stopExistingTaskTimers(session) : [];
   for (const task of session.kanbanTasks) {
     if (task.id !== taskId) continue;
     const prev = before(task);
@@ -158,15 +176,20 @@ export const kanbanMove: Handler = async (ws, session, data) => {
     rebalanceKpiContribution(task, prev, session.goals);
     break;
   }
+  let lifeStopped = null;
+  let quotaStopped = null;
   if (startingTimer) {
-    stopActiveLifeLogIfAny();
-    stopActiveQuotaLogIfAny();
+    lifeStopped = stopActiveLifeLogIfAny();
+    quotaStopped = stopActiveQuotaLogIfAny();
   }
   saveTasks(session.kanbanTasks);
   saveGoals(session.goals);
   scheduleAutosync();
   sendKanbanAndGoals(ws, session);
   if (startingTimer) broadcastTimeTrackingSync();
+  await broadcastSchedulesForStoppedTasks(session, stoppedTaskIds);
+  if (lifeStopped) await createScheduleFromLifeLogStop(session, lifeStopped);
+  if (quotaStopped) await createScheduleFromQuotaLogStop(session, quotaStopped);
 };
 
 export const kanbanAdd: Handler = async (ws, session, data) => {
@@ -211,7 +234,7 @@ export const kanbanReorder: Handler = async (ws, session, data) => {
   const movedTaskId = String(moveData?.taskId ?? "");
   const startingTimer =
     moveData !== null && isStartingTimer(moveData) && hasTask(session, movedTaskId);
-  if (startingTimer) stopExistingTaskTimers(session);
+  const stoppedTaskIds = startingTimer ? stopExistingTaskTimers(session) : [];
   if (moveData && movedTaskId) {
     for (const task of session.kanbanTasks) {
       if (task.id !== movedTaskId) continue;
@@ -245,24 +268,31 @@ export const kanbanReorder: Handler = async (ws, session, data) => {
     if (!seen.has(t.id)) newOrder.push(t);
   }
   session.kanbanTasks = newOrder;
+  let lifeStopped = null;
+  let quotaStopped = null;
   if (startingTimer) {
-    stopActiveLifeLogIfAny();
-    stopActiveQuotaLogIfAny();
+    lifeStopped = stopActiveLifeLogIfAny();
+    quotaStopped = stopActiveQuotaLogIfAny();
   }
   saveTasks(session.kanbanTasks);
   saveGoals(session.goals);
   scheduleAutosync();
   sendKanbanAndGoals(ws, session);
   if (startingTimer) broadcastTimeTrackingSync();
+  await broadcastSchedulesForStoppedTasks(session, stoppedTaskIds);
+  if (lifeStopped) await createScheduleFromLifeLogStop(session, lifeStopped);
+  if (quotaStopped) await createScheduleFromQuotaLogStop(session, quotaStopped);
 };
 
 export const kanbanEdit: Handler = async (ws, session, data) => {
   const taskId = String(data.taskId ?? "");
   const startingTimer = isStartingTimer(data) && hasTask(session, taskId);
-  if (startingTimer) stopExistingTaskTimers(session);
+  const stoppedTaskIds = startingTimer ? stopExistingTaskTimers(session) : [];
+  const addedTimeLogs: TimeLog[] = [];
   for (const task of session.kanbanTasks) {
     if (task.id !== taskId) continue;
     const prev = before(task);
+    const prevLogsLen = task.timeLogs.length;
     for (const key of [
       "title",
       "description",
@@ -279,15 +309,36 @@ export const kanbanEdit: Handler = async (ws, session, data) => {
     }
     if (!task.goalId) task.kpiId = "";
     rebalanceKpiContribution(task, prev, session.goals);
+    if (!startingTimer && task.timeLogs.length > prevLogsLen) {
+      addedTimeLogs.push(...task.timeLogs.slice(prevLogsLen));
+    }
     break;
   }
+  let lifeStopped = null;
+  let quotaStopped = null;
   if (startingTimer) {
-    stopActiveLifeLogIfAny();
-    stopActiveQuotaLogIfAny();
+    lifeStopped = stopActiveLifeLogIfAny();
+    quotaStopped = stopActiveQuotaLogIfAny();
   }
   saveTasks(session.kanbanTasks);
   saveGoals(session.goals);
   scheduleAutosync();
   sendKanbanAndGoals(ws, session);
   if (startingTimer) broadcastTimeTrackingSync();
+  await broadcastSchedulesForStoppedTasks(session, stoppedTaskIds);
+  if (lifeStopped) await createScheduleFromLifeLogStop(session, lifeStopped);
+  if (quotaStopped) await createScheduleFromQuotaLogStop(session, quotaStopped);
+  if (addedTimeLogs.length > 0) {
+    const target = session.kanbanTasks.find((t) => t.id === taskId);
+    if (target) {
+      for (const log of addedTimeLogs) {
+        await createScheduleFromTimerLog(session, {
+          origin: { type: "task", id: originIdForTaskTimeLog(target.id, log) },
+          title: target.title,
+          startIso: log.start,
+          endIso: log.end,
+        });
+      }
+    }
+  }
 };

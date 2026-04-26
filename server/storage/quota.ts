@@ -100,15 +100,13 @@ export function loadQuotaLogsInRange(startIso: string, endIso: string): QuotaLog
   return rows.map(logRowToDict);
 }
 
-export function stopActiveQuotaLogIfAny(): string {
-  const now = nowIso();
+export function stopActiveQuotaLogIfAny(): QuotaLog | null {
   const db = getDb();
   const row = db
     .prepare("SELECT id FROM quota_logs WHERE ended_at = '' LIMIT 1")
     .get() as { id: string } | undefined;
-  if (!row) return "";
-  db.prepare("UPDATE quota_logs SET ended_at = ? WHERE ended_at = ''").run(now);
-  return row.id;
+  if (!row) return null;
+  return stopQuotaLog(row.id);
 }
 
 export function startQuotaLog(quotaId: string): QuotaLog {

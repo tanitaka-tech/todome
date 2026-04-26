@@ -1,5 +1,18 @@
 import { getDb } from "../db.ts";
-import type { Schedule } from "../types.ts";
+import type { Schedule, ScheduleOrigin, ScheduleOriginType } from "../types.ts";
+
+const ORIGIN_TYPES: readonly ScheduleOriginType[] = ["task", "lifelog", "quota"];
+
+function normalizeOrigin(raw: unknown): ScheduleOrigin | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const o = raw as Record<string, unknown>;
+  const type = ORIGIN_TYPES.includes(o.type as ScheduleOriginType)
+    ? (o.type as ScheduleOriginType)
+    : null;
+  const id = typeof o.id === "string" ? o.id : "";
+  if (!type || !id) return undefined;
+  return { type, id };
+}
 
 interface Row {
   data: string;
@@ -119,7 +132,8 @@ export function replaceSubscriptionSchedules(
 }
 
 export function normalizeSchedule(raw: Partial<Schedule>): Schedule {
-  return {
+  const origin = normalizeOrigin(raw.origin);
+  const base: Schedule = {
     id: String(raw.id ?? ""),
     source: raw.source === "subscription" ? "subscription" : "manual",
     subscriptionId: String(raw.subscriptionId ?? ""),
@@ -139,4 +153,6 @@ export function normalizeSchedule(raw: Partial<Schedule>): Schedule {
     googleEventId: String(raw.googleEventId ?? ""),
     googleAccountId: String(raw.googleAccountId ?? ""),
   };
+  if (origin) base.origin = origin;
+  return base;
 }
