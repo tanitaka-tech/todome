@@ -742,12 +742,13 @@ export function ScheduleWeekScroller({
                   topLabel = formatHHMM(startMin);
                   bottomLabel = formatHHMM(endMin);
                 }
-                const canResize = schedule.source === "manual";
+                const isVirtualActive = schedule.id.startsWith("virtual-active-");
+                const canResize = schedule.source === "manual" && !isVirtualActive;
                 return (
                   <button
                     key={schedule.id}
                     type="button"
-                    className={`schedule-week-event${isResizingThis ? " is-resizing" : ""}`}
+                    className={`schedule-week-event${isResizingThis ? " is-resizing" : ""}${isVirtualActive ? " is-active-virtual" : ""}`}
                     style={{
                       top: displayTop,
                       height: displayHeight,
@@ -761,6 +762,7 @@ export function ScheduleWeekScroller({
                         didResizeRef.current = false;
                         return;
                       }
+                      if (isVirtualActive) return;
                       onEventClick(schedule);
                     }}
                   >
