@@ -7762,6 +7762,15 @@ body {
   line-height: 1;
 }
 
+/* ズーム中だけ全画面を覆ってカーソルを非表示にする */
+.schedule-zoom-cursor-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  cursor: none;
+  background: transparent;
+}
+
 .schedule-week-day-col {
   position: relative;
   border-right: 1px solid var(--border);
