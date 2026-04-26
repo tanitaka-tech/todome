@@ -7823,6 +7823,16 @@ body {
   opacity: 0.4;
 }
 
+.schedule-week-event.is-active-virtual,
+.schedule-month-event.is-active-virtual {
+  cursor: default;
+  animation: scheduleActivePulse 1.6s ease-in-out infinite;
+}
+@keyframes scheduleActivePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
 .schedule-week-event-resize {
   position: absolute;
   left: 0;
