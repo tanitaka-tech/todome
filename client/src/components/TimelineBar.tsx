@@ -30,8 +30,6 @@ interface Props {
   tick?: number;
   /** 現在時刻にスクロールするか。Overview では true、retro (過去日) では false。 */
   autoScrollToNow?: boolean;
-  /** 縦 (デフォルト) or 横。 */
-  orientation?: "vertical" | "horizontal";
 }
 
 type SegmentKind = "task" | "life" | "quota" | "manual";
@@ -44,14 +42,11 @@ interface Segment {
   label: string;
   sublabel: string;
   color: string;
-  tooltip: string;
 }
 
 const QUOTA_SEG_COLOR = "#8b5cf6";
-
-const HOUR_HEIGHT_PX = 56;
-const HOUR_WIDTH_PX = 80;
-const HORIZONTAL_LANE_HEIGHT_PX = 44;
+const HOUR_WIDTH_PX = 56;
+const LANE_HEIGHT_PX = 28;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
@@ -82,12 +77,10 @@ export function TimelineBar({
   quotaLogs,
   tick: _tick,
   autoScrollToNow = false,
-  orientation = "vertical",
 }: Props) {
   const { t } = useTranslation("lifeLog");
   const scrollRef = useRef<HTMLDivElement>(null);
-  const scrollHRef = useRef<HTMLDivElement>(null);
-  const containerHRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [hover, setHover] = useState<{
     seg: Segment;
     x: number;
@@ -97,7 +90,7 @@ export function TimelineBar({
   const nowMs = Date.now();
   const totalMs = rangeEndMs - rangeStartMs;
   const totalHours = Math.round(totalMs / (60 * 60 * 1000));
-  const totalHeight = totalHours * HOUR_HEIGHT_PX;
+  const totalWidth = totalHours * HOUR_WIDTH_PX;
 
   const segments = useMemo<Segment[]>(() => {
     const out: Segment[] = [];
@@ -143,11 +136,9 @@ export function TimelineBar({
         label,
         sublabel: `${formatTimeOfDay(start)}–${formatTimeOfDay(end)}`,
         color,
-        tooltip: `${label}\n${formatTimeOfDay(start)}–${formatTimeOfDay(end)} (${formatDuration(Math.max(0, Math.floor((end - start) / 1000)))})`,
       });
     }
 
-    // active 計測 (Schedule にまだ載っていない計測中のもの) を別経路で追加
     for (const task of tasks) {
       if (!task.timerStartedAt) continue;
       const start = Date.parse(task.timerStartedAt);
@@ -162,7 +153,6 @@ export function TimelineBar({
         label: task.title,
         sublabel: `${formatTimeOfDay(start)}–`,
         color: "var(--accent)",
-        tooltip: `${task.title} (計測中)\n${formatTimeOfDay(start)}–`,
       });
     }
 
@@ -185,9 +175,8 @@ export function TimelineBar({
         startMs: Math.max(start, rangeStartMs),
         endMs: Math.min(end, rangeEndMs),
         label: name,
-        sublabel: `${formatTimeOfDay(start)}– (計測中)`,
+        sublabel: `${formatTimeOfDay(start)}–`,
         color,
-        tooltip: `${name} (計測中)\n${formatTimeOfDay(start)}–`,
       });
     }
 
@@ -205,9 +194,8 @@ export function TimelineBar({
         startMs: Math.max(start, rangeStartMs),
         endMs: Math.min(end, rangeEndMs),
         label: name,
-        sublabel: `${formatTimeOfDay(start)}– (計測中)`,
+        sublabel: `${formatTimeOfDay(start)}–`,
         color: QUOTA_SEG_COLOR,
-        tooltip: `${name} (計測中)\n${formatTimeOfDay(start)}–`,
       });
     }
 
@@ -225,12 +213,12 @@ export function TimelineBar({
   ]);
 
   const hourMarkers = useMemo(() => {
-    const markers: { hour: number; top: number }[] = [];
+    const markers: { hour: number; left: number }[] = [];
     const startDate = new Date(rangeStartMs);
     for (let i = 0; i <= totalHours; i += 1) {
       markers.push({
         hour: (startDate.getHours() + i) % 24,
-        top: i * HOUR_HEIGHT_PX,
+        left: i * HOUR_WIDTH_PX,
       });
     }
     return markers;
@@ -238,204 +226,111 @@ export function TimelineBar({
 
   const safeNow = clamp(nowMs, rangeStartMs, rangeEndMs);
   const nowIsInRange = nowMs > rangeStartMs && nowMs < rangeEndMs;
-  const nowTop = ((safeNow - rangeStartMs) / totalMs) * totalHeight;
-
-  const totalWidth = totalHours * HOUR_WIDTH_PX;
   const nowLeftPx = ((safeNow - rangeStartMs) / totalMs) * totalWidth;
 
-  // 初回マウント時 + autoScrollToNow=true のときだけ現在時刻にスクロール。
-  // orientation 切替でも再度スクロールできるよう、orientation ごとにリセット。
   const didAutoScroll = useRef(false);
   useEffect(() => {
-    didAutoScroll.current = false;
-  }, [orientation]);
-  useEffect(() => {
-    if (orientation !== "vertical") return;
     if (didAutoScroll.current) return;
     if (!autoScrollToNow) return;
     if (!scrollRef.current) return;
     if (!nowIsInRange) return;
     didAutoScroll.current = true;
     const container = scrollRef.current;
-    container.scrollTop = Math.max(0, nowTop - container.clientHeight / 3);
-  }, [autoScrollToNow, nowIsInRange, nowTop, orientation]);
-  useEffect(() => {
-    if (orientation !== "horizontal") return;
-    if (didAutoScroll.current) return;
-    if (!autoScrollToNow) return;
-    if (!scrollHRef.current) return;
-    if (!nowIsInRange) return;
-    didAutoScroll.current = true;
-    const container = scrollHRef.current;
     container.scrollLeft = Math.max(0, nowLeftPx - container.clientWidth / 3);
-  }, [autoScrollToNow, nowIsInRange, nowLeftPx, orientation]);
+  }, [autoScrollToNow, nowIsInRange, nowLeftPx]);
 
   const hasAny = segments.length > 0;
 
-  if (orientation === "horizontal") {
-    const onSegEnter = (e: React.MouseEvent<HTMLDivElement>, s: Segment) => {
-      const container = containerHRef.current;
-      if (!container) return;
-      const segRect = e.currentTarget.getBoundingClientRect();
-      const containerRect = container.getBoundingClientRect();
-      setHover({
-        seg: s,
-        x: segRect.left - containerRect.left + segRect.width / 2,
-        y: segRect.top - containerRect.top,
-      });
-    };
-    const durationSec = hover
-      ? Math.max(0, Math.floor((hover.seg.endMs - hover.seg.startMs) / 1000))
-      : 0;
-    return (
-      <div className="timeline-h" ref={containerHRef}>
-        <div className="timeline-h-scroll" ref={scrollHRef}>
-          <div
-            className="timeline-h-canvas"
-            style={{ width: `${totalWidth}px` }}
-          >
-            <div className="timeline-h-axis">
-              {hourMarkers.map((m, i) => (
-                <span
-                  key={`${m.hour}-${i}`}
-                  className="timeline-h-axis-label"
-                  style={{ left: `${i * HOUR_WIDTH_PX}px` }}
-                >
-                  {String(m.hour).padStart(2, "0")}:00
-                </span>
-              ))}
-            </div>
-            <div
-              className="timeline-h-lane"
-              style={{ height: `${HORIZONTAL_LANE_HEIGHT_PX}px` }}
-            >
-              {hourMarkers.map((_m, i) => (
-                <div
-                  key={`g-${i}`}
-                  className="timeline-h-grid-line"
-                  style={{ left: `${i * HOUR_WIDTH_PX}px` }}
-                />
-              ))}
-              {segments.map((s) => {
-                const leftPx =
-                  ((s.startMs - rangeStartMs) / totalMs) * totalWidth;
-                const widthPx = Math.max(
-                  2,
-                  ((s.endMs - s.startMs) / totalMs) * totalWidth,
-                );
-                return (
-                  <div
-                    key={s.key}
-                    className={`timeline-h-seg timeline-h-seg--${s.kind}`}
-                    style={{
-                      left: `${leftPx}px`,
-                      width: `${widthPx}px`,
-                      background: s.color,
-                    }}
-                    onMouseEnter={(e) => onSegEnter(e, s)}
-                    onMouseLeave={() => setHover(null)}
-                  >
-                    <div className="timeline-h-seg-label">{s.label}</div>
-                  </div>
-                );
-              })}
-              {nowIsInRange && (
-                <div
-                  className="timeline-h-now"
-                  style={{ left: `${nowLeftPx}px` }}
-                  title={t("timelineNow", "現在")}
-                >
-                  <span className="timeline-h-now-dot" />
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-        {hover && (
-          <div
-            className="timeline-h-popup"
-            style={{ left: `${hover.x}px`, top: `${hover.y}px` }}
-          >
-            <div className="timeline-h-popup-title">{hover.seg.label}</div>
-            <div className="timeline-h-popup-time">{hover.seg.sublabel}</div>
-            <div className="timeline-h-popup-duration">
-              {formatDuration(durationSec)}
-            </div>
-          </div>
-        )}
-        {!hasAny && (
-          <div className="timeline-v-empty">
-            {t("timelineEmpty", "この日はまだ計測がありません。")}
-          </div>
-        )}
-      </div>
-    );
-  }
+  const onSegEnter = (e: React.MouseEvent<HTMLDivElement>, s: Segment) => {
+    const container = containerRef.current;
+    if (!container) return;
+    const segRect = e.currentTarget.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+    setHover({
+      seg: s,
+      x: segRect.left - containerRect.left + segRect.width / 2,
+      y: segRect.top - containerRect.top,
+    });
+  };
+  const durationSec = hover
+    ? Math.max(0, Math.floor((hover.seg.endMs - hover.seg.startMs) / 1000))
+    : 0;
 
   return (
-    <div className="timeline-v">
-      <div className="timeline-v-scroll" ref={scrollRef}>
+    <div className="timeline-h" ref={containerRef}>
+      <div className="timeline-h-scroll" ref={scrollRef}>
         <div
-          className="timeline-v-canvas"
-          style={{ height: `${totalHeight}px` }}
+          className="timeline-h-canvas"
+          style={{ width: `${totalWidth}px` }}
         >
-          <div className="timeline-v-axis">
-            {hourMarkers.map((m) => (
-              <div
-                key={m.top}
-                className="timeline-v-axis-row"
-                style={{ top: `${m.top}px` }}
+          <div className="timeline-h-axis">
+            {hourMarkers.map((m, i) => (
+              <span
+                key={`${m.hour}-${i}`}
+                className="timeline-h-axis-label"
+                style={{ left: `${m.left}px` }}
               >
-                <span className="timeline-v-axis-label">
-                  {String(m.hour).padStart(2, "0")}:00
-                </span>
-              </div>
+                {String(m.hour).padStart(2, "0")}
+              </span>
             ))}
           </div>
-          <div className="timeline-v-lane">
-            {hourMarkers.map((m) => (
+          <div
+            className="timeline-h-lane"
+            style={{ height: `${LANE_HEIGHT_PX}px` }}
+          >
+            {hourMarkers.map((m, i) => (
               <div
-                key={m.top}
-                className="timeline-v-grid-line"
-                style={{ top: `${m.top}px` }}
+                key={`g-${i}`}
+                className="timeline-h-grid-line"
+                style={{ left: `${m.left}px` }}
               />
             ))}
             {segments.map((s) => {
-              const top = ((s.startMs - rangeStartMs) / totalMs) * totalHeight;
-              const height = Math.max(
-                14,
-                ((s.endMs - s.startMs) / totalMs) * totalHeight,
+              const leftPx = ((s.startMs - rangeStartMs) / totalMs) * totalWidth;
+              const widthPx = Math.max(
+                2,
+                ((s.endMs - s.startMs) / totalMs) * totalWidth,
               );
               return (
                 <div
                   key={s.key}
-                  className={`timeline-v-seg timeline-v-seg--${s.kind}`}
+                  className={`timeline-h-seg timeline-h-seg--${s.kind}`}
                   style={{
-                    top: `${top}px`,
-                    height: `${height}px`,
+                    left: `${leftPx}px`,
+                    width: `${widthPx}px`,
                     background: s.color,
                   }}
-                  title={s.tooltip}
+                  onMouseEnter={(e) => onSegEnter(e, s)}
+                  onMouseLeave={() => setHover(null)}
                 >
-                  <div className="timeline-v-seg-label">{s.label}</div>
-                  <div className="timeline-v-seg-sub">{s.sublabel}</div>
+                  <div className="timeline-h-seg-label">{s.label}</div>
                 </div>
               );
             })}
             {nowIsInRange && (
               <div
-                className="timeline-v-now"
-                style={{ top: `${nowTop}px` }}
+                className="timeline-h-now"
+                style={{ left: `${nowLeftPx}px` }}
                 title={t("timelineNow", "現在")}
-              >
-                <span className="timeline-v-now-dot" />
-              </div>
+              />
             )}
           </div>
         </div>
       </div>
+      {hover && (
+        <div
+          className="timeline-h-popup"
+          style={{ left: `${hover.x}px`, top: `${hover.y}px` }}
+        >
+          <div className="timeline-h-popup-title">{hover.seg.label}</div>
+          <div className="timeline-h-popup-time">{hover.seg.sublabel}</div>
+          <div className="timeline-h-popup-duration">
+            {formatDuration(durationSec)}
+          </div>
+        </div>
+      )}
       {!hasAny && (
-        <div className="timeline-v-empty">
+        <div className="timeline-h-empty">
           {t("timelineEmpty", "この日はまだ計測がありません。")}
         </div>
       )}
