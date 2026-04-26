@@ -533,6 +533,13 @@ export function streakRank(days: number): 0 | 1 | 2 | 3 | 4 {
 
 export type ScheduleSource = "manual" | "subscription";
 
+export type ScheduleOriginType = "task" | "lifelog" | "quota";
+
+export interface ScheduleOrigin {
+  type: ScheduleOriginType;
+  id: string;
+}
+
 export interface Schedule {
   id: string;
   source: ScheduleSource;
@@ -554,6 +561,18 @@ export interface Schedule {
   googleEventId: string;
   /** Google Calendar に push / fetch したアカウント ID。空なら旧データ。 */
   googleAccountId: string;
+  /** 計測ログ (タスク/LifeLog/QuotaLog) から自動生成された場合の由来。手動作成は undefined。 */
+  origin?: ScheduleOrigin;
+}
+
+const FAINT_SCHEDULE_DURATION_MS = 15_000;
+
+export function isFaintSchedule(s: Schedule): boolean {
+  if (s.allDay || !s.start || !s.end) return false;
+  const start = new Date(s.start).getTime();
+  const end = new Date(s.end).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return false;
+  return end - start < FAINT_SCHEDULE_DURATION_MS;
 }
 
 export type SubscriptionStatus = "idle" | "fetching" | "ok" | "error";

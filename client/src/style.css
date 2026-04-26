@@ -7927,6 +7927,11 @@ body {
     inset 0 0 0 3px rgba(255, 255, 255, 0.35);
 }
 
+.schedule-week-event.is-faint,
+.schedule-month-event.is-faint {
+  opacity: 0.4;
+}
+
 .schedule-week-event-resize {
   position: absolute;
   left: 0;

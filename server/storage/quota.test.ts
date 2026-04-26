@@ -248,20 +248,21 @@ describe("startQuotaLog / stopQuotaLog — 計測ログ操作", () => {
 });
 
 describe("stopActiveQuotaLogIfAny — アクティブログの停止", () => {
-  it("アクティブなログがない場合は空文字を返す", () => {
+  it("アクティブなログがない場合は null を返す", () => {
     const result = stopActiveQuotaLogIfAny();
-    expect(result).toBe("");
+    expect(result).toBeNull();
   });
 
-  it("アクティブなログがある場合はそのIDを返して停止する", () => {
+  it("アクティブなログがある場合は停止後の QuotaLog を返す", () => {
     saveQuotas([makeQuota({ id: "q1", name: "掃除" })]);
     const log = startQuotaLog("q1");
 
-    const stoppedId = stopActiveQuotaLogIfAny();
-    expect(stoppedId).toBe(log.id);
+    const stopped = stopActiveQuotaLogIfAny();
+    expect(stopped?.id).toBe(log.id);
+    expect(stopped?.endedAt).not.toBe("");
 
     // 停止後はアクティブログがない
-    expect(stopActiveQuotaLogIfAny()).toBe("");
+    expect(stopActiveQuotaLogIfAny()).toBeNull();
   });
 });
 

@@ -20,6 +20,11 @@ import {
 import type { Quota } from "../../types.ts";
 import { broadcast, sendTo } from "../broadcast.ts";
 import type { Handler } from "../dispatch.ts";
+import {
+  createScheduleFromLifeLogStop,
+  createScheduleFromQuotaLogStop,
+  createScheduleFromTaskTimerStop,
+} from "./scheduleFromTimer.ts";
 
 export const quotaUpsert: Handler = async (_ws, _session, data) => {
   const incoming = (data.quota ?? {}) as Partial<Quota> & Record<string, unknown>;
@@ -76,7 +81,7 @@ export const quotaReorder: Handler = async (_ws, _session, data) => {
 export const quotaLogStart: Handler = async (_ws, session, data) => {
   const quotaId = String(data.quota_id ?? data.quotaId ?? "");
   if (!quotaId) return;
-  stopTaskTimersIfRunning(session.kanbanTasks);
+  const stoppedTaskIds = stopTaskTimersIfRunning(session.kanbanTasks);
   saveTasks(session.kanbanTasks);
   const lifeStopped = stopActiveLifeLogIfAny();
   const log = startQuotaLog(quotaId);
@@ -89,9 +94,14 @@ export const quotaLogStart: Handler = async (_ws, session, data) => {
     type: "quota_streak_sync",
     streaks: computeAllQuotaStreaks(loadQuotas(), loadAllQuotaLogs()),
   });
+  if (lifeStopped) await createScheduleFromLifeLogStop(session, lifeStopped);
+  for (const id of stoppedTaskIds) {
+    const task = session.kanbanTasks.find((t) => t.id === id);
+    if (task) await createScheduleFromTaskTimerStop(session, task);
+  }
 };
 
-export const quotaLogStop: Handler = async (_ws, _session, data) => {
+export const quotaLogStop: Handler = async (_ws, session, data) => {
   const logId = String(data.log_id ?? data.logId ?? "");
   const memo = typeof data.memo === "string" ? (data.memo as string) : undefined;
   if (!logId) return;
@@ -103,6 +113,7 @@ export const quotaLogStop: Handler = async (_ws, _session, data) => {
     type: "quota_streak_sync",
     streaks: computeAllQuotaStreaks(loadQuotas(), loadAllQuotaLogs()),
   });
+  if (stopped) await createScheduleFromQuotaLogStop(session, stopped);
 };
 
 export const quotaLogRangeRequest: Handler = async (ws, _session, data) => {
