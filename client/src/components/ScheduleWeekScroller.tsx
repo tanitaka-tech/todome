@@ -452,20 +452,6 @@ export function ScheduleWeekScroller({
     };
   }, [dragActive]);
 
-  // Pointer Lock 中はカーソル非表示。Escape 等で lock が解けたらズーム終了。
-  useEffect(() => {
-    if (!isZooming) return;
-    const handlePointerLockChange = () => {
-      if (!document.pointerLockElement) {
-        zoomDxRef.current = 0;
-        setZooming(null);
-      }
-    };
-    document.addEventListener("pointerlockchange", handlePointerLockChange);
-    return () => {
-      document.removeEventListener("pointerlockchange", handlePointerLockChange);
-    };
-  }, [isZooming]);
 
   useEffect(() => {
     if (!isSelecting) return;
@@ -575,7 +561,6 @@ export function ScheduleWeekScroller({
       anchorMin,
       anchorOffsetInBody,
     });
-    hoursEl.requestPointerLock?.();
     e.preventDefault();
   };
 
@@ -608,7 +593,6 @@ export function ScheduleWeekScroller({
       });
     };
     const handleUp = () => {
-      document.exitPointerLock?.();
       zoomDxRef.current = 0;
       setZooming(null);
     };
@@ -1023,6 +1007,7 @@ export function ScheduleWeekScroller({
           {hover.time}
         </div>
       )}
+      {isZooming && <div className="schedule-zoom-cursor-mask" />}
     </div>
   );
 }
