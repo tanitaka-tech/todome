@@ -12,7 +12,7 @@ import type {
   Schedule,
   ScheduleColorContext,
 } from "../types";
-import { isFaintSchedule, scheduleColor } from "../types";
+import { scheduleColor } from "../types";
 import { getHolidayName, isDayOff } from "../holiday";
 
 interface SelectingState {
@@ -747,7 +747,7 @@ export function ScheduleWeekScroller({
                   <button
                     key={schedule.id}
                     type="button"
-                    className={`schedule-week-event${isResizingThis ? " is-resizing" : ""}${isFaintSchedule(schedule) ? " is-faint" : ""}`}
+                    className={`schedule-week-event${isResizingThis ? " is-resizing" : ""}`}
                     style={{
                       top: displayTop,
                       height: displayHeight,

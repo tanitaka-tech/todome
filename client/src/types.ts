@@ -565,16 +565,6 @@ export interface Schedule {
   origin?: ScheduleOrigin;
 }
 
-const FAINT_SCHEDULE_DURATION_MS = 15_000;
-
-export function isFaintSchedule(s: Schedule): boolean {
-  if (s.allDay || !s.start || !s.end) return false;
-  const start = new Date(s.start).getTime();
-  const end = new Date(s.end).getTime();
-  if (!Number.isFinite(start) || !Number.isFinite(end)) return false;
-  return end - start < FAINT_SCHEDULE_DURATION_MS;
-}
-
 export type SubscriptionStatus = "idle" | "fetching" | "ok" | "error";
 
 /**

@@ -146,13 +146,24 @@ describe("createScheduleFromTimerLog — 計測ログから Schedule 生成", ()
     });
   });
 
-  it("15 秒未満でも Schedule は作成される（薄表示は UI 側の責務）", async () => {
+  it("15 秒未満の計測は Schedule 化しない（誤操作扱い）", async () => {
     const session = createSessionState();
     await createScheduleFromTimerLog(session, {
       origin: { type: "task", id: "t1" },
       title: "短い",
       startIso: "2026-04-25T09:00:00",
       endIso: "2026-04-25T09:00:05",
+    });
+    expect(loadManualSchedules()).toHaveLength(0);
+  });
+
+  it("ちょうど 15 秒の計測は Schedule 化する（境界）", async () => {
+    const session = createSessionState();
+    await createScheduleFromTimerLog(session, {
+      origin: { type: "task", id: "t1" },
+      title: "境界",
+      startIso: "2026-04-25T09:00:00",
+      endIso: "2026-04-25T09:00:15",
     });
     expect(loadManualSchedules()).toHaveLength(1);
   });

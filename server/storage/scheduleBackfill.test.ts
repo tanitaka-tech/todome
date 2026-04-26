@@ -192,6 +192,40 @@ describe("backfillSchedulesFromTimerLogs", () => {
     expect(result.added).toBe(0);
   });
 
+  it("15 秒未満の TimeLog/LifeLog/QuotaLog はスキップする (誤操作扱い)", () => {
+    saveTasks([
+      makeTask({
+        id: "t1",
+        title: "短いタスク",
+        timeLogs: [
+          { start: "2026-04-25T09:00:00", end: "2026-04-25T09:00:05", duration: 5 },
+          { start: "2026-04-25T10:00:00", end: "2026-04-25T10:00:14", duration: 14 },
+        ],
+      }),
+    ]);
+    saveLifeActivities([makeActivity({ id: "a1", name: "X" })]);
+    saveQuotas([makeQuota({ id: "q1", name: "Y" })]);
+    insertLifeLog("l1", "a1", "2026-04-25T12:00:00", "2026-04-25T12:00:10");
+    insertQuotaLog("ql1", "q1", "2026-04-25T13:00:00", "2026-04-25T13:00:08");
+
+    const result = backfillSchedulesFromTimerLogs();
+    expect(result.added).toBe(0);
+  });
+
+  it("ちょうど 15 秒の計測は Schedule 化する (境界)", () => {
+    saveTasks([
+      makeTask({
+        id: "t1",
+        title: "境界",
+        timeLogs: [
+          { start: "2026-04-25T09:00:00", end: "2026-04-25T09:00:15", duration: 15 },
+        ],
+      }),
+    ]);
+    const result = backfillSchedulesFromTimerLogs();
+    expect(result.added).toBe(1);
+  });
+
   it("idempotent: 二度呼んでも重複追加しない", () => {
     saveTasks([
       makeTask({

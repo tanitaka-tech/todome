@@ -42,11 +42,14 @@ interface Segment {
   label: string;
   sublabel: string;
   color: string;
+  faint?: boolean;
 }
 
 const QUOTA_SEG_COLOR = "#8b5cf6";
 const HOUR_WIDTH_PX = 56;
 const LANE_HEIGHT_PX = 28;
+/** 計測中で 15 秒未満のものは「誤操作の可能性」として薄く表示する。 */
+const FAINT_ACTIVE_THRESHOLD_MS = 15_000;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
@@ -153,6 +156,7 @@ export function TimelineBar({
         label: task.title,
         sublabel: `${formatTimeOfDay(start)}–`,
         color: "var(--accent)",
+        faint: end - start < FAINT_ACTIVE_THRESHOLD_MS,
       });
     }
 
@@ -177,6 +181,7 @@ export function TimelineBar({
         label: name,
         sublabel: `${formatTimeOfDay(start)}–`,
         color,
+        faint: end - start < FAINT_ACTIVE_THRESHOLD_MS,
       });
     }
 
@@ -196,6 +201,7 @@ export function TimelineBar({
         label: name,
         sublabel: `${formatTimeOfDay(start)}–`,
         color: QUOTA_SEG_COLOR,
+        faint: end - start < FAINT_ACTIVE_THRESHOLD_MS,
       });
     }
 
@@ -294,7 +300,7 @@ export function TimelineBar({
               return (
                 <div
                   key={s.key}
-                  className={`timeline-h-seg timeline-h-seg--${s.kind}`}
+                  className={`timeline-h-seg timeline-h-seg--${s.kind}${s.faint ? " is-faint" : ""}`}
                   style={{
                     left: `${leftPx}px`,
                     width: `${widthPx}px`,

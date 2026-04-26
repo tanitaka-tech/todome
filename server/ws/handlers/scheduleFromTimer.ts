@@ -29,12 +29,23 @@ interface CreateOpts {
   endIso: string;
 }
 
+/** 15秒未満の計測は誤操作の可能性が高いため Schedule 化しない。 */
+const MIN_SCHEDULE_DURATION_MS = 15_000;
+
 export async function createScheduleFromTimerLog(
   session: SessionState,
   opts: CreateOpts,
 ): Promise<void> {
   if (!opts.startIso || !opts.endIso) return;
   if (opts.endIso <= opts.startIso) return;
+  const startMs = Date.parse(opts.startIso);
+  const endMs = Date.parse(opts.endIso);
+  if (
+    Number.isFinite(startMs) &&
+    Number.isFinite(endMs) &&
+    endMs - startMs < MIN_SCHEDULE_DURATION_MS
+  )
+    return;
   const now = nowLocalIso();
   const schedule: Schedule = normalizeSchedule({
     id: shortId(),
