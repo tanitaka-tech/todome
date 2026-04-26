@@ -255,19 +255,20 @@ describe("startLifeLog / stopLifeLog — 計測ログ操作", () => {
 });
 
 describe("stopActiveLifeLogIfAny — アクティブログの停止", () => {
-  it("アクティブなログがない場合は空文字を返す", () => {
+  it("アクティブなログがない場合は null を返す", () => {
     const result = stopActiveLifeLogIfAny();
-    expect(result).toBe("");
+    expect(result).toBeNull();
   });
 
-  it("アクティブなログがある場合はそのIDを返して停止する", () => {
+  it("アクティブなログがある場合は停止後の LifeLog を返す", () => {
     saveLifeActivities([makeActivity({ id: "a1", name: "食事" })]);
     const log = startLifeLog("a1");
 
-    const stoppedId = stopActiveLifeLogIfAny();
-    expect(stoppedId).toBe(log.id);
+    const stopped = stopActiveLifeLogIfAny();
+    expect(stopped?.id).toBe(log.id);
+    expect(stopped?.endedAt).not.toBe("");
 
-    expect(stopActiveLifeLogIfAny()).toBe("");
+    expect(stopActiveLifeLogIfAny()).toBeNull();
   });
 });
 

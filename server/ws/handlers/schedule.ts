@@ -30,7 +30,7 @@ import { buildCalDAVStatus } from "./caldav.ts";
 import { buildGoogleStatus } from "./google.ts";
 import { refreshSubscriptionAndBroadcast } from "./subscription.ts";
 
-function broadcastSchedules(session: { schedules: Schedule[] }): void {
+export function broadcastSchedules(session: { schedules: Schedule[] }): void {
   session.schedules = loadSchedules();
   broadcast({ type: "schedule_sync", schedules: session.schedules });
 }
@@ -127,7 +127,7 @@ function pickWriteTarget(
   return null;
 }
 
-async function maybePushToCloud(schedule: Schedule): Promise<void> {
+export async function maybePushToCloud(schedule: Schedule): Promise<void> {
   const caldavCfg = loadCalDAVConfig();
   const googleCfg = loadGoogleConfig();
   const subs = loadSubscriptions();
