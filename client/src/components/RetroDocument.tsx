@@ -11,6 +11,7 @@ import type {
   QuotaLog,
   RetroDocument as RetroDocumentT,
   RetroType,
+  Schedule,
 } from "../types";
 import { getDayRangeForDate, isTaskCompletedInPeriod } from "../types";
 import { TimelineBar } from "./TimelineBar";
@@ -32,6 +33,7 @@ interface Props {
   lifeLogsForPeriod: LifeLog[];
   quotas: Quota[];
   quotaLogsForPeriod: QuotaLog[];
+  schedules: Schedule[];
   dayBoundaryHour: number;
   onEditField?: (key: EditableKey, value: string) => void;
   onEditDayRating?: (value: number) => void;
@@ -271,6 +273,7 @@ export function RetroDocumentView({
   lifeLogsForPeriod,
   quotas,
   quotaLogsForPeriod,
+  schedules,
   dayBoundaryHour,
   onEditField,
   onEditDayRating,
@@ -356,6 +359,7 @@ export function RetroDocumentView({
             <TimelineBar
               rangeStartMs={dayRange.startMs}
               rangeEndMs={dayRange.endMs}
+              schedules={schedules}
               tasks={tasks}
               lifeLogs={lifeLogsForPeriod}
               lifeActivities={lifeActivities}

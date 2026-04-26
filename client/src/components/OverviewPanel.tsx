@@ -9,6 +9,7 @@ import type {
   LifeLog,
   Quota,
   QuotaLog,
+  Schedule,
 } from "../types";
 import {
   formatDuration,
@@ -27,6 +28,7 @@ interface Props {
   lifeLogs: LifeLog[];
   quotas: Quota[];
   quotaLogs: QuotaLog[];
+  schedules: Schedule[];
   dayBoundaryHour: number;
 }
 
@@ -200,6 +202,7 @@ export function OverviewPanel({
   lifeLogs,
   quotas,
   quotaLogs,
+  schedules,
   dayBoundaryHour,
 }: Props) {
   const { t } = useTranslation("overview");
@@ -401,6 +404,7 @@ export function OverviewPanel({
               <TimelineBar
                 rangeStartMs={todayRange.startMs}
                 rangeEndMs={todayRange.endMs}
+                schedules={schedules}
                 tasks={tasks}
                 lifeLogs={lifeLogs}
                 lifeActivities={lifeActivities}

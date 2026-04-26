@@ -9,6 +9,7 @@ import type {
   RetroDocument,
   RetroType,
   Retrospective,
+  Schedule,
 } from "../types";
 import { isTaskCompletedInPeriod } from "../types";
 import { RetroSession } from "./RetroSession";
@@ -32,6 +33,7 @@ interface Props {
   lifeLogsForActiveRetro: LifeLog[];
   quotas: Quota[];
   quotaLogsForActiveRetro: QuotaLog[];
+  schedules: Schedule[];
   dayBoundaryHour: number;
   onStart: (type: RetroType, anchorDate?: string, resumeDraftId?: string) => void;
   onSend: (text: string) => void;
@@ -161,6 +163,7 @@ export function RetroPanel({
   lifeLogsForActiveRetro,
   quotas,
   quotaLogsForActiveRetro,
+  schedules,
   dayBoundaryHour,
   onStart,
   onSend,
@@ -246,6 +249,7 @@ export function RetroPanel({
         lifeLogsForPeriod={lifeLogsForActiveRetro}
         quotas={quotas}
         quotaLogsForPeriod={quotaLogsForActiveRetro}
+        schedules={schedules}
         dayBoundaryHour={dayBoundaryHour}
         onSend={onSend}
         onComplete={onComplete}
