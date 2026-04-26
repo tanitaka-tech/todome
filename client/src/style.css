@@ -6785,10 +6785,10 @@ body {
   z-index: 2;
 }
 .timeline-h-popup {
-  position: absolute;
+  position: fixed;
   transform: translate(-50%, calc(-100% - 8px));
   pointer-events: none;
-  z-index: 20;
+  z-index: 1000;
   background: var(--surface-raised);
   border: 1px solid var(--border);
   border-radius: 6px;

@@ -84,7 +84,6 @@ export function TimelineBar({
 }: Props) {
   const { t } = useTranslation("lifeLog");
   const scrollRef = useRef<HTMLDivElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
   const [hover, setHover] = useState<{
     seg: Segment;
     x: number;
@@ -252,14 +251,11 @@ export function TimelineBar({
   const hasAny = segments.length > 0;
 
   const onSegEnter = (e: React.MouseEvent<HTMLDivElement>, s: Segment) => {
-    const container = containerRef.current;
-    if (!container) return;
     const segRect = e.currentTarget.getBoundingClientRect();
-    const containerRect = container.getBoundingClientRect();
     setHover({
       seg: s,
-      x: segRect.left - containerRect.left + segRect.width / 2,
-      y: segRect.top - containerRect.top,
+      x: segRect.left + segRect.width / 2,
+      y: segRect.top,
     });
   };
   const durationSec = hover
@@ -267,7 +263,7 @@ export function TimelineBar({
     : 0;
 
   return (
-    <div className="timeline-h" ref={containerRef}>
+    <div className="timeline-h">
       <div className="timeline-h-scroll" ref={scrollRef}>
         <div
           className="timeline-h-canvas"
