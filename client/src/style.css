@@ -7822,6 +7822,9 @@ body {
 .timeline-h-seg.is-faint {
   opacity: 0.4;
 }
+.timeline-h-seg.is-active:not(.is-faint) {
+  animation: scheduleActivePulse 1.6s ease-in-out infinite;
+}
 
 .schedule-week-event.is-active-virtual,
 .schedule-month-event.is-active-virtual {
