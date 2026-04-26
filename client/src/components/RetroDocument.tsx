@@ -280,16 +280,6 @@ export function RetroDocumentView({
   onEditSleep,
 }: Props) {
   const { t } = useTranslation("retro");
-  const [timelineOrientation, setTimelineOrientation] = useState<
-    "vertical" | "horizontal"
-  >(() => {
-    const saved = localStorage.getItem("timeline:orientation");
-    return saved === "horizontal" ? "horizontal" : "vertical";
-  });
-  const setOrientation = (o: "vertical" | "horizontal") => {
-    setTimelineOrientation(o);
-    localStorage.setItem("timeline:orientation", o);
-  };
   const completedTasks = tasks.filter((t) =>
     isTaskCompletedInPeriod(t, periodStart, periodEnd),
   );
@@ -334,27 +324,9 @@ export function RetroDocumentView({
 
       {isDaily && dayRange && (
         <section className="retro-doc-section">
-          <div className="retro-doc-section-title-row">
-            <h3 className="retro-doc-section-title">
-              {t("docSectionTimeline", "タイムスケジュール")}
-            </h3>
-            <div className="retro-view-toggle" role="group">
-              <button
-                type="button"
-                className={`retro-view-toggle-btn${timelineOrientation === "vertical" ? " retro-view-toggle-btn--active" : ""}`}
-                onClick={() => setOrientation("vertical")}
-              >
-                {t("timelineOrientVertical", "縦")}
-              </button>
-              <button
-                type="button"
-                className={`retro-view-toggle-btn${timelineOrientation === "horizontal" ? " retro-view-toggle-btn--active" : ""}`}
-                onClick={() => setOrientation("horizontal")}
-              >
-                {t("timelineOrientHorizontal", "横")}
-              </button>
-            </div>
-          </div>
+          <h3 className="retro-doc-section-title">
+            {t("docSectionTimeline", "タイムスケジュール")}
+          </h3>
           <div className="retro-doc-section-body">
             <TimelineBar
               rangeStartMs={dayRange.startMs}
@@ -365,7 +337,6 @@ export function RetroDocumentView({
               lifeActivities={lifeActivities}
               quotas={quotas}
               quotaLogs={quotaLogsForPeriod}
-              orientation={timelineOrientation}
             />
           </div>
         </section>
