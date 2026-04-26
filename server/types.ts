@@ -157,6 +157,13 @@ export interface AIToolConfig {
 
 export type ScheduleSource = "manual" | "subscription";
 
+export type ScheduleOriginType = "task" | "lifelog" | "quota";
+
+export interface ScheduleOrigin {
+  type: ScheduleOriginType;
+  id: string;
+}
+
 export interface Schedule {
   id: string;
   source: ScheduleSource;
@@ -180,6 +187,8 @@ export interface Schedule {
   googleEventId: string;
   /** Google Calendar に push / fetch したアカウント ID。空なら旧データ。 */
   googleAccountId: string;
+  /** 計測ログ (タスク/LifeLog/QuotaLog) から自動生成された場合の由来。手動作成は undefined。 */
+  origin?: ScheduleOrigin;
 }
 
 export type SubscriptionStatus = "idle" | "fetching" | "ok" | "error";

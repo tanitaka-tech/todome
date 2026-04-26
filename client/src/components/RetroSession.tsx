@@ -10,6 +10,7 @@ import type {
   QuotaLog,
   RetroMessage,
   Retrospective,
+  Schedule,
 } from "../types";
 import { RetroDocumentView } from "./RetroDocument";
 
@@ -23,6 +24,7 @@ interface Props {
   lifeLogsForPeriod: LifeLog[];
   quotas: Quota[];
   quotaLogsForPeriod: QuotaLog[];
+  schedules: Schedule[];
   dayBoundaryHour: number;
   onSend: (text: string) => void;
   onComplete: () => void;
@@ -51,6 +53,7 @@ export function RetroSession({
   lifeLogsForPeriod,
   quotas,
   quotaLogsForPeriod,
+  schedules,
   dayBoundaryHour,
   onSend,
   onComplete,
@@ -231,6 +234,7 @@ export function RetroSession({
             lifeLogsForPeriod={lifeLogsForPeriod}
             quotas={quotas}
             quotaLogsForPeriod={quotaLogsForPeriod}
+            schedules={schedules}
             dayBoundaryHour={dayBoundaryHour}
             onEditField={(key, value) => onEditField(retro.id, key, value)}
             onEditDayRating={(v) => onEditDayRating(retro.id, v)}

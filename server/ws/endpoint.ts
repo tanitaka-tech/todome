@@ -11,6 +11,7 @@ import { loadGoals } from "../storage/goals.ts";
 import { loadTasks } from "../storage/kanban.ts";
 import { loadProfile } from "../storage/profile.ts";
 import { loadSchedules } from "../storage/schedule.ts";
+import { backfillSchedulesFromTimerLogs } from "../storage/scheduleBackfill.ts";
 import { loadSubscriptions } from "../storage/subscription.ts";
 import { sendTo } from "./broadcast.ts";
 import { MESSAGE_HANDLERS } from "./dispatch.ts";
@@ -47,6 +48,7 @@ export const wsHandlers = {
     }
     if (wsNeedsReload.has(ws)) {
       wsNeedsReload.delete(ws);
+      backfillSchedulesFromTimerLogs();
       ws.data.session.kanbanTasks = loadTasks();
       ws.data.session.goals = loadGoals();
       ws.data.session.profile = loadProfile();

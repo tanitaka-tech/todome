@@ -29,6 +29,7 @@ import type {
 } from "../types";
 import {
   formatDuration,
+  formatLocalIso,
   getDayRangeForDate,
   isLifeLogActive,
   isQuotaLogActive,
@@ -55,6 +56,7 @@ import {
   saveRetroTab,
   saveRetroViewMode,
 } from "../viewState";
+import { useTick } from "../hooks/useTick";
 import { useWebSocket } from "../hooks/useWebSocket";
 import { KanbanBoard } from "./KanbanBoard";
 import { ChatPanel } from "./ChatPanel";
@@ -293,6 +295,84 @@ export function App() {
 
   // 各テーマの --accent と同期した値（書き込み先未設定の manual イベントの表示色）。
   const themeAccent = useMemo(() => getThemeAccent(theme), [theme]);
+
+  // 計測中 (timerStartedAt あり / endedAt 空) の task / LifeLog / QuotaLog を仮想 Schedule に変換し、
+  // SchedulePanel の週・月表示にも反映する。永続化されないため id は "virtual-active-" prefix で識別し、
+  // クリック・リサイズは無効化される (ScheduleWeekScroller / ScheduleMonthView 側で判定)。
+  const activeTick = useTick();
+  const displaySchedules = useMemo<Schedule[]>(() => {
+    void activeTick;
+    // eslint-disable-next-line react-hooks/purity
+    const nowMs = Date.now();
+    const nowIso = formatLocalIso(new Date(nowMs));
+    const virtual: Schedule[] = [];
+    const blank = (id: string, title: string, start: string, end: string, origin: Schedule["origin"]): Schedule => ({
+      id,
+      source: "manual",
+      subscriptionId: "",
+      externalUid: "",
+      title,
+      description: "",
+      location: "",
+      start,
+      end,
+      allDay: false,
+      rrule: "",
+      recurrenceId: "",
+      createdAt: "",
+      updatedAt: "",
+      caldavObjectUrl: "",
+      caldavEtag: "",
+      googleEventId: "",
+      googleAccountId: "",
+      origin,
+    });
+    for (const t of tasks) {
+      if (!t.timerStartedAt) continue;
+      const startMs = Date.parse(t.timerStartedAt);
+      if (!Number.isFinite(startMs) || startMs >= nowMs) continue;
+      virtual.push(
+        blank(
+          `virtual-active-task-${t.id}`,
+          t.title || "(無題)",
+          t.timerStartedAt,
+          nowIso,
+          { type: "task", id: t.id },
+        ),
+      );
+    }
+    for (const log of lifeLogs) {
+      if (log.endedAt) continue;
+      const startMs = Date.parse(log.startedAt);
+      if (!Number.isFinite(startMs) || startMs >= nowMs) continue;
+      const activity = lifeActivities.find((a) => a.id === log.activityId);
+      virtual.push(
+        blank(
+          `virtual-active-lifelog-${log.id}`,
+          activity?.name ?? "活動",
+          log.startedAt,
+          nowIso,
+          { type: "lifelog", id: log.id },
+        ),
+      );
+    }
+    for (const log of quotaLogs) {
+      if (log.endedAt) continue;
+      const startMs = Date.parse(log.startedAt);
+      if (!Number.isFinite(startMs) || startMs >= nowMs) continue;
+      const quota = quotas.find((q) => q.id === log.quotaId);
+      virtual.push(
+        blank(
+          `virtual-active-quota-${log.id}`,
+          quota?.name ?? "ノルマ",
+          log.startedAt,
+          nowIso,
+          { type: "quota", id: log.id },
+        ),
+      );
+    }
+    return virtual.length === 0 ? schedules : [...schedules, ...virtual];
+  }, [schedules, tasks, lifeLogs, lifeActivities, quotaLogs, quotas, activeTick]);
 
   useEffect(() => {
     applyLanguage(language);
@@ -1427,6 +1507,7 @@ export function App() {
             lifeLogs={lifeLogs}
             quotas={quotas}
             quotaLogs={quotaLogs}
+            schedules={schedules}
             dayBoundaryHour={dayBoundaryHour}
           />
         ) : activeView === "board" ? (
@@ -1460,7 +1541,7 @@ export function App() {
           />
         ) : activeView === "schedule" ? (
           <SchedulePanel
-            schedules={schedules}
+            schedules={displaySchedules}
             subscriptions={subscriptions}
             send={send}
             dayBoundaryHour={dayBoundaryHour}
@@ -1488,6 +1569,7 @@ export function App() {
             lifeLogsForActiveRetro={lifeLogsForActiveRetro}
             quotas={quotas}
             quotaLogsForActiveRetro={quotaLogsForActiveRetro}
+            schedules={schedules}
             dayBoundaryHour={dayBoundaryHour}
             onStart={handleRetroStart}
             onSend={handleRetroSend}

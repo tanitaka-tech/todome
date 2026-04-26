@@ -21,6 +21,11 @@ import {
 import type { LifeActivity } from "../../types.ts";
 import { broadcast, sendTo } from "../broadcast.ts";
 import type { Handler } from "../dispatch.ts";
+import {
+  createScheduleFromLifeLogStop,
+  createScheduleFromQuotaLogStop,
+  createScheduleFromTaskTimerStop,
+} from "./scheduleFromTimer.ts";
 
 export const lifeActivityUpsert: Handler = async (_ws, _session, data) => {
   const incoming = (data.activity ?? {}) as Partial<LifeActivity> & Record<string, unknown>;
@@ -82,7 +87,7 @@ export const lifeActivityReorder: Handler = async (_ws, _session, data) => {
 export const lifeLogStart: Handler = async (_ws, session, data) => {
   const activityId = String(data.activity_id ?? data.activityId ?? "");
   if (!activityId) return;
-  stopTaskTimersIfRunning(session.kanbanTasks);
+  const stoppedTaskIds = stopTaskTimersIfRunning(session.kanbanTasks);
   saveTasks(session.kanbanTasks);
   const quotaStopped = stopActiveQuotaLogIfAny();
   const log = startLifeLog(activityId);
@@ -96,17 +101,25 @@ export const lifeLogStart: Handler = async (_ws, session, data) => {
       type: "quota_streak_sync",
       streaks: computeAllQuotaStreaks(loadQuotas(), loadAllQuotaLogs()),
     });
+    await createScheduleFromQuotaLogStop(session, quotaStopped);
+  }
+  for (const id of stoppedTaskIds) {
+    const task = session.kanbanTasks.find((t) => t.id === id);
+    if (task) await createScheduleFromTaskTimerStop(session, task);
   }
 };
 
-export const lifeLogStop: Handler = async (_ws, _session, data) => {
+export const lifeLogStop: Handler = async (_ws, session, data) => {
   const logId = String(data.log_id ?? data.logId ?? "");
   const memo = typeof data.memo === "string" ? (data.memo as string) : undefined;
   if (!logId) return;
   const stopped = stopLifeLog(logId, memo);
   scheduleAutosync();
   broadcast({ type: "life_log_sync", logs: loadTodayLifeLogs() });
-  if (stopped) broadcast({ type: "life_log_stopped", log: stopped });
+  if (stopped) {
+    broadcast({ type: "life_log_stopped", log: stopped });
+    await createScheduleFromLifeLogStop(session, stopped);
+  }
 };
 
 export const lifeLogDelete: Handler = async (_ws, _session, data) => {

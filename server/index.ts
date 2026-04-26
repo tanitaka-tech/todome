@@ -4,11 +4,16 @@ import { join } from "node:path";
 import { PROJECT_ROOT, PORT } from "./config.ts";
 import { initDb } from "./db.ts";
 import type { WSData } from "./state.ts";
+import { backfillSchedulesFromTimerLogs } from "./storage/scheduleBackfill.ts";
 import { makeWSData, wsHandlers } from "./ws/endpoint.ts";
 import { registerAllHandlers } from "./ws/handlers/index.ts";
 import { handleOAuthCallback } from "./ws/handlers/google.ts";
 
 initDb();
+const backfill = backfillSchedulesFromTimerLogs();
+if (backfill.added > 0) {
+  console.log(`[startup] backfilled ${backfill.added} schedules from timer logs`);
+}
 registerAllHandlers();
 
 // Bun のデフォルトでは unhandled rejection / uncaught exception が握りつぶされて

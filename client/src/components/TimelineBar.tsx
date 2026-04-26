@@ -6,41 +6,51 @@ import type {
   LifeLog,
   Quota,
   QuotaLog,
+  Schedule,
 } from "../types";
-import { LIFE_CATEGORY_COLORS, formatDuration } from "../types";
+import {
+  DEFAULT_SCHEDULE_COLOR,
+  LIFE_CATEGORY_COLORS,
+  formatDuration,
+} from "../types";
 
 interface Props {
   rangeStartMs: number;
   rangeEndMs: number;
+  schedules: Schedule[];
+  /** active 計測表示用 (timerStartedAt から作る)。 */
   tasks: KanbanTask[];
+  /** active 計測表示用 (endedAt 空) + origin.id から activity 引き当て用。 */
   lifeLogs: LifeLog[];
+  /** active 計測表示用 (endedAt 空) + origin.id から quota 引き当て用。 */
+  quotaLogs?: QuotaLog[];
   lifeActivities: LifeActivity[];
   quotas?: Quota[];
-  quotaLogs?: QuotaLog[];
   /** live update用。値が変われば再描画。 */
   tick?: number;
   /** 現在時刻にスクロールするか。Overview では true、retro (過去日) では false。 */
   autoScrollToNow?: boolean;
-  /** 縦 (デフォルト) or 横。 */
-  orientation?: "vertical" | "horizontal";
 }
+
+type SegmentKind = "task" | "life" | "quota" | "manual";
 
 interface Segment {
   key: string;
-  kind: "task" | "life" | "quota";
+  kind: SegmentKind;
   startMs: number;
   endMs: number;
   label: string;
   sublabel: string;
   color: string;
-  tooltip: string;
+  faint?: boolean;
+  active?: boolean;
 }
 
 const QUOTA_SEG_COLOR = "#8b5cf6";
-
-const HOUR_HEIGHT_PX = 56;
-const HOUR_WIDTH_PX = 80;
-const HORIZONTAL_LANE_HEIGHT_PX = 44;
+const HOUR_WIDTH_PX = 56;
+const LANE_HEIGHT_PX = 28;
+/** 計測中で 15 秒未満のものは「誤操作の可能性」として薄く表示する。 */
+const FAINT_ACTIVE_THRESHOLD_MS = 15_000;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
@@ -63,6 +73,7 @@ function formatTimeOfDay(ms: number): string {
 export function TimelineBar({
   rangeStartMs,
   rangeEndMs,
+  schedules,
   tasks,
   lifeLogs,
   lifeActivities,
@@ -70,12 +81,9 @@ export function TimelineBar({
   quotaLogs,
   tick: _tick,
   autoScrollToNow = false,
-  orientation = "vertical",
 }: Props) {
   const { t } = useTranslation("lifeLog");
   const scrollRef = useRef<HTMLDivElement>(null);
-  const scrollHRef = useRef<HTMLDivElement>(null);
-  const containerHRef = useRef<HTMLDivElement>(null);
   const [hover, setHover] = useState<{
     seg: Segment;
     x: number;
@@ -85,53 +93,79 @@ export function TimelineBar({
   const nowMs = Date.now();
   const totalMs = rangeEndMs - rangeStartMs;
   const totalHours = Math.round(totalMs / (60 * 60 * 1000));
-  const totalHeight = totalHours * HOUR_HEIGHT_PX;
+  const totalWidth = totalHours * HOUR_WIDTH_PX;
 
   const segments = useMemo<Segment[]>(() => {
     const out: Segment[] = [];
-    for (const task of tasks) {
-      for (const log of task.timeLogs || []) {
-        const start = Date.parse(log.start);
-        const end = Date.parse(log.end);
-        if (Number.isNaN(start) || Number.isNaN(end)) continue;
-        if (!overlaps(start, end, rangeStartMs, rangeEndMs)) continue;
-        out.push({
-          key: `t-${task.id}-${log.start}`,
-          kind: "task",
-          startMs: Math.max(start, rangeStartMs),
-          endMs: Math.min(end, rangeEndMs),
-          label: task.title,
-          sublabel: `${formatTimeOfDay(start)}–${formatTimeOfDay(end)}`,
-          color: "var(--accent)",
-          tooltip: `${task.title}\n${formatTimeOfDay(start)}–${formatTimeOfDay(end)} (${formatDuration(Math.max(0, Math.floor((end - start) / 1000)))})`,
-        });
-      }
-      if (task.timerStartedAt) {
-        const start = Date.parse(task.timerStartedAt);
-        const end = nowMs;
-        if (
-          !Number.isNaN(start) &&
-          overlaps(start, end, rangeStartMs, rangeEndMs)
-        ) {
-          out.push({
-            key: `t-${task.id}-active`,
-            kind: "task",
-            startMs: Math.max(start, rangeStartMs),
-            endMs: Math.min(end, rangeEndMs),
-            label: task.title,
-            sublabel: `${formatTimeOfDay(start)}–`,
-            color: "var(--accent)",
-            tooltip: `${task.title} (計測中)\n${formatTimeOfDay(start)}–`,
-          });
+    const activityMap = new Map(lifeActivities.map((a) => [a.id, a]));
+    const quotaMap = new Map((quotas ?? []).map((q) => [q.id, q]));
+    const lifeLogMap = new Map(lifeLogs.map((l) => [l.id, l]));
+    const quotaLogMap = new Map((quotaLogs ?? []).map((l) => [l.id, l]));
+
+    for (const sch of schedules) {
+      if (sch.allDay) continue;
+      const start = Date.parse(sch.start);
+      const end = Date.parse(sch.end);
+      if (Number.isNaN(start) || Number.isNaN(end)) continue;
+      if (!overlaps(start, end, rangeStartMs, rangeEndMs)) continue;
+      let kind: SegmentKind = "manual";
+      let label = sch.title || "(無題)";
+      let color = DEFAULT_SCHEDULE_COLOR;
+      if (sch.origin?.type === "task") {
+        kind = "task";
+        color = "var(--accent)";
+      } else if (sch.origin?.type === "lifelog") {
+        kind = "life";
+        const log = lifeLogMap.get(sch.origin.id);
+        const activity = log ? activityMap.get(log.activityId) : undefined;
+        if (activity) {
+          color = LIFE_CATEGORY_COLORS[activity.category];
+          label = `${activity.icon} ${activity.name}`;
+        } else {
+          color = LIFE_CATEGORY_COLORS.other;
         }
+      } else if (sch.origin?.type === "quota") {
+        kind = "quota";
+        color = QUOTA_SEG_COLOR;
+        const log = quotaLogMap.get(sch.origin.id);
+        const quota = log ? quotaMap.get(log.quotaId) : undefined;
+        if (quota) label = `${quota.icon} ${quota.name}`;
       }
+      out.push({
+        key: `s-${sch.id}`,
+        kind,
+        startMs: Math.max(start, rangeStartMs),
+        endMs: Math.min(end, rangeEndMs),
+        label,
+        sublabel: `${formatTimeOfDay(start)}–${formatTimeOfDay(end)}`,
+        color,
+      });
     }
 
-    const activityMap = new Map(lifeActivities.map((a) => [a.id, a]));
+    for (const task of tasks) {
+      if (!task.timerStartedAt) continue;
+      const start = Date.parse(task.timerStartedAt);
+      const end = nowMs;
+      if (Number.isNaN(start)) continue;
+      if (!overlaps(start, end, rangeStartMs, rangeEndMs)) continue;
+      out.push({
+        key: `t-${task.id}-active`,
+        kind: "task",
+        startMs: Math.max(start, rangeStartMs),
+        endMs: Math.min(end, rangeEndMs),
+        label: task.title,
+        sublabel: `${formatTimeOfDay(start)}–`,
+        color: "var(--accent)",
+        faint: end - start < FAINT_ACTIVE_THRESHOLD_MS,
+        active: true,
+      });
+    }
+
     for (const log of lifeLogs) {
+      if (log.endedAt) continue;
       const start = Date.parse(log.startedAt);
-      const end = log.endedAt ? Date.parse(log.endedAt) : nowMs;
-      if (Number.isNaN(start) || Number.isNaN(end)) continue;
+      if (Number.isNaN(start)) continue;
+      const end = nowMs;
       if (!overlaps(start, end, rangeStartMs, rangeEndMs)) continue;
       const activity = activityMap.get(log.activityId);
       const color = activity
@@ -141,39 +175,42 @@ export function TimelineBar({
         ? `${activity.icon} ${activity.name}`
         : log.activityId;
       out.push({
-        key: `l-${log.id}`,
+        key: `l-${log.id}-active`,
         kind: "life",
         startMs: Math.max(start, rangeStartMs),
         endMs: Math.min(end, rangeEndMs),
         label: name,
-        sublabel: `${formatTimeOfDay(start)}–${formatTimeOfDay(end)}`,
+        sublabel: `${formatTimeOfDay(start)}–`,
         color,
-        tooltip: `${name}\n${formatTimeOfDay(start)}–${formatTimeOfDay(end)} (${formatDuration(Math.max(0, Math.floor((end - start) / 1000)))})`,
+        faint: end - start < FAINT_ACTIVE_THRESHOLD_MS,
+        active: true,
       });
     }
 
-    const quotaMap = new Map((quotas ?? []).map((q) => [q.id, q]));
     for (const log of quotaLogs ?? []) {
+      if (log.endedAt) continue;
       const start = Date.parse(log.startedAt);
-      const end = log.endedAt ? Date.parse(log.endedAt) : nowMs;
-      if (Number.isNaN(start) || Number.isNaN(end)) continue;
+      if (Number.isNaN(start)) continue;
+      const end = nowMs;
       if (!overlaps(start, end, rangeStartMs, rangeEndMs)) continue;
       const quota = quotaMap.get(log.quotaId);
       const name = quota ? `${quota.icon} ${quota.name}` : log.quotaId;
       out.push({
-        key: `q-${log.id}`,
+        key: `q-${log.id}-active`,
         kind: "quota",
         startMs: Math.max(start, rangeStartMs),
         endMs: Math.min(end, rangeEndMs),
         label: name,
-        sublabel: `${formatTimeOfDay(start)}–${formatTimeOfDay(end)}`,
+        sublabel: `${formatTimeOfDay(start)}–`,
         color: QUOTA_SEG_COLOR,
-        tooltip: `${name}\n${formatTimeOfDay(start)}–${formatTimeOfDay(end)} (${formatDuration(Math.max(0, Math.floor((end - start) / 1000)))})`,
+        faint: end - start < FAINT_ACTIVE_THRESHOLD_MS,
+        active: true,
       });
     }
 
     return out;
   }, [
+    schedules,
     tasks,
     lifeLogs,
     lifeActivities,
@@ -185,12 +222,12 @@ export function TimelineBar({
   ]);
 
   const hourMarkers = useMemo(() => {
-    const markers: { hour: number; top: number }[] = [];
+    const markers: { hour: number; left: number }[] = [];
     const startDate = new Date(rangeStartMs);
     for (let i = 0; i <= totalHours; i += 1) {
       markers.push({
         hour: (startDate.getHours() + i) % 24,
-        top: i * HOUR_HEIGHT_PX,
+        left: i * HOUR_WIDTH_PX,
       });
     }
     return markers;
@@ -198,204 +235,112 @@ export function TimelineBar({
 
   const safeNow = clamp(nowMs, rangeStartMs, rangeEndMs);
   const nowIsInRange = nowMs > rangeStartMs && nowMs < rangeEndMs;
-  const nowTop = ((safeNow - rangeStartMs) / totalMs) * totalHeight;
-
-  const totalWidth = totalHours * HOUR_WIDTH_PX;
   const nowLeftPx = ((safeNow - rangeStartMs) / totalMs) * totalWidth;
 
-  // 初回マウント時 + autoScrollToNow=true のときだけ現在時刻にスクロール。
-  // orientation 切替でも再度スクロールできるよう、orientation ごとにリセット。
   const didAutoScroll = useRef(false);
   useEffect(() => {
-    didAutoScroll.current = false;
-  }, [orientation]);
-  useEffect(() => {
-    if (orientation !== "vertical") return;
     if (didAutoScroll.current) return;
     if (!autoScrollToNow) return;
     if (!scrollRef.current) return;
     if (!nowIsInRange) return;
     didAutoScroll.current = true;
     const container = scrollRef.current;
-    container.scrollTop = Math.max(0, nowTop - container.clientHeight / 3);
-  }, [autoScrollToNow, nowIsInRange, nowTop, orientation]);
-  useEffect(() => {
-    if (orientation !== "horizontal") return;
-    if (didAutoScroll.current) return;
-    if (!autoScrollToNow) return;
-    if (!scrollHRef.current) return;
-    if (!nowIsInRange) return;
-    didAutoScroll.current = true;
-    const container = scrollHRef.current;
     container.scrollLeft = Math.max(0, nowLeftPx - container.clientWidth / 3);
-  }, [autoScrollToNow, nowIsInRange, nowLeftPx, orientation]);
+  }, [autoScrollToNow, nowIsInRange, nowLeftPx]);
 
   const hasAny = segments.length > 0;
 
-  if (orientation === "horizontal") {
-    const onSegEnter = (e: React.MouseEvent<HTMLDivElement>, s: Segment) => {
-      const container = containerHRef.current;
-      if (!container) return;
-      const segRect = e.currentTarget.getBoundingClientRect();
-      const containerRect = container.getBoundingClientRect();
-      setHover({
-        seg: s,
-        x: segRect.left - containerRect.left + segRect.width / 2,
-        y: segRect.top - containerRect.top,
-      });
-    };
-    const durationSec = hover
-      ? Math.max(0, Math.floor((hover.seg.endMs - hover.seg.startMs) / 1000))
-      : 0;
-    return (
-      <div className="timeline-h" ref={containerHRef}>
-        <div className="timeline-h-scroll" ref={scrollHRef}>
-          <div
-            className="timeline-h-canvas"
-            style={{ width: `${totalWidth}px` }}
-          >
-            <div className="timeline-h-axis">
-              {hourMarkers.map((m, i) => (
-                <span
-                  key={`${m.hour}-${i}`}
-                  className="timeline-h-axis-label"
-                  style={{ left: `${i * HOUR_WIDTH_PX}px` }}
-                >
-                  {String(m.hour).padStart(2, "0")}:00
-                </span>
-              ))}
-            </div>
-            <div
-              className="timeline-h-lane"
-              style={{ height: `${HORIZONTAL_LANE_HEIGHT_PX}px` }}
-            >
-              {hourMarkers.map((_m, i) => (
-                <div
-                  key={`g-${i}`}
-                  className="timeline-h-grid-line"
-                  style={{ left: `${i * HOUR_WIDTH_PX}px` }}
-                />
-              ))}
-              {segments.map((s) => {
-                const leftPx =
-                  ((s.startMs - rangeStartMs) / totalMs) * totalWidth;
-                const widthPx = Math.max(
-                  2,
-                  ((s.endMs - s.startMs) / totalMs) * totalWidth,
-                );
-                return (
-                  <div
-                    key={s.key}
-                    className={`timeline-h-seg timeline-h-seg--${s.kind}`}
-                    style={{
-                      left: `${leftPx}px`,
-                      width: `${widthPx}px`,
-                      background: s.color,
-                    }}
-                    onMouseEnter={(e) => onSegEnter(e, s)}
-                    onMouseLeave={() => setHover(null)}
-                  >
-                    <div className="timeline-h-seg-label">{s.label}</div>
-                  </div>
-                );
-              })}
-              {nowIsInRange && (
-                <div
-                  className="timeline-h-now"
-                  style={{ left: `${nowLeftPx}px` }}
-                  title={t("timelineNow", "現在")}
-                >
-                  <span className="timeline-h-now-dot" />
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-        {hover && (
-          <div
-            className="timeline-h-popup"
-            style={{ left: `${hover.x}px`, top: `${hover.y}px` }}
-          >
-            <div className="timeline-h-popup-title">{hover.seg.label}</div>
-            <div className="timeline-h-popup-time">{hover.seg.sublabel}</div>
-            <div className="timeline-h-popup-duration">
-              {formatDuration(durationSec)}
-            </div>
-          </div>
-        )}
-        {!hasAny && (
-          <div className="timeline-v-empty">
-            {t("timelineEmpty", "この日はまだ計測がありません。")}
-          </div>
-        )}
-      </div>
+  const onSegEnter = (e: React.MouseEvent<HTMLDivElement>, s: Segment) => {
+    const segRect = e.currentTarget.getBoundingClientRect();
+    // popup の最大幅 260 → half 130、画面端 8px のマージンを残してクランプ
+    const halfW = 130;
+    const padding = 8;
+    const rawX = segRect.left + segRect.width / 2;
+    const clampedX = Math.max(
+      halfW + padding,
+      Math.min(window.innerWidth - halfW - padding, rawX),
     );
-  }
+    setHover({ seg: s, x: clampedX, y: segRect.top });
+  };
+  const durationSec = hover
+    ? Math.max(0, Math.floor((hover.seg.endMs - hover.seg.startMs) / 1000))
+    : 0;
 
   return (
-    <div className="timeline-v">
-      <div className="timeline-v-scroll" ref={scrollRef}>
+    <div className="timeline-h">
+      <div className="timeline-h-scroll" ref={scrollRef}>
         <div
-          className="timeline-v-canvas"
-          style={{ height: `${totalHeight}px` }}
+          className="timeline-h-canvas"
+          style={{ width: `${totalWidth}px` }}
         >
-          <div className="timeline-v-axis">
-            {hourMarkers.map((m) => (
-              <div
-                key={m.top}
-                className="timeline-v-axis-row"
-                style={{ top: `${m.top}px` }}
+          <div className="timeline-h-axis">
+            {hourMarkers.map((m, i) => (
+              <span
+                key={`${m.hour}-${i}`}
+                className="timeline-h-axis-label"
+                style={{ left: `${m.left}px` }}
               >
-                <span className="timeline-v-axis-label">
-                  {String(m.hour).padStart(2, "0")}:00
-                </span>
-              </div>
+                {String(m.hour).padStart(2, "0")}
+              </span>
             ))}
           </div>
-          <div className="timeline-v-lane">
-            {hourMarkers.map((m) => (
+          <div
+            className="timeline-h-lane"
+            style={{ height: `${LANE_HEIGHT_PX}px` }}
+          >
+            {hourMarkers.map((m, i) => (
               <div
-                key={m.top}
-                className="timeline-v-grid-line"
-                style={{ top: `${m.top}px` }}
+                key={`g-${i}`}
+                className="timeline-h-grid-line"
+                style={{ left: `${m.left}px` }}
               />
             ))}
             {segments.map((s) => {
-              const top = ((s.startMs - rangeStartMs) / totalMs) * totalHeight;
-              const height = Math.max(
-                14,
-                ((s.endMs - s.startMs) / totalMs) * totalHeight,
+              const leftPx = ((s.startMs - rangeStartMs) / totalMs) * totalWidth;
+              const widthPx = Math.max(
+                2,
+                ((s.endMs - s.startMs) / totalMs) * totalWidth,
               );
               return (
                 <div
                   key={s.key}
-                  className={`timeline-v-seg timeline-v-seg--${s.kind}`}
+                  className={`timeline-h-seg timeline-h-seg--${s.kind}${s.faint ? " is-faint" : ""}${s.active ? " is-active" : ""}`}
                   style={{
-                    top: `${top}px`,
-                    height: `${height}px`,
+                    left: `${leftPx}px`,
+                    width: `${widthPx}px`,
                     background: s.color,
                   }}
-                  title={s.tooltip}
+                  onMouseEnter={(e) => onSegEnter(e, s)}
+                  onMouseLeave={() => setHover(null)}
                 >
-                  <div className="timeline-v-seg-label">{s.label}</div>
-                  <div className="timeline-v-seg-sub">{s.sublabel}</div>
+                  <div className="timeline-h-seg-label">{s.label}</div>
                 </div>
               );
             })}
             {nowIsInRange && (
               <div
-                className="timeline-v-now"
-                style={{ top: `${nowTop}px` }}
+                className="timeline-h-now"
+                style={{ left: `${nowLeftPx}px` }}
                 title={t("timelineNow", "現在")}
-              >
-                <span className="timeline-v-now-dot" />
-              </div>
+              />
             )}
           </div>
         </div>
       </div>
+      {hover && (
+        <div
+          className="timeline-h-popup"
+          style={{ left: `${hover.x}px`, top: `${hover.y}px` }}
+        >
+          <div className="timeline-h-popup-title">{hover.seg.label}</div>
+          <div className="timeline-h-popup-time">{hover.seg.sublabel}</div>
+          <div className="timeline-h-popup-duration">
+            {formatDuration(durationSec)}
+          </div>
+        </div>
+      )}
       {!hasAny && (
-        <div className="timeline-v-empty">
+        <div className="timeline-h-empty">
           {t("timelineEmpty", "この日はまだ計測がありません。")}
         </div>
       )}
