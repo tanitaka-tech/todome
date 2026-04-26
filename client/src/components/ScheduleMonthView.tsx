@@ -5,7 +5,7 @@ import type {
   Schedule,
   ScheduleColorContext,
 } from "../types";
-import { isFaintSchedule, scheduleColor, sortSchedulesByStart } from "../types";
+import { scheduleColor, sortSchedulesByStart } from "../types";
 import { getHolidayName, isDayOff } from "../holiday";
 
 interface Props {
@@ -148,7 +148,7 @@ export function ScheduleMonthView({
                     <button
                       key={`${s.id}-${cell.iso}`}
                       type="button"
-                      className={`schedule-month-event${s.allDay ? " is-allday" : ""}${startsThisCell ? "" : " is-cont"}${isFaintSchedule(s) ? " is-faint" : ""}`}
+                      className={`schedule-month-event${s.allDay ? " is-allday" : ""}${startsThisCell ? "" : " is-cont"}`}
                       style={{ backgroundColor: color }}
                       title={s.title}
                       onClick={(e) => {

@@ -18,9 +18,21 @@ function originKey(type: string, id: string): string {
   return `${type}:${id}`;
 }
 
+/** 15秒未満の計測は誤操作の可能性が高いため Schedule 化しない (createScheduleFromTimerLog と同基準)。 */
+const MIN_SCHEDULE_DURATION_MS = 15_000;
+
 function isValidRange(startIso: string, endIso: string): boolean {
   if (!startIso || !endIso) return false;
-  return endIso > startIso;
+  if (endIso <= startIso) return false;
+  const startMs = Date.parse(startIso);
+  const endMs = Date.parse(endIso);
+  if (
+    Number.isFinite(startMs) &&
+    Number.isFinite(endMs) &&
+    endMs - startMs < MIN_SCHEDULE_DURATION_MS
+  )
+    return false;
+  return true;
 }
 
 /**
