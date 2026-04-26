@@ -13,7 +13,7 @@ interface Row {
   data: string;
 }
 
-function normalizeProfile(raw: unknown): UserProfile {
+export function normalizeProfile(raw: unknown): UserProfile {
   const r = (raw && typeof raw === "object" ? raw : {}) as Partial<UserProfile>;
   return {
     currentState: typeof r.currentState === "string" ? r.currentState : "",
