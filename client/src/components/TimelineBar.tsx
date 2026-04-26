@@ -43,6 +43,7 @@ interface Segment {
   sublabel: string;
   color: string;
   faint?: boolean;
+  active?: boolean;
 }
 
 const QUOTA_SEG_COLOR = "#8b5cf6";
@@ -157,6 +158,7 @@ export function TimelineBar({
         sublabel: `${formatTimeOfDay(start)}–`,
         color: "var(--accent)",
         faint: end - start < FAINT_ACTIVE_THRESHOLD_MS,
+        active: true,
       });
     }
 
@@ -182,6 +184,7 @@ export function TimelineBar({
         sublabel: `${formatTimeOfDay(start)}–`,
         color,
         faint: end - start < FAINT_ACTIVE_THRESHOLD_MS,
+        active: true,
       });
     }
 
@@ -202,6 +205,7 @@ export function TimelineBar({
         sublabel: `${formatTimeOfDay(start)}–`,
         color: QUOTA_SEG_COLOR,
         faint: end - start < FAINT_ACTIVE_THRESHOLD_MS,
+        active: true,
       });
     }
 
@@ -300,7 +304,7 @@ export function TimelineBar({
               return (
                 <div
                   key={s.key}
-                  className={`timeline-h-seg timeline-h-seg--${s.kind}${s.faint ? " is-faint" : ""}`}
+                  className={`timeline-h-seg timeline-h-seg--${s.kind}${s.faint ? " is-faint" : ""}${s.active ? " is-active" : ""}`}
                   style={{
                     left: `${leftPx}px`,
                     width: `${widthPx}px`,
