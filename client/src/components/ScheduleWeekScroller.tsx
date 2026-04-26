@@ -39,6 +39,12 @@ interface HoverState {
   y: number;
 }
 
+interface ZoomingState {
+  startHourHeight: number;
+  anchorMin: number;
+  anchorOffsetInBody: number;
+}
+
 export interface ScheduleWeekScrollerHandle {
   scrollByDays: (n: number) => void;
 }
@@ -61,7 +67,10 @@ interface Props {
 }
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
-const HOUR_HEIGHT = 48;
+const DEFAULT_HOUR_HEIGHT = 48;
+const MIN_HOUR_HEIGHT = 16;
+const MAX_HOUR_HEIGHT = 200;
+const ZOOM_DRAG_SENSITIVITY = 0.006;
 const SNAP_MIN = 15;
 const DEFAULT_DRAG_DURATION_MIN = 30;
 const GUTTER_WIDTH = 64;
@@ -107,6 +116,14 @@ function buildInitialDayList(anchor: Date, weekStart: 0 | 1): Date[] {
 function snapMinutes(raw: number): number {
   const snapped = Math.round(raw / SNAP_MIN) * SNAP_MIN;
   return Math.max(0, Math.min(24 * 60, snapped));
+}
+
+// hourHeight に応じて時間軸ガターに表示する補助分ラベルを返す。
+function getSubTickMinutes(hh: number): number[] {
+  if (hh >= 180) return [10, 20, 30, 40, 50];
+  if (hh >= 110) return [15, 30, 45];
+  if (hh >= 64) return [30];
+  return [];
 }
 
 function minutesFromMidnight(iso: string): number {
@@ -183,6 +200,11 @@ export function ScheduleWeekScroller({
   const [dayList, setDayList] = useState<Date[]>(() =>
     buildInitialDayList(anchor, calendarWeekStart),
   );
+  const [hourHeight, setHourHeight] = useState<number>(DEFAULT_HOUR_HEIGHT);
+  const hourHeightRef = useRef(hourHeight);
+  useLayoutEffect(() => {
+    hourHeightRef.current = hourHeight;
+  });
   // 現在時刻 (1分ごとに更新)。今ライン (Apple Calendar 風) の描画に使う。
   const [nowDate, setNowDate] = useState<Date>(() => new Date());
   useEffect(() => {
@@ -208,13 +230,13 @@ export function ScheduleWeekScroller({
     // クライアント高から差し引いて、可視のタイムグリッド領域の中央に合わせる。
     const now = new Date();
     const currentMin = now.getHours() * 60 + now.getMinutes();
-    const currentY = (currentMin / 60) * HOUR_HEIGHT;
+    const currentY = (currentMin / 60) * hourHeight;
     const headEl = el.querySelector(".schedule-week-scroller-head") as HTMLElement | null;
     const allDayEl = el.querySelector(".schedule-week-scroller-allday") as HTMLElement | null;
     const headersHeight =
       (headEl?.offsetHeight ?? 0) + (allDayEl?.offsetHeight ?? 0);
     const visibleGridHeight = Math.max(
-      HOUR_HEIGHT,
+      hourHeight,
       el.clientHeight - headersHeight,
     );
     el.scrollTop = Math.max(0, currentY - visibleGridHeight / 2);
@@ -402,6 +424,9 @@ export function ScheduleWeekScroller({
   const resizingRef = useRef<ResizingState | null>(null);
   const didResizeRef = useRef(false);
   const [hover, setHover] = useState<HoverState | null>(null);
+  const [zooming, setZooming] = useState<ZoomingState | null>(null);
+  const zoomingRef = useRef<ZoomingState | null>(null);
+  const zoomDxRef = useRef(0);
 
   useLayoutEffect(() => {
     selectingRef.current = selecting;
@@ -409,10 +434,14 @@ export function ScheduleWeekScroller({
   useLayoutEffect(() => {
     resizingRef.current = resizing;
   });
+  useLayoutEffect(() => {
+    zoomingRef.current = zooming;
+  });
 
   const isSelecting = selecting !== null;
   const isResizing = resizing !== null;
-  const dragActive = isSelecting || isResizing;
+  const isZooming = zooming !== null;
+  const dragActive = isSelecting || isResizing || isZooming;
 
   useEffect(() => {
     if (!dragActive) return;
@@ -423,6 +452,21 @@ export function ScheduleWeekScroller({
     };
   }, [dragActive]);
 
+  // Pointer Lock 中はカーソル非表示。Escape 等で lock が解けたらズーム終了。
+  useEffect(() => {
+    if (!isZooming) return;
+    const handlePointerLockChange = () => {
+      if (!document.pointerLockElement) {
+        zoomDxRef.current = 0;
+        setZooming(null);
+      }
+    };
+    document.addEventListener("pointerlockchange", handlePointerLockChange);
+    return () => {
+      document.removeEventListener("pointerlockchange", handlePointerLockChange);
+    };
+  }, [isZooming]);
+
   useEffect(() => {
     if (!isSelecting) return;
     const handleMove = (e: MouseEvent) => {
@@ -431,7 +475,7 @@ export function ScheduleWeekScroller({
       const col = dayColMapRef.current.get(cur.dayIso);
       if (!col) return;
       const rect = col.getBoundingClientRect();
-      const min = snapMinutes(((e.clientY - rect.top) / HOUR_HEIGHT) * 60);
+      const min = snapMinutes(((e.clientY - rect.top) / hourHeightRef.current) * 60);
       setSelecting((prev) =>
         prev && prev.currentMin !== min ? { ...prev, currentMin: min } : prev,
       );
@@ -463,7 +507,7 @@ export function ScheduleWeekScroller({
       const col = dayColMapRef.current.get(cur.dayIso);
       if (!col) return;
       const rect = col.getBoundingClientRect();
-      const min = snapMinutes(((e.clientY - rect.top) / HOUR_HEIGHT) * 60);
+      const min = snapMinutes(((e.clientY - rect.top) / hourHeightRef.current) * 60);
       const next = min !== cur.currentMin ? { ...cur, currentMin: min } : cur;
       if (min !== cur.currentMin) {
         didResizeRef.current = true;
@@ -508,10 +552,73 @@ export function ScheduleWeekScroller({
     const col = dayColMapRef.current.get(dayIso);
     if (!col) return;
     const rect = col.getBoundingClientRect();
-    const min = snapMinutes(((e.clientY - rect.top) / HOUR_HEIGHT) * 60);
+    const min = snapMinutes(((e.clientY - rect.top) / hourHeight) * 60);
     setSelecting({ dayIso, anchorMin: min, currentMin: min });
     e.preventDefault();
   };
+
+  // 時間軸ガターを掴んで水平方向にドラッグ → 1時間あたりのpxを伸縮。
+  // Pointer Lock でカーソル非表示・位置固定。掴んだ時刻が画面上で動かないよう
+  // scrollTop を補正する (ピンチ的にカーソル位置を中心にズーム)。
+  const handleHoursMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    const el = containerRef.current;
+    if (!el) return;
+    const hoursEl = e.currentTarget as HTMLElement;
+    const hoursRect = hoursEl.getBoundingClientRect();
+    const offsetY = e.clientY - hoursRect.top;
+    const anchorMin = (offsetY / hourHeight) * 60;
+    const anchorOffsetInBody = (anchorMin / 60) * hourHeight - el.scrollTop;
+    zoomDxRef.current = 0;
+    setZooming({
+      startHourHeight: hourHeight,
+      anchorMin,
+      anchorOffsetInBody,
+    });
+    hoursEl.requestPointerLock?.();
+    e.preventDefault();
+  };
+
+  useEffect(() => {
+    if (!isZooming) return;
+    const handleMove = (e: MouseEvent) => {
+      const cur = zoomingRef.current;
+      if (!cur) return;
+      const el = containerRef.current;
+      if (!el) return;
+      zoomDxRef.current += e.movementX;
+      const factor = Math.exp(zoomDxRef.current * ZOOM_DRAG_SENSITIVITY);
+      const next = Math.min(
+        MAX_HOUR_HEIGHT,
+        Math.max(MIN_HOUR_HEIGHT, cur.startHourHeight * factor),
+      );
+      setHourHeight(next);
+      // setHourHeight 後 DOM 反映前に scrollTop を当てる必要があるので
+      // requestAnimationFrame で次フレームに補正
+      requestAnimationFrame(() => {
+        const elNow = containerRef.current;
+        if (!elNow) return;
+        const wantedScrollTop = (cur.anchorMin / 60) * next - cur.anchorOffsetInBody;
+        const maxScrollTop = Math.max(0, elNow.scrollHeight - elNow.clientHeight);
+        skipScrollRef.current = true;
+        elNow.scrollTop = Math.max(0, Math.min(maxScrollTop, wantedScrollTop));
+        requestAnimationFrame(() => {
+          skipScrollRef.current = false;
+        });
+      });
+    };
+    const handleUp = () => {
+      document.exitPointerLock?.();
+      zoomDxRef.current = 0;
+      setZooming(null);
+    };
+    window.addEventListener("mousemove", handleMove);
+    window.addEventListener("mouseup", handleUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMove);
+      window.removeEventListener("mouseup", handleUp);
+    };
+  }, [isZooming]);
 
   const handleResizeStart = (
     e: React.MouseEvent,
@@ -569,10 +676,10 @@ export function ScheduleWeekScroller({
         const endMin = s.end
           ? Math.max(startMin + 15, minutesFromMidnight(s.end))
           : startMin + 60;
-        const topPx = (startMin / 60) * HOUR_HEIGHT;
+        const topPx = (startMin / 60) * hourHeight;
         const heightPx = Math.max(
           16,
-          ((endMin - startMin) / 60) * HOUR_HEIGHT,
+          ((endMin - startMin) / 60) * hourHeight,
         );
         items.push({ schedule: s, topPx, heightPx });
       }
@@ -580,7 +687,7 @@ export function ScheduleWeekScroller({
       map.set(iso, items);
     }
     return map;
-  }, [dayList, schedules]);
+  }, [dayList, schedules, hourHeight]);
 
   const daysGridStyle: React.CSSProperties = {
     gridTemplateColumns: `repeat(${dayList.length}, ${dayWidth}px)`,
@@ -667,22 +774,37 @@ export function ScheduleWeekScroller({
 
       {/* 三段目: 時間グリッド */}
       <div className="schedule-week-scroller-body">
-        <div className="schedule-week-scroller-hours">
-          {HOURS.map((h) => (
-            <div
-              key={h}
-              className="schedule-week-hour-label"
-              style={{ height: HOUR_HEIGHT }}
-            >
-              {pad2(h)}:00
-            </div>
-          ))}
+        <div
+          className="schedule-week-scroller-hours"
+          onMouseDown={handleHoursMouseDown}
+        >
+          {HOURS.map((h) => {
+            const subTicks = getSubTickMinutes(hourHeight);
+            return (
+              <div
+                key={h}
+                className="schedule-week-hour-label"
+                style={{ height: hourHeight }}
+              >
+                {pad2(h)}:00
+                {subTicks.map((m) => (
+                  <span
+                    key={m}
+                    className="schedule-week-hour-label-tick"
+                    style={{ top: (m / 60) * hourHeight }}
+                  >
+                    :{pad2(m)}
+                  </span>
+                ))}
+              </div>
+            );
+          })}
           {(() => {
             const min = nowDate.getHours() * 60 + nowDate.getMinutes();
             return (
               <div
                 className="schedule-week-now-time"
-                style={{ top: (min / 60) * HOUR_HEIGHT }}
+                style={{ top: (min / 60) * hourHeight }}
               >
                 {formatHHMM(min)}
               </div>
@@ -704,8 +826,8 @@ export function ScheduleWeekScroller({
             const e = Math.max(selecting.anchorMin, selecting.currentMin);
             const visibleEnd = e === s ? s + DEFAULT_DRAG_DURATION_MIN : e;
             selBox = {
-              top: (s / 60) * HOUR_HEIGHT,
-              height: Math.max(8, ((visibleEnd - s) / 60) * HOUR_HEIGHT),
+              top: (s / 60) * hourHeight,
+              height: Math.max(8, ((visibleEnd - s) / 60) * hourHeight),
               label: `${formatHHMM(s)} – ${formatHHMM(visibleEnd)}`,
             };
           }
@@ -723,7 +845,7 @@ export function ScheduleWeekScroller({
                 <div
                   key={h}
                   className="schedule-week-hour-cell"
-                  style={{ height: HOUR_HEIGHT }}
+                  style={{ height: hourHeight }}
                 />
               ))}
               {events.map(({ schedule, topPx, heightPx }) => {
@@ -734,10 +856,10 @@ export function ScheduleWeekScroller({
                 let bottomLabel = (schedule.end || "").slice(11, 16);
                 if (isResizingThis && resizing) {
                   const { startMin, endMin } = computeResizedRange(resizing);
-                  displayTop = (startMin / 60) * HOUR_HEIGHT;
+                  displayTop = (startMin / 60) * hourHeight;
                   displayHeight = Math.max(
                     8,
-                    ((endMin - startMin) / 60) * HOUR_HEIGHT,
+                    ((endMin - startMin) / 60) * hourHeight,
                   );
                   topLabel = formatHHMM(startMin);
                   bottomLabel = formatHHMM(endMin);
@@ -862,7 +984,7 @@ export function ScheduleWeekScroller({
         })}
         {(() => {
           const min = nowDate.getHours() * 60 + nowDate.getMinutes();
-          const top = (min / 60) * HOUR_HEIGHT;
+          const top = (min / 60) * hourHeight;
           const todayIso = formatLocalDate(nowDate);
           const todayIdx = dayList.findIndex(
             (d) => formatLocalDate(d) === todayIso,

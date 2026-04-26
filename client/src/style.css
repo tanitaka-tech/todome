@@ -7638,6 +7638,7 @@ body {
   background: var(--bg);
   display: flex;
   flex-direction: column;
+  cursor: zoom-in;
 }
 
 .schedule-week-head,
@@ -7741,12 +7742,24 @@ body {
 }
 
 .schedule-week-hour-label {
+  position: relative;
   font-size: 0.7rem;
   color: var(--fg-muted);
   padding: 2px 4px;
   text-align: right;
   box-sizing: border-box;
   border-bottom: 1px solid var(--border);
+}
+
+.schedule-week-hour-label-tick {
+  position: absolute;
+  right: 4px;
+  font-size: 0.6rem;
+  color: var(--fg-muted);
+  opacity: 0.5;
+  pointer-events: none;
+  transform: translateY(-50%);
+  line-height: 1;
 }
 
 .schedule-week-day-col {
