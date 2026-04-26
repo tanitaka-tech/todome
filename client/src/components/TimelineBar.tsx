@@ -252,11 +252,15 @@ export function TimelineBar({
 
   const onSegEnter = (e: React.MouseEvent<HTMLDivElement>, s: Segment) => {
     const segRect = e.currentTarget.getBoundingClientRect();
-    setHover({
-      seg: s,
-      x: segRect.left + segRect.width / 2,
-      y: segRect.top,
-    });
+    // popup の最大幅 260 → half 130、画面端 8px のマージンを残してクランプ
+    const halfW = 130;
+    const padding = 8;
+    const rawX = segRect.left + segRect.width / 2;
+    const clampedX = Math.max(
+      halfW + padding,
+      Math.min(window.innerWidth - halfW - padding, rawX),
+    );
+    setHover({ seg: s, x: clampedX, y: segRect.top });
   };
   const durationSec = hover
     ? Math.max(0, Math.floor((hover.seg.endMs - hover.seg.startMs) / 1000))
