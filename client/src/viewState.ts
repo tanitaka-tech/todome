@@ -1,7 +1,7 @@
 import type { RetroType } from "./types";
 import type { RetroViewMode } from "./components/RetroPanel";
 
-const BOARD_GOAL_FILTER_KEY = "todome.board.goalFilter";
+const BOARD_GOAL_FILTER_KEY = "todome.board.goalFilters";
 const BOARD_RECENT_DAYS_KEY = "todome.board.recentDays";
 const RETRO_TAB_KEY = "todome.retro.tab";
 const RETRO_VIEW_MODE_KEY = "todome.retro.viewMode";
@@ -17,15 +17,25 @@ const DEFAULT_BOARD_QUOTA_WIDTH = 440;
 const RETRO_TYPES: RetroType[] = ["daily", "weekly", "monthly", "yearly"];
 const VALID_RECENT_DAYS = new Set([0, 1, 3, 7, 30]);
 
-export function loadBoardGoalFilter(): string {
-  if (typeof window === "undefined") return "";
-  return window.localStorage.getItem(BOARD_GOAL_FILTER_KEY) ?? "";
+export function loadBoardGoalFilters(): string[] {
+  if (typeof window === "undefined") return [];
+  const raw = window.localStorage.getItem(BOARD_GOAL_FILTER_KEY);
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed.filter((v): v is string => typeof v === "string");
+    }
+  } catch {
+    /* fall through */
+  }
+  return [];
 }
 
-export function saveBoardGoalFilter(value: string): void {
+export function saveBoardGoalFilters(value: string[]): void {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(BOARD_GOAL_FILTER_KEY, value);
+    window.localStorage.setItem(BOARD_GOAL_FILTER_KEY, JSON.stringify(value));
   } catch {
     /* ignore quota errors */
   }
