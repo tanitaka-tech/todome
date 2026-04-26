@@ -42,13 +42,13 @@ import {
   type Language,
 } from "../i18n/language";
 import {
-  loadBoardGoalFilter,
+  loadBoardGoalFilters,
   loadBoardRecentDays,
   loadDayBoundaryHour,
   loadPopupTaskId,
   loadRetroTab,
   loadRetroViewMode,
-  saveBoardGoalFilter,
+  saveBoardGoalFilters,
   saveBoardRecentDays,
   saveDayBoundaryHour,
   savePopupTaskId,
@@ -241,8 +241,8 @@ export function App() {
   const [retroStreamText, setRetroStreamText] = useState("");
   const [retroWaiting, setRetroWaiting] = useState(false);
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
-  const [boardGoalFilter, setBoardGoalFilterState] = useState<string>(() =>
-    loadBoardGoalFilter(),
+  const [boardGoalFilters, setBoardGoalFiltersState] = useState<string[]>(() =>
+    loadBoardGoalFilters(),
   );
   const [boardRecentDays, setBoardRecentDaysState] = useState<number>(() =>
     loadBoardRecentDays(),
@@ -262,9 +262,9 @@ export function App() {
     loadRetroViewMode(),
   );
 
-  const setBoardGoalFilter = useCallback((value: string) => {
-    setBoardGoalFilterState(value);
-    saveBoardGoalFilter(value);
+  const setBoardGoalFilters = useCallback((value: string[]) => {
+    setBoardGoalFiltersState(value);
+    saveBoardGoalFilters(value);
   }, []);
   const setBoardRecentDays = useCallback((value: number) => {
     setBoardRecentDaysState(value);
@@ -1438,8 +1438,8 @@ export function App() {
             onCardClick={setSelectedTask}
             onTimerToggle={handleTimerToggle}
             onMoveColumn={handleMoveColumn}
-            goalFilter={boardGoalFilter}
-            setGoalFilter={setBoardGoalFilter}
+            goalFilters={boardGoalFilters}
+            setGoalFilters={setBoardGoalFilters}
             recentDays={boardRecentDays}
             setRecentDays={setBoardRecentDays}
             lifeActivities={lifeActivities}

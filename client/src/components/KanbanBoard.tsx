@@ -29,8 +29,8 @@ interface Props {
   onCardClick: (task: KanbanTask) => void;
   onTimerToggle: (taskId: string) => void;
   onMoveColumn: (taskId: string, column: string) => void;
-  goalFilter: string;
-  setGoalFilter: (value: string) => void;
+  goalFilters: string[];
+  setGoalFilters: (value: string[]) => void;
   recentDays: number;
   setRecentDays: (value: number) => void;
   lifeActivities: LifeActivity[];
@@ -68,6 +68,23 @@ function clampBottomHeight(height: number, availableHeight: number): number {
   return Math.max(MIN_BOTTOM_HEIGHT, Math.min(maxBottom, height));
 }
 
+function summarizeGoalFilters(
+  selected: string[],
+  goals: Goal[],
+  t: (key: string) => string,
+): string {
+  if (selected.length === 0) return "";
+  const labelOf = (id: string): string => {
+    if (id === GOAL_FILTER_NONE) return t("filterNoGoal");
+    const g = goals.find((x) => x.id === id);
+    return g ? g.name : "";
+  };
+  const labels = selected.map(labelOf).filter(Boolean);
+  if (labels.length === 0) return "";
+  if (labels.length === 1) return labels[0];
+  return `${labels[0]} +${labels.length - 1}`;
+}
+
 export function KanbanBoard({
   tasks,
   goals,
@@ -76,8 +93,8 @@ export function KanbanBoard({
   onCardClick,
   onTimerToggle,
   onMoveColumn,
-  goalFilter,
-  setGoalFilter,
+  goalFilters,
+  setGoalFilters,
   recentDays,
   setRecentDays,
   lifeActivities,
@@ -109,6 +126,28 @@ export function KanbanBoard({
   const bottomRowRef = useRef<HTMLDivElement>(null);
   const [bottomHeight, setBottomHeight] = useState<number>(loadBoardBottomHeight);
   const [quotaWidth, setQuotaWidth] = useState<number>(loadBoardQuotaWidth);
+  const [openPopover, setOpenPopover] = useState<"goal" | "period" | null>(null);
+  const goalPopoverRef = useRef<HTMLDivElement>(null);
+  const periodPopoverRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!openPopover) return;
+    const onPointerDown = (e: PointerEvent) => {
+      const target = e.target as Node;
+      const ref =
+        openPopover === "goal" ? goalPopoverRef.current : periodPopoverRef.current;
+      if (ref && !ref.contains(target)) setOpenPopover(null);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpenPopover(null);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [openPopover]);
 
   const getAvailableBoardHeight = () => {
     const wrap = wrapRef.current;
@@ -477,8 +516,8 @@ export function KanbanBoard({
   const submitAdd = () => {
     const title = newTitle.trim();
     if (!title || !addingTo) return;
-    const goalId =
-      goalFilter && goalFilter !== GOAL_FILTER_NONE ? goalFilter : "";
+    const realGoals = goalFilters.filter((g) => g !== GOAL_FILTER_NONE);
+    const goalId = realGoals.length === 1 ? realGoals[0] : "";
     send({
       type: "kanban_add",
       title,
@@ -489,6 +528,14 @@ export function KanbanBoard({
     setNewTitle("");
   };
 
+  const toggleGoalFilter = (id: string) => {
+    if (goalFilters.includes(id)) {
+      setGoalFilters(goalFilters.filter((v) => v !== id));
+    } else {
+      setGoalFilters([...goalFilters, id]);
+    }
+  };
+
   const handleDelete = (e: React.MouseEvent, taskId: string) => {
     e.stopPropagation();
     setTasks((prev) => prev.filter((t) => t.id !== taskId));
@@ -496,17 +543,17 @@ export function KanbanBoard({
   };
 
   const visibleTasks = useMemo(() => {
-    if (!goalFilter && recentDays === 0) return tasks;
+    if (goalFilters.length === 0 && recentDays === 0) return tasks;
     const cutoff =
       // eslint-disable-next-line react-hooks/purity
       recentDays > 0 ? Date.now() - recentDays * 24 * 60 * 60 * 1000 : 0;
+    const filterSet = new Set(goalFilters);
+    const includeNone = filterSet.has(GOAL_FILTER_NONE);
     return tasks.filter((t) => {
-      if (goalFilter) {
-        if (goalFilter === GOAL_FILTER_NONE) {
-          if (t.goalId) return false;
-        } else if (t.goalId !== goalFilter) {
-          return false;
-        }
+      if (filterSet.size > 0) {
+        const matchesNone = includeNone && !t.goalId;
+        const matchesGoal = !!t.goalId && filterSet.has(t.goalId);
+        if (!matchesNone && !matchesGoal) return false;
       }
       if (cutoff > 0 && t.column === "done") {
         if (!t.completedAt) return false;
@@ -514,7 +561,7 @@ export function KanbanBoard({
       }
       return true;
     });
-  }, [tasks, goalFilter, recentDays]);
+  }, [tasks, goalFilters, recentDays]);
 
   const hiddenCount = tasks.length - visibleTasks.length;
 
@@ -616,46 +663,114 @@ export function KanbanBoard({
   return (
     <div className="kanban-wrap" ref={wrapRef}>
       <div className="kanban-filter-bar" ref={filterBarRef}>
-        <div className="kanban-filter-group">
-          <span className="kanban-filter-label">{t("filterGoal")}</span>
-          <select
-            className="kanban-filter-select"
-            value={goalFilter}
-            onChange={(e) => setGoalFilter(e.target.value)}
+        <div className="kanban-filter-pill-wrap" ref={goalPopoverRef}>
+          <button
+            className={`kanban-filter-pill ${goalFilters.length > 0 ? "kanban-filter-pill--active" : ""} ${openPopover === "goal" ? "kanban-filter-pill--open" : ""}`}
+            onClick={() =>
+              setOpenPopover((p) => (p === "goal" ? null : "goal"))
+            }
           >
-            <option value="">{t("filterAll")}</option>
-            <option value={GOAL_FILTER_NONE}>{t("filterNoGoal")}</option>
-            {goals.filter((g) => !g.achieved).map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.name}
-              </option>
-            ))}
-          </select>
+            <span className="kanban-filter-pill-caret">▾</span>
+            <span className="kanban-filter-pill-label">{t("filterGoal")}</span>
+            {goalFilters.length > 0 && (
+              <span className="kanban-filter-pill-value">
+                {summarizeGoalFilters(goalFilters, goals, t)}
+              </span>
+            )}
+          </button>
+          {openPopover === "goal" && (
+            <div className="kanban-filter-popover" role="dialog">
+              <div className="kanban-filter-popover-head">
+                {t("filterGoalPopoverHead")}
+              </div>
+              <ul className="kanban-filter-popover-list">
+                <li>
+                  <label className="kanban-filter-popover-item">
+                    <input
+                      type="checkbox"
+                      checked={goalFilters.includes(GOAL_FILTER_NONE)}
+                      onChange={() => toggleGoalFilter(GOAL_FILTER_NONE)}
+                    />
+                    <span className="kanban-filter-popover-item-label">
+                      {t("filterNoGoal")}
+                    </span>
+                  </label>
+                </li>
+                {goals
+                  .filter((g) => !g.achieved)
+                  .map((g) => (
+                    <li key={g.id}>
+                      <label className="kanban-filter-popover-item">
+                        <input
+                          type="checkbox"
+                          checked={goalFilters.includes(g.id)}
+                          onChange={() => toggleGoalFilter(g.id)}
+                        />
+                        <span className="kanban-filter-popover-item-label">
+                          {g.name}
+                        </span>
+                      </label>
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          )}
         </div>
-        <div className="kanban-filter-group">
-          <span className="kanban-filter-label">{t("filterDone")}</span>
-          <div className="kanban-filter-tabs">
-            {RECENT_DAYS_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                className={`kanban-filter-tab ${recentDays === opt.value ? "kanban-filter-tab--active" : ""}`}
-                onClick={() => setRecentDays(opt.value)}
-              >
-                {t(opt.labelKey)}
-              </button>
-            ))}
-          </div>
+
+        <div className="kanban-filter-pill-wrap" ref={periodPopoverRef}>
+          <button
+            className={`kanban-filter-pill ${recentDays > 0 ? "kanban-filter-pill--active" : ""} ${openPopover === "period" ? "kanban-filter-pill--open" : ""}`}
+            onClick={() =>
+              setOpenPopover((p) => (p === "period" ? null : "period"))
+            }
+          >
+            <span className="kanban-filter-pill-caret">▾</span>
+            <span className="kanban-filter-pill-label">{t("filterDone")}</span>
+            <span className="kanban-filter-pill-value">
+              {t(
+                RECENT_DAYS_OPTIONS.find((o) => o.value === recentDays)
+                  ?.labelKey ?? "filterAllPeriod",
+              )}
+            </span>
+          </button>
+          {openPopover === "period" && (
+            <div className="kanban-filter-popover" role="dialog">
+              <div className="kanban-filter-popover-head">
+                {t("filterDonePopoverHead")}
+              </div>
+              <ul className="kanban-filter-popover-list">
+                {RECENT_DAYS_OPTIONS.map((opt) => (
+                  <li key={opt.value}>
+                    <button
+                      type="button"
+                      className={`kanban-filter-popover-radio ${recentDays === opt.value ? "kanban-filter-popover-radio--active" : ""}`}
+                      onClick={() => {
+                        setRecentDays(opt.value);
+                        setOpenPopover(null);
+                      }}
+                    >
+                      <span className="kanban-filter-popover-radio-dot" />
+                      <span className="kanban-filter-popover-item-label">
+                        {t(opt.labelKey)}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
+
         {hiddenCount > 0 && (
           <button
             className="kanban-filter-clear"
             onClick={() => {
-              setGoalFilter("");
+              setGoalFilters([]);
               setRecentDays(0);
+              setOpenPopover(null);
             }}
-            title={t("filterClear")}
           >
-            {t("hiddenCount", { count: hiddenCount })} &times;
+            {t("filterClear")}
           </button>
         )}
       </div>
