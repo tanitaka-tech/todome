@@ -1,12 +1,10 @@
 import { scheduleAutosync } from "../../github/autosync.ts";
-import { DEFAULT_PROFILE, saveProfile } from "../../storage/profile.ts";
-import type { UserProfile } from "../../types.ts";
+import { normalizeProfile, saveProfile } from "../../storage/profile.ts";
 import { broadcast, sendTo } from "../broadcast.ts";
 import type { Handler } from "../dispatch.ts";
 
 export const profileUpdate: Handler = async (ws, session, data) => {
-  const incoming = (data.profile ?? { ...DEFAULT_PROFILE }) as UserProfile;
-  session.profile = incoming;
+  session.profile = normalizeProfile(data.profile);
   saveProfile(session.profile);
   scheduleAutosync();
   broadcast({ type: "profile_sync", profile: session.profile });
