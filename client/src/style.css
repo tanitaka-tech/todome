@@ -8038,6 +8038,8 @@ html[data-theme="sand"] {
   flex-direction: column;
   align-items: stretch;
   gap: 2px;
+  container-type: size;
+  container-name: schedEv;
 }
 
 .schedule-week-event:hover {
@@ -8049,6 +8051,23 @@ html[data-theme="sand"] {
   font-weight: 600;
   font-size: 0.7rem;
   opacity: 0.65;
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 2px;
+  line-height: 1.2;
+}
+
+/* バーの高さがタイトル+1行の時刻すら入らない、または横幅が時刻横並びに足りず縦並びでも高さが入らない時は時刻を非表示にする */
+@container schedEv (max-height: 32px) {
+  .schedule-week-event-time {
+    display: none;
+  }
+}
+
+@container schedEv (max-height: 50px) and (max-width: 95px) {
+  .schedule-week-event-time {
+    display: none;
+  }
 }
 
 .schedule-week-event-title {

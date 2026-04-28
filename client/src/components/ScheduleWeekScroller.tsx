@@ -1053,7 +1053,10 @@ export function ScheduleWeekScroller({
                     <div className="schedule-week-event-title">
                       {schedule.title || "(untitled)"}
                     </div>
-                    <div className="schedule-week-event-time">{`⏲${topLabel}~${bottomLabel}`}</div>
+                    <div className="schedule-week-event-time">
+                      <span>{`⏲${topLabel}`}</span>
+                      <span>{`~${bottomLabel}`}</span>
+                    </div>
                     {canResize && (
                       <div
                         className="schedule-week-event-resize schedule-week-event-resize--bottom"
