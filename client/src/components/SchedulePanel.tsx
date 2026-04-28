@@ -13,6 +13,7 @@ import type {
   CalendarSubscription,
   GoogleCalendarChoice,
   GoogleStatus,
+  KanbanTask,
   Retrospective,
   Schedule,
 } from "../types";
@@ -37,6 +38,7 @@ import { PeriodDropdown } from "./PeriodDropdown";
 interface Props {
   schedules: Schedule[];
   retros: Retrospective[];
+  tasks: KanbanTask[];
   subscriptions: CalendarSubscription[];
   send: (data: unknown) => void;
   onOpenDailyRetro: (date: string) => void;
@@ -105,6 +107,7 @@ function formatWeekRange(weekStart: Date, lang: string): string {
 export function SchedulePanel({
   schedules,
   retros,
+  tasks,
   subscriptions,
   send,
   onOpenDailyRetro,
@@ -439,6 +442,7 @@ export function SchedulePanel({
                   anchor={d}
                   schedules={visibleSchedules}
                   dailyRetros={dailyRetros}
+                  tasks={tasks}
                   subscriptions={subscriptions}
                   colorContext={colorContext}
                   calendarWeekStart={calendarWeekStart}
@@ -456,6 +460,7 @@ export function SchedulePanel({
             anchor={anchor}
             schedules={visibleSchedules}
             dailyRetros={dailyRetros}
+            tasks={tasks}
             subscriptions={subscriptions}
             colorContext={colorContext}
             calendarWeekStart={calendarWeekStart}

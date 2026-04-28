@@ -2,17 +2,20 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import type {
   CalendarSubscription,
+  KanbanTask,
   Retrospective,
   Schedule,
   ScheduleColorContext,
 } from "../types";
 import { scheduleColor, sortSchedulesByStart } from "../types";
 import { getHolidayName, isDayOff } from "../holiday";
+import { RetroHoverPopup } from "./RetroHoverPopup";
 
 interface Props {
   anchor: Date;
   schedules: Schedule[];
   dailyRetros: Retrospective[];
+  tasks: KanbanTask[];
   subscriptions: CalendarSubscription[];
   colorContext: ScheduleColorContext;
   calendarWeekStart: 0 | 1;
@@ -60,6 +63,7 @@ export function ScheduleMonthView({
   anchor,
   schedules,
   dailyRetros,
+  tasks,
   subscriptions,
   colorContext,
   calendarWeekStart,
@@ -174,7 +178,6 @@ export function ScheduleMonthView({
                     key={retro.id}
                     type="button"
                     className={`schedule-month-retro${retro.completedAt ? "" : " is-draft"}`}
-                    title={retro.document.next || retro.document.learned || retro.document.did || retro.aiComment}
                     onClick={(e) => {
                       e.stopPropagation();
                       onOpenDailyRetro(cell.iso);
@@ -194,6 +197,7 @@ export function ScheduleMonthView({
                         retro.document.did ||
                         t("retroDailyFallback")}
                     </span>
+                    <RetroHoverPopup retro={retro} tasks={tasks} />
                   </button>
                 ))}
                 {retros.length === 0 && (

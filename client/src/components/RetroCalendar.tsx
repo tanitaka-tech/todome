@@ -2,11 +2,10 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type {
   KanbanTask,
-  RetroDocument,
   RetroType,
   Retrospective,
 } from "../types";
-import { isTaskCompletedInPeriod } from "../types";
+import { RetroHoverPopup } from "./RetroHoverPopup";
 
 interface Props {
   retros: Retrospective[];
@@ -30,11 +29,6 @@ const TYPE_LABEL_KEYS: Record<RetroType, string> = {
   yearly: "typeShortYearly",
 };
 
-function formatDateTime(iso: string): string {
-  if (!iso) return "";
-  return iso.replace("T", " ").slice(0, 16);
-}
-
 export function RetroCalendar({ retros, tasks, type, onOpenRetro }: Props) {
   const { t, i18n } = useTranslation("retro");
   const [cursor, setCursor] = useState<Date>(() => {
@@ -49,16 +43,6 @@ export function RetroCalendar({ retros, tasks, type, onOpenRetro }: Props) {
     () => [0, 1, 2, 3, 4, 5, 6].map((i) => t(`weekday${i}`)),
     [t],
   );
-
-  const formatDailyMeta = (doc: RetroDocument): string => {
-    const parts: string[] = [];
-    if (doc.dayRating > 0)
-      parts.push(t("dailyMetaRating", { value: doc.dayRating }));
-    if (doc.wakeUpTime)
-      parts.push(t("dailyMetaWakeUp", { time: doc.wakeUpTime }));
-    if (doc.bedtime) parts.push(t("dailyMetaBedtime", { time: doc.bedtime }));
-    return parts.join(" · ");
-  };
 
   const days = useMemo(() => {
     const firstOfMonth = new Date(year, month, 1);
@@ -158,85 +142,7 @@ export function RetroCalendar({ retros, tasks, type, onOpenRetro }: Props) {
               <span className="retro-calendar-cell-day">{d.dayNum}</span>
               {hasRetro && <span className="retro-calendar-cell-dot" />}
               {hasRetro && (
-                <div className="retro-calendar-popup" role="tooltip">
-                  <div className="retro-calendar-popup-head">
-                    <span className="retro-calendar-popup-badge">
-                      {t(TYPE_LABEL_KEYS[d.retro!.type])}
-                    </span>
-                    <span className="retro-calendar-popup-period">
-                      {d.retro!.periodStart === d.retro!.periodEnd
-                        ? d.retro!.periodStart
-                        : `${d.retro!.periodStart} 〜 ${d.retro!.periodEnd}`}
-                    </span>
-                  </div>
-                  {d.retro!.type === "daily" &&
-                    formatDailyMeta(d.retro!.document) && (
-                      <div className="retro-calendar-popup-daily">
-                        {formatDailyMeta(d.retro!.document)}
-                      </div>
-                    )}
-                  {d.retro!.document.learned && (
-                    <div className="retro-calendar-popup-learned">
-                      <div className="retro-calendar-popup-learned-title">
-                        {t("learnedTitle")}
-                      </div>
-                      <div className="retro-calendar-popup-learned-body">
-                        {d.retro!.document.learned}
-                      </div>
-                    </div>
-                  )}
-                  {(() => {
-                    const doneTasks = tasks.filter((t) =>
-                      isTaskCompletedInPeriod(
-                        t,
-                        d.retro!.periodStart,
-                        d.retro!.periodEnd,
-                      ),
-                    );
-                    return (
-                      <div className="retro-calendar-popup-tasks">
-                        <div className="retro-calendar-popup-tasks-title">
-                          ✅ {t("doneTasksTitle", { count: doneTasks.length })}
-                        </div>
-                        {doneTasks.length === 0 ? (
-                          <div className="retro-calendar-popup-tasks-empty">
-                            {t("doneTasksEmpty")}
-                          </div>
-                        ) : (
-                          <ul className="retro-calendar-popup-tasks-list">
-                            {doneTasks.map((t) => (
-                              <li
-                                key={t.id}
-                                className="retro-calendar-popup-tasks-item"
-                              >
-                                {t.title}
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                    );
-                  })()}
-                  {d.retro!.aiComment && (
-                    <div className="retro-calendar-popup-ai">
-                      <div className="retro-calendar-popup-ai-title">
-                        {t("aiCommentTitle")}
-                      </div>
-                      <div className="retro-calendar-popup-ai-body">
-                        {d.retro!.aiComment}
-                      </div>
-                    </div>
-                  )}
-                  <div className="retro-calendar-popup-meta">
-                    {d.retro!.completedAt
-                      ? t("historyCompleted", {
-                          date: formatDateTime(d.retro!.completedAt),
-                        })
-                      : t("calendarDraftMeta", {
-                          date: formatDateTime(d.retro!.updatedAt),
-                        })}
-                  </div>
-                </div>
+                <RetroHoverPopup retro={d.retro!} tasks={tasks} />
               )}
             </button>
           );

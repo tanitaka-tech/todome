@@ -9,12 +9,14 @@ import {
 import { useTranslation } from "react-i18next";
 import type {
   CalendarSubscription,
+  KanbanTask,
   Retrospective,
   Schedule,
   ScheduleColorContext,
 } from "../types";
 import { scheduleColor } from "../types";
 import { getHolidayName, isDayOff } from "../holiday";
+import { RetroHoverPopup } from "./RetroHoverPopup";
 
 interface SelectingState {
   dayIso: string;
@@ -54,6 +56,7 @@ interface Props {
   anchor: Date;
   schedules: Schedule[];
   dailyRetros: Retrospective[];
+  tasks: KanbanTask[];
   subscriptions: CalendarSubscription[];
   colorContext: ScheduleColorContext;
   calendarWeekStart: 0 | 1;
@@ -163,6 +166,7 @@ export function ScheduleWeekScroller({
   anchor,
   schedules,
   dailyRetros,
+  tasks,
   subscriptions,
   colorContext,
   calendarWeekStart,
@@ -780,7 +784,6 @@ export function ScheduleWeekScroller({
                     key={retro.id}
                     type="button"
                     className={`schedule-week-retro${retro.completedAt ? "" : " is-draft"}`}
-                    title={retro.document.next || retro.document.learned || retro.document.did || retro.aiComment}
                     onClick={(e) => {
                       e.stopPropagation();
                       onOpenDailyRetro(iso);
@@ -800,6 +803,7 @@ export function ScheduleWeekScroller({
                         retro.document.did ||
                         t("retroDailyFallback")}
                     </span>
+                    <RetroHoverPopup retro={retro} tasks={tasks} />
                   </button>
                 ))}
                 {items.map((s) => (

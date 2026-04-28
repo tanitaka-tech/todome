@@ -5795,6 +5795,52 @@ body {
   visibility: visible;
   pointer-events: auto;
 }
+
+/* portal で document.body に出すバージョン (RetroHoverPopup 経由)。
+   祖先の overflow:hidden で切られないよう position: fixed + JS座標で配置。 */
+.retro-calendar-popup--floating {
+  position: fixed;
+  bottom: auto;
+  margin: 0;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: none;
+  transform: translate(-50%, -100%);
+  /* 中身に合わせて伸縮。viewport をはみ出さないよう max-width で制限。 */
+  width: max-content;
+  min-width: 220px;
+  max-width: min(420px, calc(100vw - 16px));
+  /* max-height は JS から動的に渡す (viewport 残スペースに合わせる) */
+  overflow-y: auto;
+}
+.retro-calendar-popup--floating::before {
+  height: 8px;
+  top: 100%;
+}
+.retro-calendar-popup--floating::after {
+  top: 100%;
+  border-top-color: var(--border-strong, var(--border));
+  border-bottom-color: transparent;
+}
+
+.retro-calendar-popup--floating.retro-calendar-popup--below {
+  transform: translate(-50%, 0);
+}
+.retro-calendar-popup--floating.retro-calendar-popup--below::before {
+  top: auto;
+  bottom: 100%;
+}
+.retro-calendar-popup--floating.retro-calendar-popup--below::after {
+  top: auto;
+  bottom: 100%;
+  border-top-color: transparent;
+  border-bottom-color: var(--border-strong, var(--border));
+}
+
+.retro-calendar-popup--floating.retro-calendar-popup--draft .retro-calendar-popup-badge {
+  background: var(--accent, #4c8cf5);
+  color: var(--accent-on, #fff);
+}
 .retro-calendar-popup-head {
   display: flex;
   align-items: center;
@@ -7496,6 +7542,7 @@ body {
 
 .schedule-month-retro {
   appearance: none;
+  position: relative;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -7814,6 +7861,7 @@ body {
 
 .schedule-week-retro {
   appearance: none;
+  position: relative;
   display: flex;
   align-items: center;
   gap: 4px;
