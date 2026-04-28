@@ -160,6 +160,45 @@ interface PositionedEvent {
   schedule: Schedule;
   topPx: number;
   heightPx: number;
+  startMin: number;
+  endMin: number;
+  leftPct: number;
+  widthPct: number;
+}
+
+// 開始時刻順に並んだイベント列に対し、時間が重なるものを 1 グループにまとめ、
+// 各イベントを最も左で空いている列に割り当てる。グループ全体の列数で等幅に分割する。
+function assignOverlapColumns(items: PositionedEvent[]): void {
+  let groupStart = 0;
+  let groupMaxEnd = -Infinity;
+  const flush = (from: number, to: number) => {
+    if (from >= to) return;
+    const colEnds: number[] = [];
+    const colIdx: number[] = [];
+    for (let i = from; i < to; i++) {
+      const it = items[i];
+      let c = 0;
+      while (c < colEnds.length && colEnds[c] > it.startMin) c++;
+      if (c === colEnds.length) colEnds.push(it.endMin);
+      else colEnds[c] = it.endMin;
+      colIdx.push(c);
+    }
+    const total = colEnds.length;
+    for (let i = from; i < to; i++) {
+      items[i].leftPct = colIdx[i - from] / total;
+      items[i].widthPct = 1 / total;
+    }
+  };
+  for (let i = 0; i < items.length; i++) {
+    if (items[i].startMin >= groupMaxEnd) {
+      flush(groupStart, i);
+      groupStart = i;
+      groupMaxEnd = items[i].endMin;
+    } else {
+      groupMaxEnd = Math.max(groupMaxEnd, items[i].endMin);
+    }
+  }
+  flush(groupStart, items.length);
 }
 
 export function ScheduleWeekScroller({
@@ -705,9 +744,20 @@ export function ScheduleWeekScroller({
           16,
           ((endMin - startMin) / 60) * hourHeight,
         );
-        items.push({ schedule: s, topPx, heightPx });
+        items.push({
+          schedule: s,
+          topPx,
+          heightPx,
+          startMin,
+          endMin,
+          leftPct: 0,
+          widthPct: 1,
+        });
       }
-      items.sort((a, b) => a.topPx - b.topPx);
+      items.sort((a, b) =>
+        a.startMin - b.startMin || b.endMin - a.endMin,
+      );
+      assignOverlapColumns(items);
       map.set(iso, items);
     }
     return map;
@@ -916,21 +966,21 @@ export function ScheduleWeekScroller({
                   style={{ height: hourHeight }}
                 />
               ))}
-              {events.map(({ schedule, topPx, heightPx }) => {
+              {events.map(({ schedule, topPx, heightPx, startMin, endMin, leftPct, widthPct }) => {
                 const isResizingThis = resizing?.scheduleId === schedule.id;
                 let displayTop = topPx;
                 let displayHeight = heightPx;
-                let topLabel = (schedule.start || "").slice(11, 16);
-                let bottomLabel = (schedule.end || "").slice(11, 16);
+                let topLabel = formatHHMM(startMin);
+                let bottomLabel = formatHHMM(endMin);
                 if (isResizingThis && resizing) {
-                  const { startMin, endMin } = computeResizedRange(resizing);
-                  displayTop = (startMin / 60) * hourHeight;
+                  const range = computeResizedRange(resizing);
+                  displayTop = (range.startMin / 60) * hourHeight;
                   displayHeight = Math.max(
                     8,
-                    ((endMin - startMin) / 60) * hourHeight,
+                    ((range.endMin - range.startMin) / 60) * hourHeight,
                   );
-                  topLabel = formatHHMM(startMin);
-                  bottomLabel = formatHHMM(endMin);
+                  topLabel = formatHHMM(range.startMin);
+                  bottomLabel = formatHHMM(range.endMin);
                 }
                 const isVirtualActive = schedule.id.startsWith("virtual-active-");
                 const canResize = schedule.source === "manual" && !isVirtualActive;
@@ -942,6 +992,8 @@ export function ScheduleWeekScroller({
                     style={{
                       top: displayTop,
                       height: displayHeight,
+                      left: `calc(${leftPct * 100}% + 2px)`,
+                      width: `calc(${widthPct * 100}% - 4px)`,
                       backgroundColor: scheduleColor(schedule, subscriptions, colorContext),
                     }}
                     title={schedule.title}
@@ -996,7 +1048,7 @@ export function ScheduleWeekScroller({
                     <div className="schedule-week-event-title">
                       {schedule.title || "(untitled)"}
                     </div>
-                    <div className="schedule-week-event-time">{topLabel}</div>
+                    <div className="schedule-week-event-time">{`⏲${topLabel}~${bottomLabel}`}</div>
                     {canResize && (
                       <div
                         className="schedule-week-event-resize schedule-week-event-resize--bottom"
