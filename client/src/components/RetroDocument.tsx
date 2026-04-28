@@ -109,12 +109,15 @@ function EditableMarkdownSection({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
+            const isImeComposing =
+              e.nativeEvent.isComposing || e.keyCode === 229;
             if (e.key === "Escape") {
               e.preventDefault();
               cancel();
             } else if (
               (e.metaKey || e.ctrlKey) &&
-              e.key === "Enter"
+              e.key === "Enter" &&
+              !isImeComposing
             ) {
               e.preventDefault();
               save();

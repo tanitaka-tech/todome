@@ -181,7 +181,11 @@ export function App() {
   const [waiting, setWaiting] = useState(false);
   const [selectedTask, setSelectedTask] = useState<KanbanTask | null>(null);
   const [activeView, setActiveView] = useState<ActiveView>("overview");
+  const [retroReturnView, setRetroReturnView] = useState<ActiveView | null>(
+    null,
+  );
   const navigateTo = useCallback((view: ActiveView) => {
+    setRetroReturnView(null);
     startTransition(() => setActiveView(view));
   }, []);
   const [popupTaskId, setPopupTaskIdState] = useState<string | null>(() =>
@@ -1039,12 +1043,38 @@ export function App() {
   const handleRetroCloseSession = useCallback(() => {
     setActiveRetro(null);
     setRetroStreamText("");
-  }, []);
+    if (retroReturnView) {
+      setRetroReturnView(null);
+      startTransition(() => setActiveView(retroReturnView));
+    }
+  }, [retroReturnView]);
 
   const handleRetroOpen = useCallback((retro: Retrospective) => {
     setActiveRetro(retro);
     setRetroStreamText("");
   }, []);
+
+  const handleScheduleDailyRetroOpen = useCallback(
+    (date: string) => {
+      const dailyRetros = retros
+        .filter((retro) => retro.type === "daily" && retro.periodStart === date)
+        .sort((a, b) => {
+          if (!a.completedAt && b.completedAt) return -1;
+          if (a.completedAt && !b.completedAt) return 1;
+          return b.updatedAt.localeCompare(a.updatedAt);
+        });
+      setRetroTab("daily");
+      setRetroReturnView("schedule");
+      startTransition(() => setActiveView("retro"));
+      const existing = dailyRetros[0];
+      if (existing) {
+        handleRetroOpen(existing);
+      } else {
+        handleRetroStart("daily", date);
+      }
+    },
+    [handleRetroOpen, handleRetroStart, retros, setRetroTab],
+  );
 
   const handleRetroDiscardDraft = useCallback(
     (draftId: string) => {
@@ -1542,8 +1572,10 @@ export function App() {
         ) : activeView === "schedule" ? (
           <SchedulePanel
             schedules={displaySchedules}
+            retros={retros}
             subscriptions={subscriptions}
             send={send}
+            onOpenDailyRetro={handleScheduleDailyRetroOpen}
             dayBoundaryHour={dayBoundaryHour}
             calendarWeekStart={calendarWeekStart}
             caldavStatus={caldavStatus}

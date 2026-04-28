@@ -13,6 +13,7 @@ import type {
   CalendarSubscription,
   GoogleCalendarChoice,
   GoogleStatus,
+  Retrospective,
   Schedule,
 } from "../types";
 import { nowLocalIso } from "../types";
@@ -35,8 +36,10 @@ import { PeriodDropdown } from "./PeriodDropdown";
 
 interface Props {
   schedules: Schedule[];
+  retros: Retrospective[];
   subscriptions: CalendarSubscription[];
   send: (data: unknown) => void;
+  onOpenDailyRetro: (date: string) => void;
   dayBoundaryHour: number;
   calendarWeekStart: 0 | 1;
   caldavStatus: CalDAVStatus | null;
@@ -101,8 +104,10 @@ function formatWeekRange(weekStart: Date, lang: string): string {
 
 export function SchedulePanel({
   schedules,
+  retros,
   subscriptions,
   send,
+  onOpenDailyRetro,
   dayBoundaryHour: _dayBoundaryHour,
   calendarWeekStart,
   caldavStatus,
@@ -156,6 +161,11 @@ export function SchedulePanel({
       return enabledSubs.has(s.subscriptionId);
     });
   }, [schedules, subscriptions]);
+
+  const dailyRetros = useMemo(
+    () => retros.filter((retro) => retro.type === "daily"),
+    [retros],
+  );
 
   const goToday = useCallback(() => {
     setAnchor(new Date());
@@ -428,11 +438,13 @@ export function SchedulePanel({
                 <ScheduleMonthView
                   anchor={d}
                   schedules={visibleSchedules}
+                  dailyRetros={dailyRetros}
                   subscriptions={subscriptions}
                   colorContext={colorContext}
                   calendarWeekStart={calendarWeekStart}
                   onEventClick={handleEventClick}
                   onSlotClick={handleSlotClick}
+                  onOpenDailyRetro={onOpenDailyRetro}
                 />
               </div>
             ))}
@@ -443,6 +455,7 @@ export function SchedulePanel({
             ref={scrollerRef}
             anchor={anchor}
             schedules={visibleSchedules}
+            dailyRetros={dailyRetros}
             subscriptions={subscriptions}
             colorContext={colorContext}
             calendarWeekStart={calendarWeekStart}
@@ -450,6 +463,7 @@ export function SchedulePanel({
             onEventClick={handleEventClick}
             onSlotClick={handleSlotClick}
             onScheduleResize={handleScheduleResize}
+            onOpenDailyRetro={onOpenDailyRetro}
           />
         )}
       </div>

@@ -9,6 +9,7 @@ import {
 import { useTranslation } from "react-i18next";
 import type {
   CalendarSubscription,
+  Retrospective,
   Schedule,
   ScheduleColorContext,
 } from "../types";
@@ -52,12 +53,14 @@ export interface ScheduleWeekScrollerHandle {
 interface Props {
   anchor: Date;
   schedules: Schedule[];
+  dailyRetros: Retrospective[];
   subscriptions: CalendarSubscription[];
   colorContext: ScheduleColorContext;
   calendarWeekStart: 0 | 1;
   onAnchorChange: (d: Date) => void;
   onEventClick: (schedule: Schedule) => void;
   onSlotClick: (start: string, end: string, allDay: boolean) => void;
+  onOpenDailyRetro: (date: string) => void;
   onScheduleResize: (
     schedule: Schedule,
     newStart: string,
@@ -159,12 +162,14 @@ interface PositionedEvent {
 export function ScheduleWeekScroller({
   anchor,
   schedules,
+  dailyRetros,
   subscriptions,
   colorContext,
   calendarWeekStart,
   onAnchorChange,
   onEventClick,
   onSlotClick,
+  onOpenDailyRetro,
   onScheduleResize,
   ref,
 }: Props) {
@@ -647,6 +652,18 @@ export function ScheduleWeekScroller({
     return map;
   }, [dayList, schedules]);
 
+  const retrosByDay = useMemo(() => {
+    const map = new Map<string, Retrospective[]>();
+    for (const day of dayList) {
+      const iso = formatLocalDate(day);
+      map.set(
+        iso,
+        dailyRetros.filter((retro) => retro.periodStart === iso),
+      );
+    }
+    return map;
+  }, [dayList, dailyRetros]);
+
   const timedByDay = useMemo(() => {
     const map = new Map<string, PositionedEvent[]>();
     for (const day of dayList) {
@@ -692,6 +709,7 @@ export function ScheduleWeekScroller({
             const isToday = iso === todayIso;
             const off = isDayOff(d);
             const holidayName = getHolidayName(d);
+            const retros = retrosByDay.get(iso) ?? [];
             return (
               <div
                 key={`head-${iso}`}
@@ -707,6 +725,30 @@ export function ScheduleWeekScroller({
                     {holidayName}
                   </div>
                 )}
+                <button
+                  type="button"
+                  className={`schedule-week-retro-indicator${retros.length > 0 ? "" : " is-add"}`}
+                  title={
+                    retros.length > 0
+                      ? retros
+                          .map(
+                            (retro) =>
+                              retro.document.next ||
+                              retro.document.learned ||
+                              retro.document.did ||
+                              t("retroDailyFallback"),
+                          )
+                          .join("\n")
+                      : t("addDailyRetro")
+                  }
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenDailyRetro(iso);
+                  }}
+                >
+                  {retros.length > 0 ? t("retroDailyMark") : "+"}
+                  {retros.length > 1 ? retros.length : ""}
+                </button>
               </div>
             );
           })}
@@ -725,6 +767,7 @@ export function ScheduleWeekScroller({
           {dayList.map((d) => {
             const iso = formatLocalDate(d);
             const items = allDayByDay.get(iso) ?? [];
+            const retros = retrosByDay.get(iso) ?? [];
             const off = isDayOff(d);
             return (
               <div
@@ -735,6 +778,33 @@ export function ScheduleWeekScroller({
                   onSlotClick(`${iso}T00:00:00`, `${iso}T00:00:00`, true);
                 }}
               >
+                {retros.map((retro) => (
+                  <button
+                    key={retro.id}
+                    type="button"
+                    className={`schedule-week-retro${retro.completedAt ? "" : " is-draft"}`}
+                    title={retro.document.next || retro.document.learned || retro.document.did || retro.aiComment}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenDailyRetro(iso);
+                    }}
+                  >
+                    <span className="schedule-week-retro-mark">
+                      {t("retroDailyMark")}
+                    </span>
+                    {!retro.completedAt && (
+                      <span className="schedule-week-retro-draft">
+                        {t("retroDraft")}
+                      </span>
+                    )}
+                    <span className="schedule-week-retro-title">
+                      {retro.document.next ||
+                        retro.document.learned ||
+                        retro.document.did ||
+                        t("retroDailyFallback")}
+                    </span>
+                  </button>
+                ))}
                 {items.map((s) => (
                   <button
                     key={`${s.id}-${iso}`}

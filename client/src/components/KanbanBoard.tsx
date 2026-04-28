@@ -893,7 +893,7 @@ export function KanbanBoard({
                     value={newTitle}
                     onChange={(e) => setNewTitle(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.nativeEvent.isComposing) return;
+                      if (e.nativeEvent.isComposing || e.keyCode === 229) return;
                       if (e.key === "Enter") submitAdd();
                       if (e.key === "Escape") setAddingTo(null);
                     }}

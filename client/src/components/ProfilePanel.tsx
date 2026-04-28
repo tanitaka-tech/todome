@@ -640,7 +640,9 @@ export function ProfilePanel({ profile, setProfile, send }: Props) {
                           commitEditorName();
                         }}
                         onKeyDown={(e) => {
-                          if (e.key === "Enter") {
+                          const isImeComposing =
+                            e.nativeEvent.isComposing || e.keyCode === 229;
+                          if (e.key === "Enter" && !isImeComposing) {
                             e.preventDefault();
                             commitEditorName();
                           } else if (e.key === "Escape") {
@@ -680,6 +682,7 @@ export function ProfilePanel({ profile, setProfile, send }: Props) {
                   value={newCatName}
                   onChange={(e) => setNewCatName(e.target.value)}
                   onKeyDown={(e) => {
+                    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
                     if (e.key === "Enter") addCategory(newCatName);
                   }}
                 />

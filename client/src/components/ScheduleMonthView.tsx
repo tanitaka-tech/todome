@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import type {
   CalendarSubscription,
+  Retrospective,
   Schedule,
   ScheduleColorContext,
 } from "../types";
@@ -11,11 +12,13 @@ import { getHolidayName, isDayOff } from "../holiday";
 interface Props {
   anchor: Date;
   schedules: Schedule[];
+  dailyRetros: Retrospective[];
   subscriptions: CalendarSubscription[];
   colorContext: ScheduleColorContext;
   calendarWeekStart: 0 | 1;
   onEventClick: (schedule: Schedule) => void;
   onSlotClick: (start: string, end: string, allDay: boolean) => void;
+  onOpenDailyRetro: (date: string) => void;
 }
 
 interface DayCell {
@@ -56,11 +59,13 @@ function buildMonthGrid(anchor: Date, weekStart: 0 | 1): DayCell[] {
 export function ScheduleMonthView({
   anchor,
   schedules,
+  dailyRetros,
   subscriptions,
   colorContext,
   calendarWeekStart,
   onEventClick,
   onSlotClick,
+  onOpenDailyRetro,
 }: Props) {
   const { t } = useTranslation("schedule");
 
@@ -75,6 +80,16 @@ export function ScheduleMonthView({
   );
   const sorted = useMemo(() => sortSchedulesByStart(schedules), [schedules]);
   const todayIso = formatLocalDate(new Date());
+
+  const retrosByDate = useMemo(() => {
+    const map = new Map<string, Retrospective[]>();
+    for (const retro of dailyRetros) {
+      const arr = map.get(retro.periodStart) ?? [];
+      arr.push(retro);
+      map.set(retro.periodStart, arr);
+    }
+    return map;
+  }, [dailyRetros]);
 
   const eventsByDate = useMemo(() => {
     const map = new Map<string, Schedule[]>();
@@ -108,6 +123,7 @@ export function ScheduleMonthView({
       <div className="schedule-month-grid">
         {cells.map((cell) => {
           const events = eventsByDate.get(cell.iso) ?? [];
+          const retros = retrosByDate.get(cell.iso) ?? [];
           const isToday = cell.iso === todayIso;
           const off = isDayOff(cell.date);
           const holidayName = getHolidayName(cell.date);
@@ -133,11 +149,66 @@ export function ScheduleMonthView({
                     {holidayName}
                   </span>
                 )}
-                <span className="schedule-month-day-num">
+                <button
+                  type="button"
+                  className="schedule-month-day-num schedule-month-day-retro-button"
+                  title={
+                    retros.length > 0
+                      ? t("openDailyRetro")
+                      : t("addDailyRetro")
+                  }
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenDailyRetro(cell.iso);
+                  }}
+                >
                   {cell.date.getDate()}
-                </span>
+                </button>
               </div>
-              <div className="schedule-month-events">
+              <div
+                className="schedule-month-events"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {retros.map((retro) => (
+                  <button
+                    key={retro.id}
+                    type="button"
+                    className={`schedule-month-retro${retro.completedAt ? "" : " is-draft"}`}
+                    title={retro.document.next || retro.document.learned || retro.document.did || retro.aiComment}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenDailyRetro(cell.iso);
+                    }}
+                  >
+                    <span className="schedule-month-retro-mark">
+                      {t("retroDailyMark")}
+                    </span>
+                    {!retro.completedAt && (
+                      <span className="schedule-month-retro-draft">
+                        {t("retroDraft")}
+                      </span>
+                    )}
+                    <span className="schedule-month-retro-title">
+                      {retro.document.next ||
+                        retro.document.learned ||
+                        retro.document.did ||
+                        t("retroDailyFallback")}
+                    </span>
+                  </button>
+                ))}
+                {retros.length === 0 && (
+                  <button
+                    type="button"
+                    className="schedule-month-retro-add"
+                    title={t("addDailyRetro")}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenDailyRetro(cell.iso);
+                    }}
+                  >
+                    {t("addDailyRetroShort")}
+                  </button>
+                )}
                 {events.slice(0, 4).map((s) => {
                   const color = scheduleColor(s, subscriptions, colorContext);
                   const time = s.allDay
