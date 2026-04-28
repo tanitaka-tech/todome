@@ -15,6 +15,7 @@ export const en_schedule: Record<string, string> = {
   openDailyRetro: "Open retrospective for this day",
   addDailyRetro: "Add retrospective for this day",
   addDailyRetroShort: "+R",
+  addDailyRetroLong: "+ Add retrospective",
   editEvent: "Edit event",
   createEvent: "Create event",
   viewEvent: "Event details",

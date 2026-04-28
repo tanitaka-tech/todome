@@ -176,6 +176,7 @@ export function ScheduleWeekScroller({
   const { t } = useTranslation("schedule");
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const headRef = useRef<HTMLDivElement>(null);
   const dayColMapRef = useRef<Map<string, HTMLDivElement>>(new Map());
   const onAnchorChangeRef = useRef(onAnchorChange);
   const onScheduleResizeRef = useRef(onScheduleResize);
@@ -202,6 +203,10 @@ export function ScheduleWeekScroller({
   });
 
   const [dayWidth, setDayWidth] = useState<number>(MIN_DAY_WIDTH);
+  // ヘッダ行の実高。allday 行の sticky top をヘッダの直下に揃えるため、
+  // ResizeObserver で追従する。祝日名の有無で高さが変わるので静的指定では
+  // overlap or gap が出る。
+  const [headHeight, setHeadHeight] = useState<number>(49);
   const [dayList, setDayList] = useState<Date[]>(() =>
     buildInitialDayList(anchor, calendarWeekStart),
   );
@@ -261,6 +266,20 @@ export function ScheduleWeekScroller({
       if (w <= 0) return;
       const next = Math.max(MIN_DAY_WIDTH, (w - GUTTER_WIDTH) / 7);
       setDayWidth((prev) => (Math.abs(prev - next) > 0.5 ? next : prev));
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  useLayoutEffect(() => {
+    const el = headRef.current;
+    if (!el) return;
+    const update = () => {
+      const h = el.offsetHeight;
+      if (h <= 0) return;
+      setHeadHeight((prev) => (Math.abs(prev - h) > 0.5 ? h : prev));
     };
     update();
     const ro = new ResizeObserver(update);
@@ -701,7 +720,7 @@ export function ScheduleWeekScroller({
       onScroll={handleScroll}
     >
       {/* 一段目: ヘッダ (曜日 + 日付) */}
-      <div className="schedule-week-scroller-head">
+      <div className="schedule-week-scroller-head" ref={headRef}>
         <div className="schedule-week-scroller-corner" />
         <div className="schedule-week-scroller-day-heads" style={daysGridStyle}>
           {dayList.map((d) => {
@@ -709,7 +728,6 @@ export function ScheduleWeekScroller({
             const isToday = iso === todayIso;
             const off = isDayOff(d);
             const holidayName = getHolidayName(d);
-            const retros = retrosByDay.get(iso) ?? [];
             return (
               <div
                 key={`head-${iso}`}
@@ -725,30 +743,6 @@ export function ScheduleWeekScroller({
                     {holidayName}
                   </div>
                 )}
-                <button
-                  type="button"
-                  className={`schedule-week-retro-indicator${retros.length > 0 ? "" : " is-add"}`}
-                  title={
-                    retros.length > 0
-                      ? retros
-                          .map(
-                            (retro) =>
-                              retro.document.next ||
-                              retro.document.learned ||
-                              retro.document.did ||
-                              t("retroDailyFallback"),
-                          )
-                          .join("\n")
-                      : t("addDailyRetro")
-                  }
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onOpenDailyRetro(iso);
-                  }}
-                >
-                  {retros.length > 0 ? t("retroDailyMark") : "+"}
-                  {retros.length > 1 ? retros.length : ""}
-                </button>
               </div>
             );
           })}
@@ -756,7 +750,10 @@ export function ScheduleWeekScroller({
       </div>
 
       {/* 二段目: allDay 行 */}
-      <div className="schedule-week-scroller-allday">
+      <div
+        className="schedule-week-scroller-allday"
+        style={{ top: headHeight }}
+      >
         <div className="schedule-week-scroller-allday-gutter">
           {t("allDay")}
         </div>
@@ -820,6 +817,19 @@ export function ScheduleWeekScroller({
                     {s.title || "(untitled)"}
                   </button>
                 ))}
+                {retros.length === 0 && (
+                  <button
+                    type="button"
+                    className="schedule-week-retro-add"
+                    title={t("addDailyRetro")}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenDailyRetro(iso);
+                    }}
+                  >
+                    {t("addDailyRetroLong")}
+                  </button>
+                )}
               </div>
             );
           })}

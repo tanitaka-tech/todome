@@ -15,6 +15,7 @@ export const ja_schedule: Record<string, string> = {
   openDailyRetro: "この日の振り返りを開く",
   addDailyRetro: "この日の振り返りを追加",
   addDailyRetroShort: "+振",
+  addDailyRetroLong: "+ 振り返りを作成",
   // Editor
   editEvent: "イベントを編集",
   createEvent: "イベントを作成",

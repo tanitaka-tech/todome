@@ -7624,7 +7624,7 @@ body {
 
 .schedule-week-scroller-allday {
   position: sticky;
-  top: 49px; /* head の高さ */
+  /* top はヘッダ実高に合わせて JS から指定 (祝日名表示で高さが変動するため) */
   z-index: 5;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
@@ -7715,7 +7715,8 @@ body {
 }
 
 .schedule-week-scroller-hours {
-  z-index: 5;
+  /* allday 行 (z:5) より下にして、縦スクロール時に時刻ラベルが allday に隠れるようにする */
+  z-index: 4;
   background: var(--bg);
   display: flex;
   flex-direction: column;
@@ -7767,31 +7768,6 @@ body {
   color: var(--accent-fg, #fff);
   border-radius: 999px;
   padding: 1px 10px;
-}
-
-.schedule-week-retro-indicator {
-  appearance: none;
-  position: absolute;
-  right: 4px;
-  bottom: 4px;
-  min-width: 17px;
-  height: 17px;
-  padding: 0 4px;
-  border: 1px solid color-mix(in srgb, var(--accent) 60%, var(--surface));
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--accent) 18%, var(--surface));
-  color: var(--accent);
-  font-size: 0.65rem;
-  font-weight: 800;
-  line-height: 15px;
-  box-sizing: border-box;
-  cursor: pointer;
-}
-
-.schedule-week-retro-indicator.is-add {
-  border-style: dashed;
-  color: var(--fg-muted);
-  background: transparent;
 }
 
 .schedule-week-day-head.is-off { background: var(--day-off-bg); }
@@ -7856,8 +7832,35 @@ body {
   cursor: pointer;
 }
 
+.schedule-week-retro:hover {
+  background: color-mix(in srgb, var(--accent) 22%, var(--surface));
+  border-color: var(--accent);
+}
+
 .schedule-week-retro.is-draft {
   border-style: dashed;
+}
+
+.schedule-week-retro-add {
+  appearance: none;
+  width: calc(100% - 8px);
+  margin: 2px 4px;
+  padding: 2px 6px;
+  border: 1px dashed color-mix(in srgb, var(--accent) 50%, var(--border));
+  border-radius: 4px;
+  background: transparent;
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: left;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+
+.schedule-week-retro-add:hover {
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  border-style: solid;
 }
 
 .schedule-week-retro-mark,
