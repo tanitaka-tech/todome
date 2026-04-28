@@ -1573,6 +1573,7 @@ export function App() {
           <SchedulePanel
             schedules={displaySchedules}
             retros={retros}
+            tasks={tasks}
             subscriptions={subscriptions}
             send={send}
             onOpenDailyRetro={handleScheduleDailyRetroOpen}
