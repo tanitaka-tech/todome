@@ -18,6 +18,7 @@ import type {
 import { scheduleColor } from "../types";
 import { getHolidayName, isDayOff } from "../holiday";
 import { RetroHoverPopup } from "./RetroHoverPopup";
+import { ScheduleEventHoverPopup } from "./ScheduleEventHoverPopup";
 
 interface SelectingState {
   dayIso: string;
@@ -865,13 +866,16 @@ export function ScheduleWeekScroller({
                       type="button"
                       className="schedule-week-allday-event"
                       style={{ "--event-color": c } as CSSProperties}
-                      title={s.title}
                       onClick={(e) => {
                         e.stopPropagation();
                         onEventClick(s);
                       }}
                     >
                       {s.title || "(untitled)"}
+                      <ScheduleEventHoverPopup
+                        schedule={s}
+                        subscriptions={subscriptions}
+                      />
                     </button>
                   );
                 })}
@@ -1001,7 +1005,6 @@ export function ScheduleWeekScroller({
                       width: `calc(${widthPct * 100}% - 4px)`,
                       "--event-color": eventColor,
                     } as CSSProperties}
-                    title={schedule.title}
                     onMouseDown={(e) => e.stopPropagation()}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -1092,6 +1095,12 @@ export function ScheduleWeekScroller({
                               : prev,
                           );
                         }}
+                      />
+                    )}
+                    {!isVirtualActive && (
+                      <ScheduleEventHoverPopup
+                        schedule={schedule}
+                        subscriptions={subscriptions}
                       />
                     )}
                   </button>

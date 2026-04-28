@@ -10,6 +10,7 @@ import type {
 import { scheduleColor, sortSchedulesByStart } from "../types";
 import { getHolidayName, isDayOff } from "../holiday";
 import { RetroHoverPopup } from "./RetroHoverPopup";
+import { ScheduleEventHoverPopup } from "./ScheduleEventHoverPopup";
 
 interface Props {
   anchor: Date;
@@ -226,7 +227,6 @@ export function ScheduleMonthView({
                       type="button"
                       className={`schedule-month-event${s.allDay ? " is-allday" : ""}${startsThisCell ? "" : " is-cont"}${isVirtualActive ? " is-active-virtual" : ""}`}
                       style={{ "--event-color": color } as CSSProperties}
-                      title={s.title}
                       onClick={(e) => {
                         e.stopPropagation();
                         if (isVirtualActive) return;
@@ -235,6 +235,9 @@ export function ScheduleMonthView({
                     >
                       {time && <span className="schedule-month-event-time">{time}</span>}
                       <span className="schedule-month-event-title">{s.title || "(untitled)"}</span>
+                      {!isVirtualActive && (
+                        <ScheduleEventHoverPopup schedule={s} subscriptions={subscriptions} />
+                      )}
                     </button>
                   );
                 })}
