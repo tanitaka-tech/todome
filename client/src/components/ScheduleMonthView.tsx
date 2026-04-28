@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import type {
   CalendarSubscription,
@@ -225,7 +225,7 @@ export function ScheduleMonthView({
                       key={`${s.id}-${cell.iso}`}
                       type="button"
                       className={`schedule-month-event${s.allDay ? " is-allday" : ""}${startsThisCell ? "" : " is-cont"}${isVirtualActive ? " is-active-virtual" : ""}`}
-                      style={{ backgroundColor: color }}
+                      style={{ "--event-color": color } as CSSProperties}
                       title={s.title}
                       onClick={(e) => {
                         e.stopPropagation();

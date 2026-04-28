@@ -7515,14 +7515,42 @@ body {
   margin-top: 2px;
 }
 
+/* イベントバーは Apple Calendar 風に "色相連動" の3要素 (淡い背景・濃い同色テキスト・濃い縦アクセント) で構成する。
+   各要素の明度はテーマ明暗で切替えるため CSS 変数化している。 */
+html[data-theme="dark"],
+html[data-theme="midnight"],
+html[data-theme="forest"],
+html[data-theme="sunset"],
+html[data-theme="ocean"],
+html[data-theme="slate"] {
+  --event-bg-l: 30%;
+  --event-bg-c-mul: 0.55;
+  --event-text-l: 84%;
+  --event-accent-l: 65%;
+}
+
+html[data-theme="beige"],
+html[data-theme="paper"],
+html[data-theme="mint"],
+html[data-theme="rose"],
+html[data-theme="sky"],
+html[data-theme="sand"] {
+  --event-bg-l: 92%;
+  --event-bg-c-mul: 0.45;
+  --event-text-l: 36%;
+  --event-accent-l: 52%;
+}
+
 .schedule-month-event {
   appearance: none;
   border: none;
+  border-left: 3px solid oklch(from var(--event-color, var(--accent)) var(--event-accent-l) c h);
   text-align: left;
   padding: 1px 6px;
   border-radius: 3px;
   font-size: 0.78rem;
-  color: #fff;
+  background-color: oklch(from var(--event-color, var(--accent)) var(--event-bg-l) calc(c * var(--event-bg-c-mul)) h);
+  color: oklch(from var(--event-color, var(--accent)) var(--event-text-l) c h);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -7611,6 +7639,7 @@ body {
 .schedule-month-event-time {
   font-weight: 600;
   flex-shrink: 0;
+  opacity: 0.65;
 }
 
 .schedule-month-event-title {
@@ -7848,11 +7877,13 @@ body {
 .schedule-week-allday-event {
   appearance: none;
   border: none;
+  border-left: 3px solid oklch(from var(--event-color, var(--accent)) var(--event-accent-l) c h);
   text-align: left;
   padding: 1px 6px;
   border-radius: 3px;
   font-size: 0.75rem;
-  color: #fff;
+  background-color: oklch(from var(--event-color, var(--accent)) var(--event-bg-l) calc(c * var(--event-bg-c-mul)) h);
+  color: oklch(from var(--event-color, var(--accent)) var(--event-text-l) c h);
   cursor: pointer;
   white-space: nowrap;
   overflow: hidden;
@@ -7993,9 +8024,11 @@ body {
   position: absolute;
   appearance: none;
   border: none;
+  border-left: 3px solid oklch(from var(--event-color, var(--accent)) var(--event-accent-l) c h);
   border-radius: 4px;
   padding: 2px 6px;
-  color: #fff;
+  background-color: oklch(from var(--event-color, var(--accent)) var(--event-bg-l) calc(c * var(--event-bg-c-mul)) h);
+  color: oklch(from var(--event-color, var(--accent)) var(--event-text-l) c h);
   text-align: left;
   cursor: pointer;
   font-size: 0.75rem;
@@ -8005,23 +8038,17 @@ body {
   flex-direction: column;
   align-items: stretch;
   gap: 2px;
-  /* イベント色とコントラストを稼ぐためのアウトライン */
-  box-shadow:
-    inset 0 0 0 1.5px rgba(0, 0, 0, 0.45),
-    inset 0 0 0 3px rgba(255, 255, 255, 0.35);
 }
 
 .schedule-week-event:hover {
-  box-shadow:
-    inset 0 0 0 1.5px rgba(0, 0, 0, 0.55),
-    inset 0 0 0 3px rgba(255, 255, 255, 0.5);
+  background-color: oklch(from var(--event-color, var(--accent)) calc(var(--event-bg-l) + 5%) calc(c * var(--event-bg-c-mul)) h);
 }
 
 .schedule-week-event-time {
   flex: 0 0 auto;
   font-weight: 600;
   font-size: 0.7rem;
-  opacity: 0.9;
+  opacity: 0.65;
 }
 
 .schedule-week-event-title {
@@ -8034,10 +8061,7 @@ body {
 
 .schedule-week-event.is-resizing {
   z-index: 3;
-  box-shadow:
-    0 0 0 2px var(--accent),
-    inset 0 0 0 1.5px rgba(0, 0, 0, 0.45),
-    inset 0 0 0 3px rgba(255, 255, 255, 0.35);
+  box-shadow: 0 0 0 2px var(--accent);
 }
 
 .timeline-h-seg.is-faint {

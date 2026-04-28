@@ -5,6 +5,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
 } from "react";
 import { useTranslation } from "react-i18next";
 import type {
@@ -856,21 +857,24 @@ export function ScheduleWeekScroller({
                     <RetroHoverPopup retro={retro} tasks={tasks} />
                   </button>
                 ))}
-                {items.map((s) => (
-                  <button
-                    key={`${s.id}-${iso}`}
-                    type="button"
-                    className="schedule-week-allday-event"
-                    style={{ backgroundColor: scheduleColor(s, subscriptions, colorContext) }}
-                    title={s.title}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEventClick(s);
-                    }}
-                  >
-                    {s.title || "(untitled)"}
-                  </button>
-                ))}
+                {items.map((s) => {
+                  const c = scheduleColor(s, subscriptions, colorContext);
+                  return (
+                    <button
+                      key={`${s.id}-${iso}`}
+                      type="button"
+                      className="schedule-week-allday-event"
+                      style={{ "--event-color": c } as CSSProperties}
+                      title={s.title}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEventClick(s);
+                      }}
+                    >
+                      {s.title || "(untitled)"}
+                    </button>
+                  );
+                })}
                 {retros.length === 0 && (
                   <button
                     type="button"
@@ -984,6 +988,7 @@ export function ScheduleWeekScroller({
                 }
                 const isVirtualActive = schedule.id.startsWith("virtual-active-");
                 const canResize = schedule.source === "manual" && !isVirtualActive;
+                const eventColor = scheduleColor(schedule, subscriptions, colorContext);
                 return (
                   <button
                     key={schedule.id}
@@ -994,8 +999,8 @@ export function ScheduleWeekScroller({
                       height: displayHeight,
                       left: `calc(${leftPct * 100}% + 2px)`,
                       width: `calc(${widthPct * 100}% - 4px)`,
-                      backgroundColor: scheduleColor(schedule, subscriptions, colorContext),
-                    }}
+                      "--event-color": eventColor,
+                    } as CSSProperties}
                     title={schedule.title}
                     onMouseDown={(e) => e.stopPropagation()}
                     onClick={(e) => {
