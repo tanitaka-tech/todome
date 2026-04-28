@@ -354,7 +354,11 @@ export function ChatPanel({
             onCompositionStart={() => { composing.current = true; }}
             onCompositionEnd={() => { composing.current = false; }}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey && !composing.current) {
+              const isImeComposing =
+                composing.current ||
+                e.nativeEvent.isComposing ||
+                e.keyCode === 229;
+              if (e.key === "Enter" && !e.shiftKey && !isImeComposing) {
                 e.preventDefault();
                 handleSend();
               }

@@ -9,6 +9,13 @@ export const ja_schedule: Record<string, string> = {
   next: "次へ",
   noEvents: "イベントなし",
   allDay: "終日",
+  retroDailyMark: "振",
+  retroDailyFallback: "日次振り返り",
+  retroDraft: "下書き",
+  openDailyRetro: "この日の振り返りを開く",
+  addDailyRetro: "この日の振り返りを追加",
+  addDailyRetroShort: "+振",
+  addDailyRetroLong: "+ 振り返りを作成",
   // Editor
   editEvent: "イベントを編集",
   createEvent: "イベントを作成",
