@@ -187,10 +187,14 @@ export function RetroSession({
                   composing.current = false;
                 }}
                 onKeyDown={(e) => {
+                  const isImeComposing =
+                    composing.current ||
+                    e.nativeEvent.isComposing ||
+                    e.keyCode === 229;
                   if (
                     e.key === "Enter" &&
                     (e.metaKey || e.ctrlKey) &&
-                    !composing.current
+                    !isImeComposing
                   ) {
                     e.preventDefault();
                     if (!waiting && !isCompleted) onComplete();
@@ -199,7 +203,7 @@ export function RetroSession({
                   if (
                     e.key === "Enter" &&
                     !e.shiftKey &&
-                    !composing.current
+                    !isImeComposing
                   ) {
                     e.preventDefault();
                     handleSend();

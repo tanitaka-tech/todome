@@ -5795,6 +5795,52 @@ body {
   visibility: visible;
   pointer-events: auto;
 }
+
+/* portal で document.body に出すバージョン (RetroHoverPopup 経由)。
+   祖先の overflow:hidden で切られないよう position: fixed + JS座標で配置。 */
+.retro-calendar-popup--floating {
+  position: fixed;
+  bottom: auto;
+  margin: 0;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: none;
+  transform: translate(-50%, -100%);
+  /* 中身に合わせて伸縮。viewport をはみ出さないよう max-width で制限。 */
+  width: max-content;
+  min-width: 220px;
+  max-width: min(420px, calc(100vw - 16px));
+  /* max-height は JS から動的に渡す (viewport 残スペースに合わせる) */
+  overflow-y: auto;
+}
+.retro-calendar-popup--floating::before {
+  height: 8px;
+  top: 100%;
+}
+.retro-calendar-popup--floating::after {
+  top: 100%;
+  border-top-color: var(--border-strong, var(--border));
+  border-bottom-color: transparent;
+}
+
+.retro-calendar-popup--floating.retro-calendar-popup--below {
+  transform: translate(-50%, 0);
+}
+.retro-calendar-popup--floating.retro-calendar-popup--below::before {
+  top: auto;
+  bottom: 100%;
+}
+.retro-calendar-popup--floating.retro-calendar-popup--below::after {
+  top: auto;
+  bottom: 100%;
+  border-top-color: transparent;
+  border-bottom-color: var(--border-strong, var(--border));
+}
+
+.retro-calendar-popup--floating.retro-calendar-popup--draft .retro-calendar-popup-badge {
+  background: var(--accent, #4c8cf5);
+  color: var(--accent-on, #fff);
+}
 .retro-calendar-popup-head {
   display: flex;
   align-items: center;
@@ -5898,6 +5944,80 @@ body {
   overscroll-behavior: contain;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* ===== Schedule event hover popup ===== */
+/* portal で document.body に出る floating popup。位置決めは JS から top/left/maxHeight を渡す。 */
+.schedule-event-popup {
+  position: fixed;
+  width: max-content;
+  min-width: 220px;
+  max-width: min(360px, calc(100vw - 16px));
+  padding: 10px 12px;
+  border: 1px solid var(--border-strong, var(--border));
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  text-align: left;
+  z-index: 20;
+  pointer-events: none;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* 上向き (バーの上に出す) */
+.schedule-event-popup--above {
+  transform: translate(-50%, -100%);
+}
+/* 下向き (バーの下に出す) */
+.schedule-event-popup--below {
+  transform: translate(-50%, 0);
+}
+
+.schedule-event-popup-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--fg);
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.schedule-event-popup-time {
+  font-size: 12px;
+  color: var(--fg-muted);
+  font-family: var(--font-mono);
+}
+
+.schedule-event-popup-location {
+  font-size: 12px;
+  color: var(--fg);
+  word-break: break-word;
+}
+
+.schedule-event-popup-desc {
+  font-size: 12px;
+  color: var(--fg);
+  line-height: 1.5;
+  max-height: 160px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding-top: 4px;
+  border-top: 1px dashed var(--border);
+}
+
+.schedule-event-popup-source {
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-hover, rgba(255, 255, 255, 0.04));
+  color: var(--fg-muted);
+  font-size: 10px;
+  font-weight: 600;
 }
 
 /* ===== Retrospective session (2-pane) ===== */
@@ -7429,7 +7549,6 @@ body {
   align-items: center;
   gap: 4px;
   font-size: 0.85rem;
-  pointer-events: none;
 }
 
 .schedule-month-holiday-name {
@@ -7443,7 +7562,24 @@ body {
 }
 
 .schedule-month-day-num {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-family: var(--font-body);
   font-weight: 500;
+  line-height: 1.25;
+  cursor: pointer;
+}
+
+.schedule-month-day-num:hover {
+  background: var(--surface-hover);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+.schedule-month-cell.is-today .schedule-month-day-num:hover {
+  background: var(--accent-hover, var(--accent));
 }
 
 .schedule-month-events {
@@ -7451,18 +7587,44 @@ body {
   flex-direction: column;
   gap: 2px;
   margin-top: 2px;
-  pointer-events: none;
+}
+
+/* イベントバーは Apple Calendar 風に "色相連動" の3要素 (淡い背景・濃い同色テキスト・濃い縦アクセント) で構成する。
+   各要素の明度はテーマ明暗で切替えるため CSS 変数化している。 */
+html[data-theme="dark"],
+html[data-theme="midnight"],
+html[data-theme="forest"],
+html[data-theme="sunset"],
+html[data-theme="ocean"],
+html[data-theme="slate"] {
+  --event-bg-l: 30%;
+  --event-bg-c-mul: 0.55;
+  --event-text-l: 84%;
+  --event-accent-l: 65%;
+}
+
+html[data-theme="beige"],
+html[data-theme="paper"],
+html[data-theme="mint"],
+html[data-theme="rose"],
+html[data-theme="sky"],
+html[data-theme="sand"] {
+  --event-bg-l: 92%;
+  --event-bg-c-mul: 0.45;
+  --event-text-l: 36%;
+  --event-accent-l: 52%;
 }
 
 .schedule-month-event {
-  pointer-events: auto;
   appearance: none;
   border: none;
+  border-left: 3px solid oklch(from var(--event-color, var(--accent)) var(--event-accent-l) c h);
   text-align: left;
   padding: 1px 6px;
   border-radius: 3px;
   font-size: 0.78rem;
-  color: #fff;
+  background-color: oklch(from var(--event-color, var(--accent)) var(--event-bg-l) calc(c * var(--event-bg-c-mul)) h);
+  color: oklch(from var(--event-color, var(--accent)) var(--event-text-l) c h);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -7480,9 +7642,78 @@ body {
   opacity: 0.75;
 }
 
+.schedule-month-retro {
+  appearance: none;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  min-height: 20px;
+  padding: 2px 6px;
+  border: 1px solid color-mix(in srgb, var(--accent) 56%, var(--border));
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent) 13%, var(--surface));
+  color: var(--fg);
+  font-size: 0.72rem;
+  line-height: 1.25;
+  box-sizing: border-box;
+  text-align: left;
+  cursor: pointer;
+}
+
+.schedule-month-retro:hover {
+  background: color-mix(in srgb, var(--accent) 22%, var(--surface));
+  border-color: var(--accent);
+}
+
+.schedule-month-retro.is-draft {
+  border-style: dashed;
+}
+
+.schedule-month-retro-mark,
+.schedule-month-retro-draft {
+  flex: 0 0 auto;
+  color: var(--accent);
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.schedule-month-retro-draft {
+  color: var(--fg-muted);
+}
+
+.schedule-month-retro-title {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schedule-month-retro-add {
+  appearance: none;
+  width: 100%;
+  padding: 1px 6px;
+  border: 1px dashed color-mix(in srgb, var(--accent) 50%, var(--border));
+  border-radius: 4px;
+  background: transparent;
+  color: var(--accent);
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: left;
+  cursor: pointer;
+}
+
+.schedule-month-retro-add:hover {
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  border-style: solid;
+}
+
 .schedule-month-event-time {
   font-weight: 600;
   flex-shrink: 0;
+  opacity: 0.65;
 }
 
 .schedule-month-event-title {
@@ -7543,7 +7774,7 @@ body {
 
 .schedule-week-scroller-allday {
   position: sticky;
-  top: 49px; /* head の高さ */
+  /* top はヘッダ実高に合わせて JS から指定 (祝日名表示で高さが変動するため) */
   z-index: 5;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
@@ -7634,10 +7865,12 @@ body {
 }
 
 .schedule-week-scroller-hours {
-  z-index: 5;
+  /* allday 行 (z:5) より下にして、縦スクロール時に時刻ラベルが allday に隠れるようにする */
+  z-index: 4;
   background: var(--bg);
   display: flex;
   flex-direction: column;
+  cursor: zoom-in;
 }
 
 .schedule-week-head,
@@ -7659,6 +7892,7 @@ body {
 }
 
 .schedule-week-day-head {
+  position: relative;
   text-align: center;
   padding: 6px 4px;
   border-right: 1px solid var(--border);
@@ -7717,15 +7951,88 @@ body {
 .schedule-week-allday-event {
   appearance: none;
   border: none;
+  border-left: 3px solid oklch(from var(--event-color, var(--accent)) var(--event-accent-l) c h);
   text-align: left;
   padding: 1px 6px;
   border-radius: 3px;
   font-size: 0.75rem;
-  color: #fff;
+  background-color: oklch(from var(--event-color, var(--accent)) var(--event-bg-l) calc(c * var(--event-bg-c-mul)) h);
+  color: oklch(from var(--event-color, var(--accent)) var(--event-text-l) c h);
   cursor: pointer;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.schedule-week-retro {
+  appearance: none;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: calc(100% - 8px);
+  min-height: 20px;
+  margin: 2px 4px;
+  padding: 2px 6px;
+  border: 1px solid color-mix(in srgb, var(--accent) 56%, var(--border));
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent) 13%, var(--surface));
+  color: var(--fg);
+  font-size: 0.72rem;
+  line-height: 1.25;
+  box-sizing: border-box;
+  text-align: left;
+  cursor: pointer;
+}
+
+.schedule-week-retro:hover {
+  background: color-mix(in srgb, var(--accent) 22%, var(--surface));
+  border-color: var(--accent);
+}
+
+.schedule-week-retro.is-draft {
+  border-style: dashed;
+}
+
+.schedule-week-retro-add {
+  appearance: none;
+  width: calc(100% - 8px);
+  margin: 2px 4px;
+  padding: 2px 6px;
+  border: 1px dashed color-mix(in srgb, var(--accent) 50%, var(--border));
+  border-radius: 4px;
+  background: transparent;
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: left;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+
+.schedule-week-retro-add:hover {
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  border-style: solid;
+}
+
+.schedule-week-retro-mark,
+.schedule-week-retro-draft {
+  flex: 0 0 auto;
+  color: var(--accent);
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.schedule-week-retro-draft {
+  color: var(--fg-muted);
+}
+
+.schedule-week-retro-title {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .schedule-week-grid {
@@ -7741,12 +8048,33 @@ body {
 }
 
 .schedule-week-hour-label {
+  position: relative;
   font-size: 0.7rem;
   color: var(--fg-muted);
   padding: 2px 4px;
   text-align: right;
   box-sizing: border-box;
   border-bottom: 1px solid var(--border);
+}
+
+.schedule-week-hour-label-tick {
+  position: absolute;
+  right: 4px;
+  font-size: 0.6rem;
+  color: var(--fg-muted);
+  opacity: 0.5;
+  pointer-events: none;
+  transform: translateY(-50%);
+  line-height: 1;
+}
+
+/* ズーム中だけ全画面を覆ってカーソルを非表示にする */
+.schedule-zoom-cursor-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  cursor: none;
+  background: transparent;
 }
 
 .schedule-week-day-col {
@@ -7768,55 +8096,65 @@ body {
 
 .schedule-week-event {
   position: absolute;
-  left: 2px;
-  right: 2px;
   appearance: none;
   border: none;
+  border-left: 3px solid oklch(from var(--event-color, var(--accent)) var(--event-accent-l) c h);
   border-radius: 4px;
   padding: 2px 6px;
-  color: #fff;
+  background-color: oklch(from var(--event-color, var(--accent)) var(--event-bg-l) calc(c * var(--event-bg-c-mul)) h);
+  color: oklch(from var(--event-color, var(--accent)) var(--event-text-l) c h);
   text-align: left;
   cursor: pointer;
   font-size: 0.75rem;
+  line-height: 1.2;
   overflow: hidden;
   display: flex;
-  flex-direction: row;
-  align-items: baseline;
-  gap: 6px;
-  /* イベント色とコントラストを稼ぐためのアウトライン */
-  box-shadow:
-    inset 0 0 0 1.5px rgba(0, 0, 0, 0.45),
-    inset 0 0 0 3px rgba(255, 255, 255, 0.35);
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  container-type: size;
+  container-name: schedEv;
 }
 
 .schedule-week-event:hover {
-  box-shadow:
-    inset 0 0 0 1.5px rgba(0, 0, 0, 0.55),
-    inset 0 0 0 3px rgba(255, 255, 255, 0.5);
+  background-color: oklch(from var(--event-color, var(--accent)) calc(var(--event-bg-l) + 5%) calc(c * var(--event-bg-c-mul)) h);
 }
 
 .schedule-week-event-time {
   flex: 0 0 auto;
   font-weight: 600;
   font-size: 0.7rem;
-  opacity: 0.9;
+  opacity: 0.65;
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 2px;
+  line-height: 1.2;
+}
+
+/* バーの高さがタイトル+1行の時刻すら入らない、または横幅が時刻横並びに足りず縦並びでも高さが入らない時は時刻を非表示にする */
+@container schedEv (max-height: 32px) {
+  .schedule-week-event-time {
+    display: none;
+  }
+}
+
+@container schedEv (max-height: 50px) and (max-width: 95px) {
+  .schedule-week-event-time {
+    display: none;
+  }
 }
 
 .schedule-week-event-title {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
   font-weight: 500;
 }
 
 .schedule-week-event.is-resizing {
   z-index: 3;
-  box-shadow:
-    0 0 0 2px var(--accent),
-    inset 0 0 0 1.5px rgba(0, 0, 0, 0.45),
-    inset 0 0 0 3px rgba(255, 255, 255, 0.35);
+  box-shadow: 0 0 0 2px var(--accent);
 }
 
 .timeline-h-seg.is-faint {
