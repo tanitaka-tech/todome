@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { PROJECT_ROOT, PORT } from "./config.ts";
 import { initDb } from "./db.ts";
 import type { WSData } from "./state.ts";
+import { isAllowedOrigin } from "./security/origin.ts";
 import { backfillSchedulesFromTimerLogs } from "./storage/scheduleBackfill.ts";
 import { makeWSData, wsHandlers } from "./ws/endpoint.ts";
 import { registerAllHandlers } from "./ws/handlers/index.ts";
@@ -80,6 +81,12 @@ const server = Bun.serve<WSData, never>({
   fetch(req, srv) {
     const url = new URL(req.url);
     if (url.pathname === "/ws") {
+      const origin = req.headers.get("origin");
+      const host = req.headers.get("host");
+      if (!isAllowedOrigin(origin, host)) {
+        console.warn(`[ws] rejected upgrade from origin=${origin ?? "(none)"} host=${host ?? "(none)"}`);
+        return new Response("forbidden origin", { status: 403 });
+      }
       if (srv.upgrade(req, { data: makeWSData() })) return undefined;
       return new Response("WS upgrade failed", { status: 500 });
     }
