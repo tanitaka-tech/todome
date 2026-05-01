@@ -9,14 +9,11 @@ __pycache__/
 .env.*
 !.env.example
 
-# Local data (DB) and GitHub sync state
-data/todome.db
-data/todome.db-journal
-data/todome.db-wal
-data/todome.db-shm
-data/repo/
-data/github_config.json
-data/google_config.json
+# Local data (DB / 各種 config JSON / GitHub 同期 repo)。
+# 認証情報を含み得るので data/ 配下は原則すべて ignore する。
+# ディレクトリの存在維持には data/.gitkeep を例外的に追跡する。
+data/*
+!data/.gitkeep
 
 # Node / Vite
 node_modules/
@@ -39,3 +36,7 @@ e2e/test-results/
 e2e/playwright-report/
 e2e/playwright/.cache/
 e2e/animation-frames/
+
+# Playwright が project root から起動された場合の出力先
+test-results/
+playwright-report/
