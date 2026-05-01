@@ -93,6 +93,10 @@ cp .env.example .env
 
 iCloud 連携を使う場合は [appleid.apple.com](https://appleid.apple.com) で **App用パスワード** を発行してください。Apple ID の本パスワードは絶対に入力しないでください。
 
+> **⚠️ 過去のコミットに認証情報が混入している場合**
+>
+> `data/` 配下は `.gitignore` で全部除外する想定ですが、過去のリビジョンで `caldav_config.json` などが誤ってコミットされた履歴がある場合は、ファイルを `git rm --cached` で外しただけでは git 履歴に残り続けます。`git filter-repo` または BFG Repo-Cleaner で履歴から削除した上で、**iCloud App用パスワードはローテーション (失効 → 再発行) してください**。
+
 ### 3. 依存関係をインストール
 
 ```bash
