@@ -7278,8 +7278,11 @@ body {
 
 /* ===== View Transitions ===== */
 :root {
-  --vt-duration-exit: 100ms;
-  --vt-duration-enter: 160ms;
+  /* exit と enter のデュレーションは必ずマッチさせる。
+     ずれると old が消えた後も new がフェード中の窓ができ、
+     その間ページ背景が透けて「ちらつき」として知覚される。 */
+  --vt-duration-exit: 120ms;
+  --vt-duration-enter: 120ms;
 }
 
 /* Extract persistent chrome from root snapshot so old-root is background-only */
@@ -8155,6 +8158,16 @@ html[data-theme="sand"] {
 .schedule-week-event.is-resizing {
   z-index: 3;
   box-shadow: 0 0 0 2px var(--accent);
+}
+
+.schedule-week-event.is-cont-start {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+.schedule-week-event.is-cont-end {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
 }
 
 .timeline-h-seg.is-faint {
