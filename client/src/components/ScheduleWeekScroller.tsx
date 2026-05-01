@@ -166,6 +166,8 @@ interface PositionedEvent {
   endMin: number;
   leftPct: number;
   widthPct: number;
+  isContStart: boolean;
+  isContEnd: boolean;
 }
 
 // 開始時刻順に並んだイベント列に対し、時間が重なるものを 1 グループにまとめ、
@@ -736,24 +738,32 @@ export function ScheduleWeekScroller({
       for (const s of schedules) {
         if (s.allDay) continue;
         const startDate = (s.start || "").slice(0, 10);
-        if (startDate !== iso) continue;
-        const startMin = minutesFromMidnight(s.start);
-        const endMin = s.end
-          ? Math.max(startMin + 15, minutesFromMidnight(s.end))
-          : startMin + 60;
-        const topPx = (startMin / 60) * hourHeight;
+        if (!startDate) continue;
+        const endDate = (s.end || s.start).slice(0, 10);
+        if (!(startDate <= iso && iso <= endDate)) continue;
+        const isContStart = iso > startDate;
+        const isContEnd = iso < endDate;
+        const segStartMin = isContStart ? 0 : minutesFromMidnight(s.start);
+        const segEndMin = isContEnd
+          ? 24 * 60
+          : s.end
+            ? Math.max(segStartMin + 15, minutesFromMidnight(s.end))
+            : segStartMin + 60;
+        const topPx = (segStartMin / 60) * hourHeight;
         const heightPx = Math.max(
           16,
-          ((endMin - startMin) / 60) * hourHeight,
+          ((segEndMin - segStartMin) / 60) * hourHeight,
         );
         items.push({
           schedule: s,
           topPx,
           heightPx,
-          startMin,
-          endMin,
+          startMin: segStartMin,
+          endMin: segEndMin,
           leftPct: 0,
           widthPct: 1,
+          isContStart,
+          isContEnd,
         });
       }
       items.sort((a, b) =>
@@ -974,7 +984,7 @@ export function ScheduleWeekScroller({
                   style={{ height: hourHeight }}
                 />
               ))}
-              {events.map(({ schedule, topPx, heightPx, startMin, endMin, leftPct, widthPct }) => {
+              {events.map(({ schedule, topPx, heightPx, startMin, endMin, leftPct, widthPct, isContStart, isContEnd }) => {
                 const isResizingThis = resizing?.scheduleId === schedule.id;
                 let displayTop = topPx;
                 let displayHeight = heightPx;
@@ -991,13 +1001,15 @@ export function ScheduleWeekScroller({
                   bottomLabel = formatHHMM(range.endMin);
                 }
                 const isVirtualActive = schedule.id.startsWith("virtual-active-");
-                const canResize = schedule.source === "manual" && !isVirtualActive;
+                const canResizeBase = schedule.source === "manual" && !isVirtualActive;
+                const canResizeTop = canResizeBase && !isContStart;
+                const canResizeBottom = canResizeBase && !isContEnd;
                 const eventColor = scheduleColor(schedule, subscriptions, colorContext);
                 return (
                   <button
-                    key={schedule.id}
+                    key={`${schedule.id}-${iso}`}
                     type="button"
-                    className={`schedule-week-event${isResizingThis ? " is-resizing" : ""}${isVirtualActive ? " is-active-virtual" : ""}`}
+                    className={`schedule-week-event${isResizingThis ? " is-resizing" : ""}${isVirtualActive ? " is-active-virtual" : ""}${isContStart ? " is-cont-start" : ""}${isContEnd ? " is-cont-end" : ""}`}
                     style={{
                       top: displayTop,
                       height: displayHeight,
@@ -1016,7 +1028,7 @@ export function ScheduleWeekScroller({
                       onEventClick(schedule);
                     }}
                   >
-                    {canResize && (
+                    {canResizeTop && (
                       <div
                         className="schedule-week-event-resize schedule-week-event-resize--top"
                         onMouseDown={(e) =>
@@ -1056,11 +1068,13 @@ export function ScheduleWeekScroller({
                     <div className="schedule-week-event-title">
                       {schedule.title || "(untitled)"}
                     </div>
-                    <div className="schedule-week-event-time">
-                      <span>{`⏲${topLabel}`}</span>
-                      <span>{`~${bottomLabel}`}</span>
-                    </div>
-                    {canResize && (
+                    {(!isContStart || !isContEnd) && (
+                      <div className="schedule-week-event-time">
+                        {!isContStart && <span>{`⏲${topLabel}`}</span>}
+                        {!isContEnd && <span>{`~${bottomLabel}`}</span>}
+                      </div>
+                    )}
+                    {canResizeBottom && (
                       <div
                         className="schedule-week-event-resize schedule-week-event-resize--bottom"
                         onMouseDown={(e) =>
