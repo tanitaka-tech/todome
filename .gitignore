@@ -24,6 +24,9 @@ client/node_modules/
 client/dist/
 client/.vite/
 
+# Bun: bun 1.2+ は bun.lock (text) を使う。古い bun.lockb (binary) を誤って commit しない。
+bun.lockb
+
 # OS
 .DS_Store
 
