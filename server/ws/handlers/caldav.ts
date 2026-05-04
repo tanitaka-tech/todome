@@ -1,6 +1,7 @@
 import { connectAndListCalendars } from "../../caldav/client.ts";
 import {
   clearCalDAVConfig,
+  isCalDAVConnected,
   loadCalDAVConfig,
   saveCalDAVConfig,
 } from "../../storage/caldav.ts";
@@ -72,7 +73,14 @@ export const caldavDisconnect: Handler = async () => {
   broadcastSubscriptionsAndSchedules();
 };
 
-export const caldavSetWriteTarget: Handler = async (_ws, _session, data) => {
+export const caldavSetWriteTarget: Handler = async (ws, _session, data) => {
+  if (!isCalDAVConnected()) {
+    sendTo(ws, {
+      type: "caldav_status",
+      status: buildCalDAVStatus("iCloud に未接続のため書き込み先を設定できません"),
+    });
+    return;
+  }
   const url = String(data.calendarUrl ?? "").trim();
   const name = String(data.calendarName ?? "").trim();
   const color = String(data.calendarColor ?? "").trim();
