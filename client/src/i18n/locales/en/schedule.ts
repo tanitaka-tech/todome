@@ -59,7 +59,7 @@ export const en_schedule: Record<string, string> = {
   needTitle: "Title is required",
   needUrl: "iCal URL is required",
   caldavTitle: "iCloud calendar sync",
-  caldavHelp: "Connect with your Apple ID and an app-specific password (issued at appleid.apple.com) to read iCloud calendars directly. The password is stored in plain text at data/caldav_config.json on the server.",
+  caldavHelp: "Connect with your Apple ID and an app-specific password (issued at appleid.apple.com) to read iCloud calendars directly. The password is stored in plain text on the server — under data/repo/ when GitHub sync is linked, otherwise under data/.",
   caldavAppleId: "Apple ID",
   caldavAppPassword: "App-specific password",
   caldavIssueLink: "Generate an app-specific password (Apple ID account page) ↗",

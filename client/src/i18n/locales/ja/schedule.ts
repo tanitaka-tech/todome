@@ -63,7 +63,7 @@ export const ja_schedule: Record<string, string> = {
   needUrl: "iCal URL を入力してください",
   // CalDAV (iCloud)
   caldavTitle: "iCloud カレンダー連携",
-  caldavHelp: "Apple ID と App用パスワード（appleid.apple.com で発行）で接続すると、iCloud のカレンダーを直接読み込めます。パスワードはサーバーの data/caldav_config.json に平文で保存されます。",
+  caldavHelp: "Apple ID と App用パスワード（appleid.apple.com で発行）で接続すると、iCloud のカレンダーを直接読み込めます。パスワードはサーバーに平文で保存されます（GitHub 連携時はデータ連携リポジトリ data/repo/、未連携時は data/ 直下）。",
   caldavAppleId: "Apple ID",
   caldavAppPassword: "App用パスワード",
   caldavIssueLink: "App用パスワードを発行する (Apple ID 管理ページ) ↗",

@@ -18,7 +18,8 @@ export const REPO_DIR = join(DATA_DIR, "repo");
 export const GITHUB_CONFIG_PATH = join(DATA_DIR, "github_config.json");
 export const AI_CONFIG_PATH = join(DATA_DIR, "ai_config.json");
 export const APP_CONFIG_PATH = join(DATA_DIR, "app_config.json");
-export const CALDAV_CONFIG_PATH = join(DATA_DIR, "caldav_config.json");
+export const CALDAV_CONFIG_FILENAME = "caldav_config.json";
+export const CALDAV_CONFIG_PATH = join(DATA_DIR, CALDAV_CONFIG_FILENAME);
 export const GOOGLE_CONFIG_PATH = join(DATA_DIR, "google_config.json");
 
 export const PORT = Number(process.env.TODOME_BACKEND_PORT ?? 3002);
@@ -54,4 +55,14 @@ export function getDbPath(): string {
   const repoDb = join(REPO_DIR, "todome.db");
   if (cfg.linked && existsSync(repoDb)) return repoDb;
   return DEFAULT_DB;
+}
+
+// 機密 config（CalDAV 等）はメインリポジトリに混入させないため、
+// GitHub 連携リポジトリ (data/repo/) が利用可能ならそちらに置く。
+export function getRepoConfigPath(filename: string): string {
+  const cfg = loadGitHubConfig();
+  if (cfg.linked && existsSync(REPO_DIR)) {
+    return join(REPO_DIR, filename);
+  }
+  return join(DATA_DIR, filename);
 }

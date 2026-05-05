@@ -17,6 +17,9 @@ data/todome.db-shm
 data/repo/
 data/github_config.json
 data/google_config.json
+data/caldav_config.json
+data/ai_config.json
+data/app_config.json
 
 # Node / Vite
 node_modules/
