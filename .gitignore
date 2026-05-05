@@ -9,6 +9,12 @@ __pycache__/
 .env.*
 !.env.example
 
+# Local data (DB / 各種 config JSON / GitHub 同期 repo)。
+# 認証情報を含み得るので data/ 配下は原則すべて ignore する。
+# ディレクトリの存在維持には data/.gitkeep を例外的に追跡する。
+data/*
+!data/.gitkeep
+
 # Local data (DB) and GitHub sync state
 data/todome.db
 data/todome.db-journal
