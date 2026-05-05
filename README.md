@@ -214,6 +214,8 @@ todome/
 └──────────────────┘                   └──────────────────┘
 ```
 
+WebSocket メッセージの全種別は [docs/websocket-protocol.md](docs/websocket-protocol.md) を参照してください。
+
 ## Special Thanks
 
 開発にあたって参考にさせていただいた資料は [docs/special-thanks.md](docs/special-thanks.md) に記載しています。
