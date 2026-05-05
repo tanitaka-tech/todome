@@ -2,8 +2,8 @@ import { Hono } from "hono";
 import { existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { PROJECT_ROOT, PORT } from "./config.ts";
-import { initDb } from "./db.ts";
-import type { WSData } from "./state.ts";
+import { initDb, walCheckpoint } from "./db.ts";
+import { activeSockets, type WSData } from "./state.ts";
 import { backfillSchedulesFromTimerLogs } from "./storage/scheduleBackfill.ts";
 import { makeWSData, wsHandlers } from "./ws/endpoint.ts";
 import { registerAllHandlers } from "./ws/handlers/index.ts";
@@ -99,3 +99,28 @@ const server = Bun.serve<WSData, never>({
 });
 
 console.log(`[todome] listening on http://${server.hostname}:${server.port}`);
+
+// SIGTERM/SIGINT で active WebSocket を 1000(normal) で閉じ、WAL を checkpoint してから終了する。
+// これがないと bun --watch の再起動や docker stop で 1006 で切られ、WAL も temp ファイルに残る。
+let shuttingDown = false;
+function shutdown(signal: string): void {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`[todome] received ${signal}, shutting down...`);
+  for (const ws of activeSockets) {
+    try {
+      ws.close(1000, "server shutdown");
+    } catch (err) {
+      console.error("[shutdown] failed to close ws:", err);
+    }
+  }
+  try {
+    server.stop();
+  } catch (err) {
+    console.error("[shutdown] server.stop failed:", err);
+  }
+  walCheckpoint();
+  process.exit(0);
+}
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
