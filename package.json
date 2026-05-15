@@ -13,7 +13,7 @@
     "check": "bun run typecheck && bun run typecheck:client && bun run lint && bun run test"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.2.119",
+    "@anthropic-ai/claude-agent-sdk": "^0.3.142",
     "hono": "^4.6.0",
     "ical.js": "^2.2.1",
     "tsdav": "^2.1.8"
