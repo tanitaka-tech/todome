@@ -61,7 +61,15 @@ export function loadLifeActivities(): LifeActivity[] {
     saveLifeActivities(defaults);
     return defaults;
   }
-  return rows.map((r) => normalizeLifeActivity(JSON.parse(r.data)));
+  const activities: LifeActivity[] = [];
+  for (const r of rows) {
+    try {
+      activities.push(normalizeLifeActivity(JSON.parse(r.data)));
+    } catch (err) {
+      console.warn("[storage/life] skip malformed activity row:", err);
+    }
+  }
+  return activities;
 }
 
 export function saveLifeActivities(activities: LifeActivity[]): void {

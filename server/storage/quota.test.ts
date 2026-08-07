@@ -38,6 +38,16 @@ function makeTask(partial: Partial<KanbanTask> & Pick<KanbanTask, "id" | "title"
   };
 }
 
+async function withoutConsoleWarn(fn: () => void | Promise<void>): Promise<void> {
+  const warn = console.warn;
+  console.warn = () => {};
+  try {
+    await fn();
+  } finally {
+    console.warn = warn;
+  }
+}
+
 beforeEach(() => {
   resetDbCache();
   const db = getDb();
@@ -145,6 +155,19 @@ describe("saveQuotas / loadQuotas — 永続化ラウンドトリップ", () => 
     const loaded = loadQuotas();
     expect(loaded).toHaveLength(1);
     expect(loaded[0]!.id).toBe("q2");
+  });
+
+  it("破損した保存行はスキップし、正常なノルマは返す", async () => {
+    const quota = makeQuota({ id: "q1", name: "掃除" });
+    saveQuotas([quota]);
+    getDb()
+      .prepare("INSERT INTO quotas (id, sort_order, data) VALUES (?, ?, ?)")
+      .run("broken", 1, "{ invalid json");
+
+    await withoutConsoleWarn(() => {
+      const loaded = loadQuotas();
+      expect(loaded).toEqual([quota]);
+    });
   });
 });
 
