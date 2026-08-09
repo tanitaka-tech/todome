@@ -225,4 +225,97 @@ describe("loadSchedules robustness", () => {
     expect(all).toHaveLength(1);
     expect(all[0]?.id).toBe("m1");
   });
+
+  it("skips non-object JSON rows without dropping valid rows", () => {
+    upsertManualSchedule(makeManual({ id: "m1", title: "Good" }));
+    const db = getDb();
+    db.prepare(
+      "INSERT INTO schedules (id, sort_order, source, subscription_id, external_uid, start_at, end_at, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    ).run(
+      "bad-string",
+      99,
+      "manual",
+      "",
+      "",
+      "2026-04-25T00:00:00",
+      "2026-04-25T01:00:00",
+      JSON.stringify("not-object"),
+    );
+    db.prepare(
+      "INSERT INTO schedules (id, sort_order, source, subscription_id, external_uid, start_at, end_at, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    ).run(
+      "bad-empty",
+      100,
+      "manual",
+      "",
+      "",
+      "2026-04-25T00:00:00",
+      "2026-04-25T01:00:00",
+      JSON.stringify({}),
+    );
+    db.prepare(
+      "INSERT INTO schedules (id, sort_order, source, subscription_id, external_uid, start_at, end_at, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    ).run(
+      "bad-no-range",
+      101,
+      "manual",
+      "",
+      "",
+      "2026-04-25T00:00:00",
+      "2026-04-25T01:00:00",
+      JSON.stringify({ id: "bad-no-range", title: "No range" }),
+    );
+
+    const all = loadSchedules();
+    expect(all).toHaveLength(1);
+    expect(all[0]?.id).toBe("m1");
+  });
+
+  it("normalizes parsed object rows before returning them", () => {
+    const db = getDb();
+    db.prepare(
+      "INSERT INTO schedules (id, sort_order, source, subscription_id, external_uid, start_at, end_at, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    ).run(
+      "dirty",
+      0,
+      "manual",
+      "",
+      "",
+      "2026-04-25T00:00:00",
+      "2026-04-25T01:00:00",
+      JSON.stringify({
+        id: "dirty",
+        title: 42,
+        source: "unknown",
+        start: "2026-04-25T09:00:00",
+        end: "2026-04-25T10:00:00",
+        allDay: "yes",
+        origin: { type: "unknown", id: "x" },
+        extra: "ignored",
+      }),
+    );
+
+    const all = loadSchedules();
+    expect(all).toHaveLength(1);
+    expect(all[0]).toEqual({
+      id: "dirty",
+      source: "manual",
+      subscriptionId: "",
+      externalUid: "",
+      title: "42",
+      description: "",
+      location: "",
+      start: "2026-04-25T09:00:00",
+      end: "2026-04-25T10:00:00",
+      allDay: true,
+      rrule: "",
+      recurrenceId: "",
+      createdAt: "",
+      updatedAt: "",
+      caldavObjectUrl: "",
+      caldavEtag: "",
+      googleEventId: "",
+      googleAccountId: "",
+    });
+  });
 });
