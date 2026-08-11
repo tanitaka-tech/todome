@@ -25,6 +25,10 @@ function errorMessage(err: unknown): string {
   return "internal error";
 }
 
+function isMessageObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
 export const wsHandlers = {
   async open(ws: AppWebSocket) {
     activeSockets.add(ws);
@@ -36,7 +40,16 @@ export const wsHandlers = {
     let data: Record<string, unknown>;
     try {
       const text = typeof raw === "string" ? raw : raw.toString("utf8");
-      data = JSON.parse(text) as Record<string, unknown>;
+      const parsed = JSON.parse(text) as unknown;
+      if (!isMessageObject(parsed)) {
+        sendTo(ws, {
+          type: "error",
+          scope: "parse",
+          message: "受信メッセージは JSON オブジェクトである必要があります",
+        });
+        return;
+      }
+      data = parsed;
     } catch (err) {
       console.error("[ws] malformed JSON:", err);
       sendTo(ws, {
