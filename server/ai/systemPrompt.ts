@@ -78,7 +78,8 @@ Bash は安全のため以下の prefix のみ許可されている。パイプ�
 は拒否されるので、結果を加工したい場合は出力を受け取ってから手元で解釈すること。
 - \`gh issue list\`, \`gh issue view\`, \`gh pr list\`, \`gh pr view\`, \`gh repo view\`
 - \`git status\`, \`git log\`, \`git diff\`
-- (設定で \`gh api\` が有効なときのみ) \`gh api ...\`
+- (設定で \`gh api\` が有効なときのみ) 読み取り専用の \`gh api ...\`
+\`--web\` / \`--browser\` のような外部 UI 起動、\`gh api\` の変更系 method / input / field 指定は拒否される。
 
 ## ノルマ操作 (TodoWrite の特殊エントリ)
 ノルマの設定変更・計測開始/停止を行うには、同じ TodoWrite の todos 配列に特殊エントリを含める。
