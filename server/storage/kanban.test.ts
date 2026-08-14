@@ -130,7 +130,7 @@ describe("loadTasks — kpiId / kpiContributed のデフォルト処理", () => 
     expect(task!.kpiId).toBe("");
   });
 
-  it("kpiContributed が文字列 'true' でも Boolean に正規化される", () => {
+  it("kpiContributed の legacy 文字列 true は true に正規化される", () => {
     const db = getDb();
     db.prepare(
       "INSERT INTO kanban_tasks (id, sort_order, data) VALUES (?, ?, ?)"
@@ -140,6 +140,19 @@ describe("loadTasks — kpiId / kpiContributed のデフォルト処理", () => 
     const task = loaded.find((t) => t.id === "legacy2");
     expect(task).toBeDefined();
     expect(typeof task!.kpiContributed).toBe("boolean");
+    expect(task!.kpiContributed).toBe(true);
+  });
+
+  it("kpiContributed の文字列 false は true 扱いにしない", () => {
+    const db = getDb();
+    db.prepare(
+      "INSERT INTO kanban_tasks (id, sort_order, data) VALUES (?, ?, ?)"
+    ).run("legacy3", 0, JSON.stringify({ id: "legacy3", title: "旧タスク", column: "done", kpiContributed: "false" }));
+
+    const loaded = loadTasks();
+    const task = loaded.find((t) => t.id === "legacy3");
+    expect(task).toBeDefined();
+    expect(task!.kpiContributed).toBe(false);
   });
 });
 
@@ -234,6 +247,70 @@ describe("loadTasks — 壊れた JSON 行をスキップして他を返す", ()
     );
     expect(() => loadTasks()).not.toThrow();
     expect(loadTasks()).toEqual([]);
+  });
+
+  it("JSON としては有効でも task として必須形を満たさない行はスキップし、正常行は正規化する", () => {
+    const db = getDb();
+    db.prepare("INSERT INTO kanban_tasks (id, sort_order, data) VALUES (?, ?, ?)").run(
+      "primitive",
+      0,
+      JSON.stringify("not a task")
+    );
+    db.prepare("INSERT INTO kanban_tasks (id, sort_order, data) VALUES (?, ?, ?)").run(
+      "missing-title",
+      1,
+      JSON.stringify({ id: "missing-title", column: "done" })
+    );
+    db.prepare("INSERT INTO kanban_tasks (id, sort_order, data) VALUES (?, ?, ?)").run(
+      "ok",
+      2,
+      JSON.stringify({
+        id: " ok ",
+        title: "正常",
+        description: 123,
+        column: "blocked",
+        memo: "memo",
+        goalId: "goal-1",
+        kpiId: 999,
+        kpiContributed: "false",
+        estimatedMinutes: "25.9",
+        timeSpent: -30,
+        timerStartedAt: 456,
+        completedAt: "2026-08-14T09:00:00",
+        timeLogs: [
+          { start: "2026-08-14T08:00:00", end: "2026-08-14T08:30:00", duration: "1800.9" },
+          { start: "2026-08-14T09:00:00", duration: 300 },
+          "not-a-log",
+        ],
+        extra: "ignored",
+      })
+    );
+
+    const loaded = loadTasks();
+
+    expect(loaded).toEqual([
+      {
+        id: "ok",
+        title: "正常",
+        description: "",
+        column: "todo",
+        memo: "memo",
+        goalId: "goal-1",
+        kpiId: "",
+        kpiContributed: false,
+        estimatedMinutes: 25,
+        timeSpent: 0,
+        timerStartedAt: "",
+        completedAt: "2026-08-14T09:00:00",
+        timeLogs: [
+          {
+            start: "2026-08-14T08:00:00",
+            end: "2026-08-14T08:30:00",
+            duration: 1800,
+          },
+        ],
+      },
+    ]);
   });
 });
 
