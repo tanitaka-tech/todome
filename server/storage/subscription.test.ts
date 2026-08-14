@@ -28,6 +28,40 @@ afterEach(() => {
 });
 
 describe("normalizeSubscription provider isolation", () => {
+  test("enabled は boolean true だけを有効扱いにする", () => {
+    expect(
+      normalizeSubscription({
+        id: "s0",
+        name: "Default",
+        url: "https://example.com/default.ics",
+      }).enabled,
+    ).toBe(true);
+    expect(
+      normalizeSubscription({
+        id: "s1",
+        name: "False string",
+        url: "https://example.com/false.ics",
+        enabled: "false" as never,
+      }).enabled,
+    ).toBe(false);
+    expect(
+      normalizeSubscription({
+        id: "s2",
+        name: "True string",
+        url: "https://example.com/true.ics",
+        enabled: "true" as never,
+      }).enabled,
+    ).toBe(false);
+    expect(
+      normalizeSubscription({
+        id: "s3",
+        name: "True",
+        url: "https://example.com/true-bool.ics",
+        enabled: true,
+      }).enabled,
+    ).toBe(true);
+  });
+
   test("provider=ics: caldavCalendarId / googleCalendarId default to empty", () => {
     const s = normalizeSubscription({
       id: "s1",
