@@ -1,5 +1,5 @@
 import { getDb } from "../db.ts";
-import type { Retrospective, RetroDocument, RetroType } from "../types.ts";
+import type { Retrospective, RetroDocument, RetroMessage, RetroType } from "../types.ts";
 
 interface Row {
   id: string;
@@ -44,14 +44,43 @@ function migrateRetroDocument(doc: Record<string, unknown>): RetroDocument {
   return migrated as unknown as RetroDocument;
 }
 
-function rowToRetro(row: Row): Retrospective {
+function parseDocument(json: string, rowId: string): Record<string, unknown> | null {
+  try {
+    const raw = JSON.parse(json);
+    if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+      return raw as Record<string, unknown>;
+    }
+  } catch (err) {
+    console.warn(`[storage/retro] skip malformed document for ${rowId}:`, err);
+    return null;
+  }
+  console.warn(`[storage/retro] skip non-object document for ${rowId}`);
+  return null;
+}
+
+function parseMessages(json: string, rowId: string): RetroMessage[] | null {
+  try {
+    const raw = JSON.parse(json);
+    if (Array.isArray(raw)) return raw as RetroMessage[];
+  } catch (err) {
+    console.warn(`[storage/retro] skip malformed messages for ${rowId}:`, err);
+    return null;
+  }
+  console.warn(`[storage/retro] skip non-array messages for ${rowId}`);
+  return null;
+}
+
+function rowToRetro(row: Row): Retrospective | null {
+  const document = parseDocument(row.document, row.id);
+  const messages = parseMessages(row.messages, row.id);
+  if (!document || !messages) return null;
   return {
     id: row.id,
     type: row.type as RetroType,
     periodStart: row.period_start,
     periodEnd: row.period_end,
-    document: migrateRetroDocument(JSON.parse(row.document)),
-    messages: JSON.parse(row.messages),
+    document: migrateRetroDocument(document),
+    messages,
     aiComment: row.ai_comment ?? "",
     completedAt: row.completed_at ?? "",
     createdAt: row.created_at,
@@ -63,7 +92,12 @@ export function loadRetros(): Retrospective[] {
   const rows = getDb()
     .prepare("SELECT * FROM retrospectives ORDER BY created_at DESC")
     .all() as Row[];
-  return rows.map(rowToRetro);
+  const retros: Retrospective[] = [];
+  for (const row of rows) {
+    const retro = rowToRetro(row);
+    if (retro) retros.push(retro);
+  }
+  return retros;
 }
 
 export function getRetro(retroId: string): Retrospective | null {
@@ -74,14 +108,18 @@ export function getRetro(retroId: string): Retrospective | null {
 }
 
 export function getRetroDraft(retroType: RetroType): Retrospective | null {
-  const row = getDb()
+  const rows = getDb()
     .prepare(
       "SELECT * FROM retrospectives " +
         "WHERE type = ? AND (completed_at = '' OR completed_at IS NULL) " +
-        "ORDER BY updated_at DESC LIMIT 1"
+        "ORDER BY updated_at DESC"
     )
-    .get(retroType) as Row | undefined;
-  return row ? rowToRetro(row) : null;
+    .all(retroType) as Row[];
+  for (const row of rows) {
+    const retro = rowToRetro(row);
+    if (retro) return retro;
+  }
+  return null;
 }
 
 export function saveRetro(retro: Retrospective): void {
