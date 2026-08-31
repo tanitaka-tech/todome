@@ -168,6 +168,21 @@ cd client && npm test && cd ..        # クライアント単体テスト (vites
 
 `.github/workflows/ci.yml` も同じコマンドを叩いているので、push 前にローカルで `bun run check` を通しておくと CI 待ちが減ります。
 
+### client の TypeScript バージョン構成
+
+client は `tsc` に TypeScript 7、`typescript` パッケージに TypeScript 6 を割り当てている。
+TS7 は programmatic API を持たず、typescript-eslint が TS6 API を必要とするため
+([typescript-eslint#10940](https://github.com/typescript-eslint/typescript-eslint/issues/10940))、
+TypeScript 公式が案内する side-by-side 構成を採っている。
+
+| 用途 | 解決先 |
+|---|---|
+| `npx tsc -b` (型チェック / `npm run build`) | `@typescript/native` = `typescript@7` |
+| `npm run lint` (typescript-eslint) | `typescript` = `@typescript/typescript6@6` |
+
+typescript-eslint が TS >=7.1 に対応したら、alias を外して `"typescript": "^7"` に戻せる。
+server (`/package.json`) は `typescript` を import するツールを持たないため素の TypeScript 7 を使う。
+
 ## 技術スタック
 
 | レイヤー | 技術 |

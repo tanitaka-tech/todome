@@ -5,7 +5,7 @@ TrelloライクなKanbanボードでタスク管理しつつ、Claude Agent SDK 
 ## 技術スタック
 
 - **Backend**: Bun 1.3+ / Hono 4.12 / WebSocket (`server/` TypeScript)
-- **Frontend**: React 19.2 + Vite 8 + TypeScript 5.9 (`client/`)
+- **Frontend**: React 19.2 + Vite 8 + TypeScript 7 (`client/`、lint は typescript-eslint 都合で TS6 API を併用)
 - **AI**: @anthropic-ai/claude-agent-sdk (Sonnet) — ツール連携で Kanban/Goal を直接操作
 - **データ**: SQLite (`bun:sqlite`、`data/` 配下・gitignore)
 - **パッケージ**: サーバー/フロントとも `bun` と `npm`
