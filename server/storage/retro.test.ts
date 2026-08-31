@@ -123,4 +123,71 @@ describe("retro storage — 完了フローの永続化 (regression: 完了時�
     expect(getRetro("retro-B")!.completedAt).toBe("2026-04-21T11:00:00");
     expect(loadRetros()).toHaveLength(2);
   });
+
+  it("壊れた retro 行は一覧と単体取得でスキップし、正常な行は保持する", async () => {
+    const { saveRetro, getRetro, loadRetros } = await import("./retro.ts");
+    const valid = makeRetro({
+      id: "retro-ok",
+      document: {
+        did: "正常な振り返り",
+        learned: "",
+        next: "",
+        dayRating: 0,
+        wakeUpTime: "",
+        bedtime: "",
+      },
+    });
+    saveRetro(valid);
+    getDb()
+      .prepare(
+        "INSERT INTO retrospectives " +
+          "(id, type, period_start, period_end, document, messages, ai_comment, completed_at, created_at, updated_at) " +
+          "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      )
+      .run(
+        "retro-broken",
+        "daily",
+        "2026-04-22",
+        "2026-04-22",
+        "{broken",
+        "[]",
+        "",
+        "",
+        "2026-04-22T10:00:00",
+        "2026-04-22T10:00:00"
+      );
+
+    expect(loadRetros().map((r) => r.id)).toEqual(["retro-ok"]);
+    expect(getRetro("retro-ok")!.document.did).toBe("正常な振り返り");
+    expect(getRetro("retro-broken")).toBeNull();
+  });
+
+  it("最新ドラフトが壊れていても、同じ種別の正常なドラフトを返す", async () => {
+    const { saveRetro, getRetroDraft } = await import("./retro.ts");
+    const valid = makeRetro({
+      id: "retro-draft-ok",
+      updatedAt: "2026-04-21T10:00:00",
+    });
+    saveRetro(valid);
+    getDb()
+      .prepare(
+        "INSERT INTO retrospectives " +
+          "(id, type, period_start, period_end, document, messages, ai_comment, completed_at, created_at, updated_at) " +
+          "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      )
+      .run(
+        "retro-draft-broken",
+        "daily",
+        "2026-04-22",
+        "2026-04-22",
+        "{}",
+        "{broken",
+        "",
+        "",
+        "2026-04-22T10:00:00",
+        "2026-04-22T10:00:00"
+      );
+
+    expect(getRetroDraft("daily")?.id).toBe("retro-draft-ok");
+  });
 });
