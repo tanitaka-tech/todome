@@ -171,6 +171,42 @@ describe("goalEdit handler", () => {
     expect(types).toContain("goal_sync");
     expect(types).toContain("kanban_sync");
   });
+
+  it("存在しない goal の編集は既存 goal とタスクを変更しない", async () => {
+    ctx.session.goals.push({
+      id: "goal-1",
+      name: "残す",
+      memo: "",
+      kpis: [
+        { id: "kpi-time", name: "time", unit: "time", targetValue: 60, currentValue: 0 },
+      ],
+      deadline: "",
+      achieved: false,
+      achievedAt: "",
+    });
+    ctx.session.kanbanTasks.push(
+      makeTask({ id: "t1", goalId: "goal-1", kpiId: "kpi-time", kpiContributed: true }),
+      makeTask({ id: "t2", goalId: "", kpiId: "orphan-kpi", kpiContributed: true })
+    );
+    const beforeGoals = JSON.stringify(ctx.session.goals);
+    const beforeTasks = JSON.stringify(ctx.session.kanbanTasks);
+
+    await goalEdit(ctx.ws, ctx.session, {
+      goal: {
+        id: "missing-goal",
+        name: "存在しない",
+        memo: "",
+        kpis: [],
+        deadline: "",
+        achieved: false,
+        achievedAt: "",
+      },
+    });
+
+    expect(JSON.stringify(ctx.session.goals)).toBe(beforeGoals);
+    expect(JSON.stringify(ctx.session.kanbanTasks)).toBe(beforeTasks);
+    expect(ctx.sent).toHaveLength(0);
+  });
 });
 
 describe("goalDelete handler", () => {
@@ -224,5 +260,29 @@ describe("goalDelete handler", () => {
     expect(t2.goalId).toBe("goal-2");
     expect(t2.kpiId).toBe("kpi-y");
     expect(t2.kpiContributed).toBe(true);
+  });
+
+  it("空の goalId 削除は未紐づけタスクの kpiId を変更しない", async () => {
+    ctx.session.goals.push({
+      id: "goal-1",
+      name: "残す",
+      memo: "",
+      kpis: [],
+      deadline: "",
+      achieved: false,
+      achievedAt: "",
+    });
+    ctx.session.kanbanTasks.push(
+      makeTask({ id: "t1", goalId: "", kpiId: "orphan-kpi", kpiContributed: true }),
+      makeTask({ id: "t2", goalId: "goal-1", kpiId: "kpi-y", kpiContributed: true })
+    );
+    const beforeGoals = JSON.stringify(ctx.session.goals);
+    const beforeTasks = JSON.stringify(ctx.session.kanbanTasks);
+
+    await goalDelete(ctx.ws, ctx.session, { goalId: "" });
+
+    expect(JSON.stringify(ctx.session.goals)).toBe(beforeGoals);
+    expect(JSON.stringify(ctx.session.kanbanTasks)).toBe(beforeTasks);
+    expect(ctx.sent).toHaveLength(0);
   });
 });

@@ -18,12 +18,24 @@ interface Row {
   data: string;
 }
 
+function isRecord(raw: unknown): raw is Partial<Schedule> & Record<string, unknown> {
+  return Boolean(raw && typeof raw === "object");
+}
+
 function safeParse(json: string): Schedule | null {
   try {
-    return JSON.parse(json) as Schedule;
+    const raw = JSON.parse(json) as unknown;
+    if (!isRecord(raw)) return null;
+    const normalized = normalizeSchedule(raw);
+    return normalized.id && normalized.start && normalized.end ? normalized : null;
   } catch {
     return null;
   }
+}
+
+function strictBoolean(value: unknown, fallback: boolean): boolean {
+  if (value === undefined) return fallback;
+  return value === true;
 }
 
 export function loadSchedules(): Schedule[] {
@@ -143,7 +155,7 @@ export function normalizeSchedule(raw: Partial<Schedule>): Schedule {
     location: String(raw.location ?? ""),
     start: String(raw.start ?? ""),
     end: String(raw.end ?? ""),
-    allDay: Boolean(raw.allDay),
+    allDay: strictBoolean(raw.allDay, false),
     rrule: String(raw.rrule ?? ""),
     recurrenceId: String(raw.recurrenceId ?? ""),
     createdAt: String(raw.createdAt ?? ""),

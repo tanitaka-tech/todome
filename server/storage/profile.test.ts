@@ -7,6 +7,7 @@ import {
   DEFAULT_PROFILE,
   applyProfileUpdate,
   loadProfile,
+  normalizeProfile,
   saveProfile,
 } from "./profile.ts";
 import type { Goal, KanbanTask, UserProfile } from "../types.ts";
@@ -80,6 +81,21 @@ describe("applyProfileUpdate — プロフィール部分更新 (純粋関数)",
     expect(result.balanceWheel).toEqual(newWheel);
   });
 
+  it("balanceWheel 要素の shape を正規化し、不正要素は保存しない", () => {
+    const profile = makeProfile({ balanceWheel: [] });
+    const result = applyProfileUpdate(profile, {
+      balanceWheel: [
+        { id: " h ", name: " 健康 ", score: 12.8, icon: " 💪 " },
+        { id: "bad", score: 5 },
+        "not-object",
+      ],
+    });
+
+    expect(result.balanceWheel).toEqual([
+      { id: "h", name: "健康", score: 10, icon: "💪" },
+    ]);
+  });
+
   it("actionPrinciples を配列で更新できる", () => {
     const profile = makeProfile({
       actionPrinciples: [{ id: "p0", text: "旧原則" }],
@@ -90,6 +106,30 @@ describe("applyProfileUpdate — プロフィール部分更新 (純粋関数)",
     ];
     const result = applyProfileUpdate(profile, { actionPrinciples: newList });
     expect(result.actionPrinciples).toEqual(newList);
+  });
+
+  it("actionPrinciples / wantToDo 要素の shape を正規化する", () => {
+    const profile = makeProfile();
+    const result = applyProfileUpdate(profile, {
+      actionPrinciples: [
+        { id: " p1 ", text: "原則1" },
+        { id: "missing-text" },
+        42,
+      ],
+      wantToDo: [
+        { text: "旅行" },
+        { id: "", text: "" },
+        null,
+      ],
+    });
+
+    expect(result.actionPrinciples).toEqual([
+      { id: "p1", text: "原則1" },
+      { id: "missing-text", text: "" },
+    ]);
+    expect(result.wantToDo).toHaveLength(1);
+    expect(result.wantToDo[0]?.id).toBeTruthy();
+    expect(result.wantToDo[0]?.text).toBe("旅行");
   });
 
   it("wantToDo を配列で更新できる", () => {
@@ -181,6 +221,42 @@ describe("saveProfile / loadProfile — 永続化ラウンドトリップ", () =
     expect(loaded.balanceWheel).toEqual([]);
     expect(loaded.actionPrinciples).toEqual([]);
     expect(loaded.wantToDo).toEqual([]);
+  });
+
+  it("loadProfile は壊れた配列要素を正規化して返す", () => {
+    getDb()
+      .prepare(
+        "INSERT INTO profile (id, data) VALUES (1, ?) " +
+          "ON CONFLICT(id) DO UPDATE SET data = excluded.data",
+      )
+      .run(
+        JSON.stringify({
+          currentState: "状態",
+          balanceWheel: [
+            { id: " work ", name: " 仕事 ", score: -3 },
+            { id: "bad" },
+          ],
+          actionPrinciples: ["文字列", { id: " p ", text: "続ける" }],
+          wantToDo: [{ text: "温泉" }, { id: "", text: "" }],
+        }),
+      );
+
+    const loaded = loadProfile();
+    expect(loaded.currentState).toBe("状態");
+    expect(loaded.balanceWheel).toEqual([
+      { id: "work", name: "仕事", score: 1 },
+    ]);
+    expect(loaded.actionPrinciples).toEqual([{ id: "p", text: "続ける" }]);
+    expect(loaded.wantToDo).toHaveLength(1);
+    expect(loaded.wantToDo[0]?.id).toBeTruthy();
+    expect(loaded.wantToDo[0]?.text).toBe("温泉");
+  });
+});
+
+describe("normalizeProfile", () => {
+  it("非 object 入力は既定値へ落とす", () => {
+    expect(normalizeProfile(null)).toEqual(DEFAULT_PROFILE);
+    expect(normalizeProfile("bad")).toEqual(DEFAULT_PROFILE);
   });
 });
 

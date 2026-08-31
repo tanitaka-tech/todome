@@ -1,6 +1,7 @@
 import {
   ensureKpiIds,
   normalizeGoalRepository,
+  normalizeGoalRepositoryValue,
   syncGoalAchievement,
 } from "../domain/goal.ts";
 import { applyProfileUpdate } from "../storage/profile.ts";
@@ -44,6 +45,56 @@ function isSpecialEntry(content: string): boolean {
   );
 }
 
+function cloneGoal(goal: Goal): Goal {
+  return {
+    ...goal,
+    kpis: goal.kpis.map((kpi) => ({ ...kpi })),
+  };
+}
+
+function buildGoalFromData(goalData: Record<string, unknown>): Goal {
+  const repository = normalizeGoalRepositoryValue(goalData.repository);
+  const goal: Goal = {
+    id: shortId(),
+    name:
+      typeof goalData.name === "string" && goalData.name.trim()
+        ? goalData.name.trim()
+        : "新しい目標",
+    memo: typeof goalData.memo === "string" ? goalData.memo : "",
+    kpis: ensureKpiIds(goalData.kpis),
+    deadline: typeof goalData.deadline === "string" ? goalData.deadline : "",
+    achieved: goalData.achieved === true,
+    achievedAt: typeof goalData.achievedAt === "string" ? goalData.achievedAt : "",
+    ...(typeof goalData.icon === "string" && goalData.icon.trim()
+      ? { icon: goalData.icon.trim() }
+      : {}),
+    ...(repository ? { repository } : {}),
+  };
+  normalizeGoalRepository(goal);
+  syncGoalAchievement(goal);
+  return goal;
+}
+
+function applyGoalData(goal: Goal, updates: Record<string, unknown>): Goal {
+  const next = cloneGoal(goal);
+  if (typeof updates.name === "string" && updates.name.trim()) {
+    next.name = updates.name.trim();
+  }
+  if (typeof updates.memo === "string") next.memo = updates.memo;
+  if (Array.isArray(updates.kpis)) next.kpis = ensureKpiIds(updates.kpis);
+  if (typeof updates.deadline === "string") next.deadline = updates.deadline;
+  if (typeof updates.achieved === "boolean") next.achieved = updates.achieved;
+  if (typeof updates.achievedAt === "string") next.achievedAt = updates.achievedAt;
+  if (typeof updates.icon === "string" && updates.icon.trim()) {
+    next.icon = updates.icon.trim();
+  }
+  const repository = normalizeGoalRepositoryValue(updates.repository);
+  if (repository) next.repository = repository;
+  normalizeGoalRepository(next);
+  syncGoalAchievement(next);
+  return next;
+}
+
 export function processTodos(
   todos: unknown,
   existingTasks: KanbanTask[],
@@ -52,7 +103,8 @@ export function processTodos(
 ): ProcessTodosResult {
   const todoList = Array.isArray(todos) ? (todos as TodoEntry[]) : [];
   const existingTaskMap = new Map(existingTasks.map((t) => [t.title, t]));
-  const existingGoalMap = new Map(existingGoals.map((g) => [g.name, g]));
+  const goals = existingGoals.map(cloneGoal);
+  const existingGoalMap = new Map(goals.map((g) => [g.name, g]));
 
   // AIが目標/プロフィールの特殊エントリだけをTodoWriteに渡した場合、
   // kanbanタスクを空で上書きせず既存を温存する。AIは「既存タスクも全て含めて渡せ」
@@ -63,7 +115,6 @@ export function processTodos(
   });
 
   const tasks: KanbanTask[] = [];
-  const goals = [...existingGoals];
   let profile = existingProfile;
 
   for (const todo of todoList) {
@@ -84,28 +135,15 @@ export function processTodos(
       const name = typeof goalData.name === "string" ? goalData.name : "";
       if (name && existingGoalMap.has(name)) {
         const existing = existingGoalMap.get(name)!;
-        for (const [k, v] of Object.entries(goalData)) {
-          (existing as unknown as Record<string, unknown>)[k] = v;
+        const updated = applyGoalData(existing, goalData);
+        const index = goals.findIndex((g) => g.id === existing.id);
+        if (index !== -1) {
+          goals[index] = updated;
+          existingGoalMap.delete(existing.name);
+          existingGoalMap.set(updated.name, updated);
         }
-        existing.kpis = ensureKpiIds(existing.kpis ?? []);
-        normalizeGoalRepository(existing);
-        syncGoalAchievement(existing);
       } else {
-        const newGoal: Goal = {
-          id: shortId(),
-          name: typeof goalData.name === "string" ? goalData.name : "新しい目標",
-          memo: typeof goalData.memo === "string" ? goalData.memo : "",
-          kpis: ensureKpiIds(goalData.kpis),
-          deadline: typeof goalData.deadline === "string" ? goalData.deadline : "",
-          achieved: Boolean(goalData.achieved),
-          achievedAt: typeof goalData.achievedAt === "string" ? goalData.achievedAt : "",
-          ...(typeof goalData.icon === "string" ? { icon: goalData.icon } : {}),
-          ...(typeof goalData.repository === "string"
-            ? { repository: goalData.repository }
-            : {}),
-        };
-        normalizeGoalRepository(newGoal);
-        syncGoalAchievement(newGoal);
+        const newGoal = buildGoalFromData(goalData);
         goals.push(newGoal);
         existingGoalMap.set(newGoal.name, newGoal);
       }
@@ -121,12 +159,13 @@ export function processTodos(
       if (!updates || typeof updates !== "object") continue;
       const target = existingGoalMap.get(goalName);
       if (!target) continue;
-      for (const [k, v] of Object.entries(updates as Record<string, unknown>)) {
-        (target as unknown as Record<string, unknown>)[k] = v;
+      const updated = applyGoalData(target, updates as Record<string, unknown>);
+      const index = goals.findIndex((g) => g.id === target.id);
+      if (index !== -1) {
+        goals[index] = updated;
+        existingGoalMap.delete(target.name);
+        existingGoalMap.set(updated.name, updated);
       }
-      target.kpis = ensureKpiIds(target.kpis ?? []);
-      normalizeGoalRepository(target);
-      syncGoalAchievement(target);
       continue;
     }
 

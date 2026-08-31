@@ -23,6 +23,7 @@ const {
   clearCalDAVConfig,
   isCalDAVConnected,
   loadCalDAVConfig,
+  normalizeCalDAVConfig,
   resetCalDAVCache,
   saveCalDAVConfig,
 } = caldav;
@@ -127,6 +128,44 @@ describe("CalDAV config storage", () => {
     setLinked(false);
     writeFileSync(CALDAV_CONFIG_PATH, "{ broken json");
     expect(loadCalDAVConfig()).toEqual({});
+  });
+
+  it("JSON として読めても object でなければ空 config として扱う", () => {
+    setLinked(false);
+    writeFileSync(CALDAV_CONFIG_PATH, JSON.stringify("not-an-object"));
+    expect(loadCalDAVConfig()).toEqual({});
+    expect(isCalDAVConnected()).toBe(false);
+  });
+
+  it("非文字列フィールドは接続情報として扱わない", () => {
+    setLinked(false);
+    writeFileSync(
+      CALDAV_CONFIG_PATH,
+      JSON.stringify({
+        appleId: 123,
+        appPassword: true,
+        connectedAt: [],
+        writeTargetCalendarUrl: { url: "https://example.com" },
+      }),
+    );
+
+    expect(loadCalDAVConfig()).toEqual({});
+    expect(isCalDAVConnected()).toBe(false);
+  });
+
+  it("normalizeCalDAVConfig は既知の文字列フィールドだけを残す", () => {
+    expect(
+      normalizeCalDAVConfig({
+        appleId: " user@example.com ",
+        appPassword: " app-pass ",
+        writeTargetCalendarName: " Main ",
+        extra: "ignored",
+      }),
+    ).toEqual({
+      appleId: "user@example.com",
+      appPassword: "app-pass",
+      writeTargetCalendarName: "Main",
+    });
   });
 
   it("GitHub config 等、関係ないファイルには触らない", () => {
