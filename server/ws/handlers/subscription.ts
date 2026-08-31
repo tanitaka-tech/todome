@@ -85,6 +85,11 @@ function googleAccountIdFromRaw(
   );
 }
 
+function strictBoolean(value: unknown, fallback: boolean): boolean {
+  if (value === undefined) return fallback;
+  return value === true;
+}
+
 export const subscriptionAdd: Handler = async (_ws, session, data) => {
   const raw = (data.subscription ?? {}) as Partial<CalendarSubscription> &
     Record<string, unknown>;
@@ -109,7 +114,7 @@ export const subscriptionAdd: Handler = async (_ws, session, data) => {
     name: raw.name ? String(raw.name) : url,
     url,
     color: raw.color ? String(raw.color) : pickDefaultColor(existing),
-    enabled: raw.enabled === undefined ? true : Boolean(raw.enabled),
+    enabled: strictBoolean(raw.enabled, true),
     status: "idle",
     createdAt: now,
     updatedAt: now,

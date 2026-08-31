@@ -21,6 +21,11 @@ function safeParse(json: string): CalendarSubscription | null {
   }
 }
 
+function strictBoolean(value: unknown, fallback: boolean): boolean {
+  if (value === undefined) return fallback;
+  return value === true;
+}
+
 export function loadSubscriptions(): CalendarSubscription[] {
   const rows = getDb()
     .prepare("SELECT data FROM calendar_subscriptions ORDER BY sort_order ASC")
@@ -65,7 +70,7 @@ export function normalizeSubscription(
     name: String(raw.name ?? ""),
     url: String(raw.url ?? ""),
     color: String(raw.color ?? ""),
-    enabled: raw.enabled === undefined ? true : Boolean(raw.enabled),
+    enabled: strictBoolean(raw.enabled, true),
     lastFetchedAt: String(raw.lastFetchedAt ?? ""),
     lastError: String(raw.lastError ?? ""),
     status:

@@ -33,6 +33,11 @@ function safeParse(json: string): Schedule | null {
   }
 }
 
+function strictBoolean(value: unknown, fallback: boolean): boolean {
+  if (value === undefined) return fallback;
+  return value === true;
+}
+
 export function loadSchedules(): Schedule[] {
   const rows = getDb()
     .prepare(
@@ -150,7 +155,7 @@ export function normalizeSchedule(raw: Partial<Schedule>): Schedule {
     location: String(raw.location ?? ""),
     start: String(raw.start ?? ""),
     end: String(raw.end ?? ""),
-    allDay: Boolean(raw.allDay),
+    allDay: strictBoolean(raw.allDay, false),
     rrule: String(raw.rrule ?? ""),
     recurrenceId: String(raw.recurrenceId ?? ""),
     createdAt: String(raw.createdAt ?? ""),
