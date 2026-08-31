@@ -26,6 +26,14 @@ const LIFE_LOG_STOP_CMD = "LIFE_LOG_STOP";
 const VALID_CATEGORIES = ["rest", "play", "routine", "other"] as const;
 const VALID_SCOPES = ["per_session", "per_day"] as const;
 
+function nonNegativeInteger(value: unknown): number | null {
+  const n =
+    typeof value === "number" || typeof value === "string"
+      ? Number(value)
+      : Number.NaN;
+  return Number.isFinite(n) ? Math.max(0, Math.trunc(n)) : null;
+}
+
 function parseJsonSafe(s: string): unknown {
   try {
     return JSON.parse(s);
@@ -81,9 +89,8 @@ export function processQuotaLifeActions(todos: unknown): QuotaLifeResult {
       const u = updates as Record<string, unknown>;
       if (typeof u.name === "string" && u.name.trim()) target.name = u.name.trim();
       if (typeof u.icon === "string" && u.icon.trim()) target.icon = u.icon.trim();
-      if (typeof u.targetMinutes === "number") {
-        target.targetMinutes = Math.max(0, Math.trunc(u.targetMinutes));
-      }
+      const targetMinutes = nonNegativeInteger(u.targetMinutes);
+      if (targetMinutes !== null) target.targetMinutes = targetMinutes;
 
       saveQuotas(quotas);
       result.quotasChanged = true;
@@ -119,12 +126,10 @@ export function processQuotaLifeActions(todos: unknown): QuotaLifeResult {
       const u = updates as Record<string, unknown>;
       if (typeof u.name === "string" && u.name.trim()) target.name = u.name.trim();
       if (typeof u.icon === "string" && u.icon.trim()) target.icon = u.icon.trim();
-      if (typeof u.softLimitMinutes === "number") {
-        target.softLimitMinutes = Math.max(0, Math.trunc(u.softLimitMinutes));
-      }
-      if (typeof u.hardLimitMinutes === "number") {
-        target.hardLimitMinutes = Math.max(0, Math.trunc(u.hardLimitMinutes));
-      }
+      const softLimitMinutes = nonNegativeInteger(u.softLimitMinutes);
+      if (softLimitMinutes !== null) target.softLimitMinutes = softLimitMinutes;
+      const hardLimitMinutes = nonNegativeInteger(u.hardLimitMinutes);
+      if (hardLimitMinutes !== null) target.hardLimitMinutes = hardLimitMinutes;
       if (
         typeof u.category === "string" &&
         VALID_CATEGORIES.includes(u.category as (typeof VALID_CATEGORIES)[number])
