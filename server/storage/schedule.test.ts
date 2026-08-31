@@ -165,6 +165,39 @@ describe("subscription replacement isolation", () => {
 });
 
 describe("normalizeSchedule provider field isolation", () => {
+  it("allDay は boolean true だけを有効扱いにする", () => {
+    expect(
+      normalizeSchedule({
+        id: "m1",
+        source: "manual",
+        title: "String false",
+        start: "2026-04-25T09:00:00",
+        end: "2026-04-25T10:00:00",
+        allDay: "false" as never,
+      }).allDay,
+    ).toBe(false);
+    expect(
+      normalizeSchedule({
+        id: "m2",
+        source: "manual",
+        title: "String true",
+        start: "2026-04-25T09:00:00",
+        end: "2026-04-25T10:00:00",
+        allDay: "true" as never,
+      }).allDay,
+    ).toBe(false);
+    expect(
+      normalizeSchedule({
+        id: "m3",
+        source: "manual",
+        title: "Bool true",
+        start: "2026-04-25T09:00:00",
+        end: "2026-04-25T10:00:00",
+        allDay: true,
+      }).allDay,
+    ).toBe(true);
+  });
+
   it("googleEventId set does not clear caldav fields", () => {
     const s = normalizeSchedule({
       id: "m1",
@@ -307,7 +340,7 @@ describe("loadSchedules robustness", () => {
       location: "",
       start: "2026-04-25T09:00:00",
       end: "2026-04-25T10:00:00",
-      allDay: true,
+      allDay: false,
       rrule: "",
       recurrenceId: "",
       createdAt: "",

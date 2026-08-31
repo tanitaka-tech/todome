@@ -190,6 +190,22 @@ describe("subscription handlers", () => {
     });
   });
 
+  it("購読追加時の enabled は boolean true だけを有効扱いにする", async () => {
+    const { ws, session } = makeRequester();
+
+    await subscriptionAdd(ws, session, {
+      subscription: {
+        name: "Public",
+        url: "https://example.com/public.ics",
+        enabled: "false",
+      },
+    });
+
+    const subscriptions = loadSubscriptions();
+    expect(subscriptions).toHaveLength(1);
+    expect(subscriptions[0]?.enabled).toBe(false);
+  });
+
   it("Google購読編集時にcreatedAtを保持し、空のaccountIdを補完する", async () => {
     saveActiveGoogleAccount();
     saveSubscriptions([

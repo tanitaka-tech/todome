@@ -65,6 +65,44 @@ export const AI_BASH_ALLOWED_PREFIXES: readonly (readonly string[])[] = [
 export const AI_BASH_OPTIONAL_PREFIXES: readonly (readonly string[])[] = [["gh", "api"]];
 
 const BASH_SHELL_META: readonly string[] = [";", "&", "|", ">", "<", "`", "$(", "${"];
+const BASH_DENIED_TOKENS: readonly string[] = [
+  "--web",
+  "--browser",
+  "--hostname",
+  "--repo-owner",
+];
+const BASH_DENIED_TOKEN_PREFIXES: readonly string[] = [
+  "--web=",
+  "--browser=",
+  "--hostname=",
+  "--repo-owner=",
+];
+const GH_API_DENIED_TOKENS: readonly string[] = ["-f", "--field", "-F", "--raw-field"];
+const GH_API_DENIED_TOKEN_PREFIXES: readonly string[] = [
+  "--field=",
+  "--raw-field=",
+];
+const GH_API_WRITE_METHODS: readonly string[] = ["POST", "PUT", "PATCH", "DELETE"];
+
+function ghApiMethodFromToken(token: string): string | null {
+  if (token.startsWith("--method=")) return token.slice("--method=".length);
+  if (token.startsWith("-X") && token !== "-X") return token.slice(2);
+  return null;
+}
+
+function isDeniedBashToken(token: string): boolean {
+  return (
+    BASH_DENIED_TOKENS.includes(token) ||
+    BASH_DENIED_TOKEN_PREFIXES.some((prefix) => token.startsWith(prefix))
+  );
+}
+
+function isDeniedGhApiToken(token: string): boolean {
+  return (
+    GH_API_DENIED_TOKENS.includes(token) ||
+    GH_API_DENIED_TOKEN_PREFIXES.some((prefix) => token.startsWith(prefix))
+  );
+}
 
 let cache: AIToolConfig | null = null;
 
@@ -111,7 +149,7 @@ export function normalizeAIConfig(raw: unknown): AIToolConfig {
 
   return {
     allowedTools,
-    allowGhApi: Boolean(cfg.allowGhApi),
+    allowGhApi: cfg.allowGhApi === true,
     model,
     thinkingEffort,
   };
@@ -161,6 +199,19 @@ export function isBashCommandAllowed(command: unknown, allowGhApi: boolean): boo
   if (BASH_SHELL_META.some((m) => command.includes(m))) return false;
   const tokens = command.trim().split(/\s+/);
   if (tokens.length === 0) return false;
+  if (tokens.some(isDeniedBashToken)) return false;
+  if (tokens[0] === "gh" && tokens[1] === "api") {
+    if (tokens.some(isDeniedGhApiToken)) return false;
+    for (let i = 0; i < tokens.length; i++) {
+      const token = tokens[i]!;
+      const method =
+        token === "--method" || token === "-X"
+          ? tokens[i + 1]?.toUpperCase() ?? ""
+          : ghApiMethodFromToken(token)?.toUpperCase() ?? "";
+      if (GH_API_WRITE_METHODS.includes(method)) return false;
+    }
+    if (tokens.some((token) => token.startsWith("--input"))) return false;
+  }
   const prefixes = allowGhApi
     ? [...AI_BASH_ALLOWED_PREFIXES, ...AI_BASH_OPTIONAL_PREFIXES]
     : AI_BASH_ALLOWED_PREFIXES;
