@@ -93,6 +93,8 @@ export function processQuotaLifeActions(todos: unknown): QuotaLifeResult {
     if (content.startsWith(QUOTA_LOG_START_PREFIX)) {
       const quotaId = content.slice(QUOTA_LOG_START_PREFIX.length).trim();
       if (!quotaId) continue;
+      const quota = loadQuotas().find((q) => q.id === quotaId);
+      if (!quota || quota.archived) continue;
       result.quotaLogStarted = startQuotaLog(quotaId);
       continue;
     }
@@ -144,6 +146,8 @@ export function processQuotaLifeActions(todos: unknown): QuotaLifeResult {
     if (content.startsWith(LIFE_LOG_START_PREFIX)) {
       const activityId = content.slice(LIFE_LOG_START_PREFIX.length).trim();
       if (!activityId) continue;
+      const activity = loadLifeActivities().find((a) => a.id === activityId);
+      if (!activity || activity.archived) continue;
       result.lifeLogStarted = startLifeLog(activityId);
       continue;
     }

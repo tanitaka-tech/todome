@@ -96,12 +96,13 @@ describe("normalizeAIConfig — 正規化 (純粋関数)", () => {
     expect(normalizeAIConfig({ allowedTools: [] }).allowedTools).toEqual([]);
   });
 
-  it("allowGhApi は Boolean に変換される", () => {
+  it("allowGhApi は true のみ許可される", () => {
     expect(normalizeAIConfig({ allowGhApi: true }).allowGhApi).toBe(true);
     expect(normalizeAIConfig({ allowGhApi: false }).allowGhApi).toBe(false);
-    expect(normalizeAIConfig({ allowGhApi: 1 }).allowGhApi).toBe(true);
+    expect(normalizeAIConfig({ allowGhApi: 1 }).allowGhApi).toBe(false);
     expect(normalizeAIConfig({ allowGhApi: 0 }).allowGhApi).toBe(false);
-    expect(normalizeAIConfig({ allowGhApi: "yes" }).allowGhApi).toBe(true);
+    expect(normalizeAIConfig({ allowGhApi: "yes" }).allowGhApi).toBe(false);
+    expect(normalizeAIConfig({ allowGhApi: "false" }).allowGhApi).toBe(false);
     expect(normalizeAIConfig({}).allowGhApi).toBe(false);
   });
 

@@ -111,7 +111,7 @@ export function normalizeAIConfig(raw: unknown): AIToolConfig {
 
   return {
     allowedTools,
-    allowGhApi: Boolean(cfg.allowGhApi),
+    allowGhApi: cfg.allowGhApi === true,
     model,
     thinkingEffort,
   };
