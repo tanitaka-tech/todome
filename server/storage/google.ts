@@ -12,63 +12,105 @@ function accountIdFromEmail(email: string): string {
   return trimmed || "google-account";
 }
 
-function normalizeAccount(raw: Partial<GoogleAccount>): GoogleAccount | null {
-  const accountEmail = String(raw.accountEmail ?? "").trim();
-  const id = String(raw.id ?? "").trim() || accountIdFromEmail(accountEmail);
+function asRecord(raw: unknown): Record<string, unknown> | null {
+  return raw && typeof raw === "object" ? (raw as Record<string, unknown>) : null;
+}
+
+function stringField(raw: unknown): string {
+  return typeof raw === "string" ? raw.trim() : "";
+}
+
+function normalizeAccount(raw: unknown): GoogleAccount | null {
+  const record = asRecord(raw);
+  if (!record) return null;
+  const accountEmail = stringField(record.accountEmail);
+  const refreshToken = stringField(record.refreshToken);
+  const accessToken = stringField(record.accessToken);
+  const accessTokenExpiresAt = stringField(record.accessTokenExpiresAt);
+  const connectedAt = stringField(record.connectedAt);
+  const writeTargetCalendarId = stringField(record.writeTargetCalendarId);
+  const writeTargetCalendarName = stringField(record.writeTargetCalendarName);
+  const writeTargetCalendarColor = stringField(record.writeTargetCalendarColor);
+  const hasKnownField = [
+    record.id,
+    accountEmail,
+    refreshToken,
+    accessToken,
+    accessTokenExpiresAt,
+    connectedAt,
+    writeTargetCalendarId,
+    writeTargetCalendarName,
+    writeTargetCalendarColor,
+  ].some((v) => typeof v === "string" && v.trim());
+  if (!hasKnownField) return null;
+  const id = stringField(record.id) || accountIdFromEmail(accountEmail);
   if (!id) return null;
   return {
     id,
     accountEmail,
-    refreshToken: raw.refreshToken ? String(raw.refreshToken) : "",
-    accessToken: raw.accessToken ? String(raw.accessToken) : "",
-    accessTokenExpiresAt: raw.accessTokenExpiresAt
-      ? String(raw.accessTokenExpiresAt)
-      : "",
-    connectedAt: raw.connectedAt ? String(raw.connectedAt) : "",
-    writeTargetCalendarId: raw.writeTargetCalendarId
-      ? String(raw.writeTargetCalendarId)
-      : "",
-    writeTargetCalendarName: raw.writeTargetCalendarName
-      ? String(raw.writeTargetCalendarName)
-      : "",
-    writeTargetCalendarColor: raw.writeTargetCalendarColor
-      ? String(raw.writeTargetCalendarColor)
-      : "",
+    refreshToken,
+    accessToken,
+    accessTokenExpiresAt,
+    connectedAt,
+    writeTargetCalendarId,
+    writeTargetCalendarName,
+    writeTargetCalendarColor,
   };
 }
 
-export function normalizeGoogleConfig(raw: GoogleConfig): GoogleConfig {
+export function normalizeGoogleConfig(raw: unknown): GoogleConfig {
+  const cfg = asRecord(raw);
+  if (!cfg) {
+    return {
+      clientId: "",
+      clientSecret: "",
+      accounts: [],
+      activeAccountId: "",
+      refreshToken: "",
+      accessToken: "",
+      accessTokenExpiresAt: "",
+      accountEmail: "",
+      connectedAt: "",
+      writeTargetCalendarId: "",
+      writeTargetCalendarName: "",
+      writeTargetCalendarColor: "",
+    };
+  }
   const accounts: GoogleAccount[] = [];
-  for (const account of raw.accounts ?? []) {
-    const normalized = normalizeAccount(account);
-    if (normalized && !accounts.some((a) => a.id === normalized.id)) {
-      accounts.push(normalized);
+  if (Array.isArray(cfg.accounts)) {
+    for (const account of cfg.accounts) {
+      const normalized = normalizeAccount(account);
+      if (normalized && !accounts.some((a) => a.id === normalized.id)) {
+        accounts.push(normalized);
+      }
     }
   }
 
-  if (raw.refreshToken && !Array.isArray(raw.accounts)) {
+  const legacyRefreshToken = stringField(cfg.refreshToken);
+  if (legacyRefreshToken && !Array.isArray(cfg.accounts)) {
     const legacy = normalizeAccount({
-      id: raw.accountEmail || "google-account",
-      accountEmail: raw.accountEmail ?? "",
-      refreshToken: raw.refreshToken,
-      accessToken: raw.accessToken,
-      accessTokenExpiresAt: raw.accessTokenExpiresAt,
-      connectedAt: raw.connectedAt,
-      writeTargetCalendarId: raw.writeTargetCalendarId,
-      writeTargetCalendarName: raw.writeTargetCalendarName,
-      writeTargetCalendarColor: raw.writeTargetCalendarColor,
+      id: stringField(cfg.accountEmail) || "google-account",
+      accountEmail: cfg.accountEmail,
+      refreshToken: legacyRefreshToken,
+      accessToken: cfg.accessToken,
+      accessTokenExpiresAt: cfg.accessTokenExpiresAt,
+      connectedAt: cfg.connectedAt,
+      writeTargetCalendarId: cfg.writeTargetCalendarId,
+      writeTargetCalendarName: cfg.writeTargetCalendarName,
+      writeTargetCalendarColor: cfg.writeTargetCalendarColor,
     });
     if (legacy) accounts.push(legacy);
   }
 
-  const activeAccountId = accounts.some((a) => a.id === raw.activeAccountId)
-    ? String(raw.activeAccountId)
+  const activeAccountIdRaw = stringField(cfg.activeAccountId);
+  const activeAccountId = accounts.some((a) => a.id === activeAccountIdRaw)
+    ? activeAccountIdRaw
     : accounts[0]?.id ?? "";
   const active = accounts.find((a) => a.id === activeAccountId);
 
   return {
-    clientId: raw.clientId ? String(raw.clientId) : "",
-    clientSecret: raw.clientSecret ? String(raw.clientSecret) : "",
+    clientId: stringField(cfg.clientId),
+    clientSecret: stringField(cfg.clientSecret),
     accounts,
     activeAccountId,
     refreshToken: active?.refreshToken ?? "",
@@ -89,9 +131,7 @@ export function loadGoogleConfig(): GoogleConfig {
     return cache;
   }
   try {
-    cache = normalizeGoogleConfig(
-      JSON.parse(readFileSync(GOOGLE_CONFIG_PATH, "utf8")) as GoogleConfig,
-    );
+    cache = normalizeGoogleConfig(JSON.parse(readFileSync(GOOGLE_CONFIG_PATH, "utf8")));
   } catch {
     cache = normalizeGoogleConfig({});
   }

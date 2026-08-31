@@ -96,12 +96,13 @@ describe("normalizeAIConfig — 正規化 (純粋関数)", () => {
     expect(normalizeAIConfig({ allowedTools: [] }).allowedTools).toEqual([]);
   });
 
-  it("allowGhApi は Boolean に変換される", () => {
+  it("allowGhApi は true のみ許可される", () => {
     expect(normalizeAIConfig({ allowGhApi: true }).allowGhApi).toBe(true);
     expect(normalizeAIConfig({ allowGhApi: false }).allowGhApi).toBe(false);
-    expect(normalizeAIConfig({ allowGhApi: 1 }).allowGhApi).toBe(true);
+    expect(normalizeAIConfig({ allowGhApi: 1 }).allowGhApi).toBe(false);
     expect(normalizeAIConfig({ allowGhApi: 0 }).allowGhApi).toBe(false);
-    expect(normalizeAIConfig({ allowGhApi: "yes" }).allowGhApi).toBe(true);
+    expect(normalizeAIConfig({ allowGhApi: "yes" }).allowGhApi).toBe(false);
+    expect(normalizeAIConfig({ allowGhApi: "false" }).allowGhApi).toBe(false);
     expect(normalizeAIConfig({}).allowGhApi).toBe(false);
   });
 
@@ -276,7 +277,7 @@ describe("isBashCommandAllowed — 許可プレフィックス (allowGhApi=false
     "gh issue list --state open",
     "gh issue view 123",
     "gh pr list",
-    "gh pr view 42 --web",
+    "gh pr view 42",
     "gh repo view",
     "git status",
     "git status -s",
@@ -299,6 +300,9 @@ describe("isBashCommandAllowed — 許可プレフィックス (allowGhApi=false
     "gh auth login",
     "gh issue create",
     "gh pr create",
+    "gh pr view 42 --web",
+    "gh pr view 42 --web=false",
+    "gh repo view --browser",
     "gh api repos/foo/bar/issues",
     "gh",
     "git",
@@ -324,6 +328,8 @@ describe("isBashCommandAllowed — allowGhApi=true で許可される拡張", ()
     expect(isBashCommandAllowed("gh api repos/foo/bar", false)).toBe(false);
     expect(isBashCommandAllowed("gh api repos/foo/bar", true)).toBe(true);
     expect(isBashCommandAllowed("gh api user", true)).toBe(true);
+    expect(isBashCommandAllowed("gh api repos/foo/bar --jq .name", true)).toBe(true);
+    expect(isBashCommandAllowed("gh api repos/foo/bar/issues --paginate", true)).toBe(true);
   });
 
   it("allowGhApi=true でも元の通常プレフィックスは引き続き許可される", () => {
@@ -334,5 +340,26 @@ describe("isBashCommandAllowed — allowGhApi=true で許可される拡張", ()
   it("allowGhApi=true でもシェルメタ文字入り gh api は拒否される", () => {
     expect(isBashCommandAllowed("gh api repos/foo/bar; rm -rf /", true)).toBe(false);
     expect(isBashCommandAllowed("gh api user | jq .login", true)).toBe(false);
+  });
+
+  it("allowGhApi=true でも変更系 method/input/field は拒否される", () => {
+    const denied = [
+      "gh api repos/foo/bar/issues -X POST",
+      "gh api repos/foo/bar/issues -XPOST",
+      "gh api repos/foo/bar/issues --method DELETE",
+      "gh api repos/foo/bar/issues --method=PATCH",
+      "gh api repos/foo/bar/issues --input body.json",
+      "gh api repos/foo/bar/issues --input=-",
+      "gh api repos/foo/bar/issues -f title=test",
+      "gh api repos/foo/bar/issues --field title=test",
+      "gh api repos/foo/bar/issues --field=title=test",
+      "gh api repos/foo/bar/issues -F title=test",
+      "gh api repos/foo/bar/issues --raw-field title=test",
+      "gh api repos/foo/bar/issues --raw-field=title=test",
+    ];
+
+    for (const cmd of denied) {
+      expect(isBashCommandAllowed(cmd, true)).toBe(false);
+    }
   });
 });

@@ -34,8 +34,11 @@ export const goalAdd: Handler = async (ws, session, data) => {
 
 export const goalEdit: Handler = async (ws, session, data) => {
   const rawGoal = (data.goal ?? {}) as Partial<Goal> & Record<string, unknown>;
+  const goalId = String(rawGoal.id ?? "");
+  const goalIndex = session.goals.findIndex((g) => g.id === goalId);
+  if (!goalId || goalIndex === -1) return;
   const incoming: Goal = {
-    id: String(rawGoal.id ?? ""),
+    id: goalId,
     name: String(rawGoal.name ?? ""),
     memo: String(rawGoal.memo ?? ""),
     kpis: ensureKpiIds(rawGoal.kpis),
@@ -47,7 +50,6 @@ export const goalEdit: Handler = async (ws, session, data) => {
   };
   normalizeGoalRepository(incoming);
   syncGoalAchievement(incoming);
-  const goalId = incoming.id;
   const validTimeKpiIds = new Set(
     incoming.kpis.filter((k) => k.unit === "time").map((k) => k.id)
   );
@@ -57,7 +59,7 @@ export const goalEdit: Handler = async (ws, session, data) => {
       task.kpiContributed = false;
     }
   }
-  session.goals = session.goals.map((g) => (g.id === goalId ? incoming : g));
+  session.goals = session.goals.map((g, i) => (i === goalIndex ? incoming : g));
   saveGoals(session.goals);
   saveTasks(session.kanbanTasks);
   scheduleAutosync();
@@ -67,6 +69,7 @@ export const goalEdit: Handler = async (ws, session, data) => {
 
 export const goalDelete: Handler = async (ws, session, data) => {
   const goalId = String(data.goalId ?? "");
+  if (!goalId || !session.goals.some((g) => g.id === goalId)) return;
   session.goals = session.goals.filter((g) => g.id !== goalId);
   for (const task of session.kanbanTasks) {
     if (task.goalId === goalId) {

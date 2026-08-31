@@ -1,7 +1,67 @@
-import { describe, expect, test } from "bun:test";
-import { normalizeSubscription } from "./subscription.ts";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { getDb, resetDbCache } from "../db.ts";
+import type { CalendarSubscription } from "../types.ts";
+import {
+  loadSubscriptions,
+  normalizeSubscription,
+  saveSubscriptions,
+} from "./subscription.ts";
+
+function makeSubscription(
+  partial: Partial<CalendarSubscription> & Pick<CalendarSubscription, "id" | "name" | "url">,
+): CalendarSubscription {
+  return normalizeSubscription({
+    color: "#3b82f6",
+    enabled: true,
+    ...partial,
+  });
+}
+
+beforeEach(() => {
+  resetDbCache();
+  const db = getDb();
+  db.exec("DELETE FROM calendar_subscriptions");
+});
+
+afterEach(() => {
+  resetDbCache();
+});
 
 describe("normalizeSubscription provider isolation", () => {
+  test("enabled は boolean true だけを有効扱いにする", () => {
+    expect(
+      normalizeSubscription({
+        id: "s0",
+        name: "Default",
+        url: "https://example.com/default.ics",
+      }).enabled,
+    ).toBe(true);
+    expect(
+      normalizeSubscription({
+        id: "s1",
+        name: "False string",
+        url: "https://example.com/false.ics",
+        enabled: "false" as never,
+      }).enabled,
+    ).toBe(false);
+    expect(
+      normalizeSubscription({
+        id: "s2",
+        name: "True string",
+        url: "https://example.com/true.ics",
+        enabled: "true" as never,
+      }).enabled,
+    ).toBe(false);
+    expect(
+      normalizeSubscription({
+        id: "s3",
+        name: "True",
+        url: "https://example.com/true-bool.ics",
+        enabled: true,
+      }).enabled,
+    ).toBe(true);
+  });
+
   test("provider=ics: caldavCalendarId / googleCalendarId default to empty", () => {
     const s = normalizeSubscription({
       id: "s1",
@@ -67,5 +127,69 @@ describe("normalizeSubscription provider isolation", () => {
       provider: "outlook",
     });
     expect(s.provider).toBe("ics");
+  });
+});
+
+describe("loadSubscriptions robustness", () => {
+  test("skips non-object JSON rows without dropping valid subscriptions", () => {
+    const valid = makeSubscription({
+      id: "good",
+      name: "Good",
+      url: "https://example.com/good.ics",
+    });
+    saveSubscriptions([valid]);
+    const db = getDb();
+    db.prepare(
+      "INSERT INTO calendar_subscriptions (id, sort_order, data) VALUES (?, ?, ?)",
+    ).run("bad-string", 10, JSON.stringify("not-object"));
+    db.prepare(
+      "INSERT INTO calendar_subscriptions (id, sort_order, data) VALUES (?, ?, ?)",
+    ).run("bad-empty", 11, JSON.stringify({}));
+    db.prepare(
+      "INSERT INTO calendar_subscriptions (id, sort_order, data) VALUES (?, ?, ?)",
+    ).run("bad-no-url", 12, JSON.stringify({ id: "bad-no-url", name: "No URL" }));
+
+    const all = loadSubscriptions();
+    expect(all).toHaveLength(1);
+    expect(all[0]?.id).toBe("good");
+  });
+
+  test("normalizes parsed object rows before returning them", () => {
+    const db = getDb();
+    db.prepare(
+      "INSERT INTO calendar_subscriptions (id, sort_order, data) VALUES (?, ?, ?)",
+    ).run(
+      "dirty",
+      0,
+      JSON.stringify({
+        id: "dirty",
+        name: 42,
+        url: "https://example.com/dirty.ics",
+        provider: "unknown",
+        enabled: "",
+        eventCount: "7",
+        extra: "ignored",
+      }),
+    );
+
+    expect(loadSubscriptions()).toEqual([
+      {
+        id: "dirty",
+        name: "42",
+        url: "https://example.com/dirty.ics",
+        color: "",
+        enabled: false,
+        lastFetchedAt: "",
+        lastError: "",
+        status: "idle",
+        eventCount: 0,
+        createdAt: "",
+        updatedAt: "",
+        provider: "ics",
+        caldavCalendarId: "",
+        googleCalendarId: "",
+        googleAccountId: "",
+      },
+    ]);
   });
 });

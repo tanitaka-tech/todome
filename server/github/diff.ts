@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { REPO_DIR, getDbPath } from "../config.ts";
 import { githubState } from "../state.ts";
-import { DEFAULT_PROFILE } from "../storage/profile.ts";
+import { DEFAULT_PROFILE, normalizeProfile } from "../storage/profile.ts";
 import type {
   Goal,
   KanbanTask,
@@ -158,6 +158,25 @@ function tableExists(db: Database, name: string): boolean {
   return row !== null && row !== undefined;
 }
 
+function parseJson(json: string): unknown | null {
+  try {
+    return JSON.parse(json) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+function parseObject<T extends object>(json: string): T | null {
+  const parsed = parseJson(json);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  return parsed as T;
+}
+
+function parseArray<T>(json: string): T[] | null {
+  const parsed = parseJson(json);
+  return Array.isArray(parsed) ? (parsed as T[]) : null;
+}
+
 function loadEntitiesFromDb(dbPath: string, isSnapshot: boolean): EntitySnapshot {
   // readonly + WAL journal モードの DB を -wal/-shm 無しで開こうとすると
   // SQLITE_CANTOPEN になる (git show で抽出した snapshot には wal/shm が付かない)。
@@ -173,7 +192,8 @@ function loadEntitiesFromDb(dbPath: string, isSnapshot: boolean): EntitySnapshot
         .prepare("SELECT data FROM kanban_tasks ORDER BY sort_order")
         .all() as { data: string }[];
       for (const r of rows) {
-        const t = JSON.parse(r.data) as KanbanTask & { kpiId?: string; kpiContributed?: boolean };
+        const t = parseObject<KanbanTask & { kpiId?: string; kpiContributed?: boolean }>(r.data);
+        if (!t) continue;
         t.kpiId ??= "";
         t.kpiContributed = Boolean(t.kpiContributed);
         tasks.push(t);
@@ -185,7 +205,9 @@ function loadEntitiesFromDb(dbPath: string, isSnapshot: boolean): EntitySnapshot
       const rows = db
         .prepare("SELECT data FROM goals ORDER BY sort_order")
         .all() as { data: string }[];
-      goals = rows.map((r) => JSON.parse(r.data) as Goal);
+      goals = rows
+        .map((r) => parseObject<Goal>(r.data))
+        .filter((g): g is Goal => g !== null);
     }
 
     let profile: UserProfile = { ...DEFAULT_PROFILE };
@@ -193,7 +215,7 @@ function loadEntitiesFromDb(dbPath: string, isSnapshot: boolean): EntitySnapshot
       const row = db
         .prepare("SELECT data FROM profile WHERE id = 1")
         .get() as { data: string } | undefined;
-      if (row) profile = JSON.parse(row.data) as UserProfile;
+      if (row) profile = normalizeProfile(parseJson(row.data));
     }
 
     const retros: Retrospective[] = [];
@@ -213,13 +235,16 @@ function loadEntitiesFromDb(dbPath: string, isSnapshot: boolean): EntitySnapshot
         updated_at: string;
       }[];
       for (const r of rows) {
+        const document = parseObject<Record<string, unknown>>(r.document);
+        const messages = parseArray<Retrospective["messages"][number]>(r.messages);
+        if (!document || !messages) continue;
         retros.push({
           id: r.id,
           type: r.type as RetroType,
           periodStart: r.period_start,
           periodEnd: r.period_end,
-          document: JSON.parse(r.document),
-          messages: JSON.parse(r.messages),
+          document: document as unknown as Retrospective["document"],
+          messages,
           aiComment: r.ai_comment ?? "",
           completedAt: r.completed_at ?? "",
           createdAt: r.created_at,
@@ -233,7 +258,9 @@ function loadEntitiesFromDb(dbPath: string, isSnapshot: boolean): EntitySnapshot
       const rows = db
         .prepare("SELECT data FROM life_activities ORDER BY sort_order")
         .all() as { data: string }[];
-      lifeActivities = rows.map((r) => JSON.parse(r.data) as LifeActivity);
+      lifeActivities = rows
+        .map((r) => parseObject<LifeActivity>(r.data))
+        .filter((a): a is LifeActivity => a !== null);
     }
 
     const lifeLogs: LifeLog[] = [];
@@ -265,7 +292,9 @@ function loadEntitiesFromDb(dbPath: string, isSnapshot: boolean): EntitySnapshot
       const rows = db
         .prepare("SELECT data FROM quotas ORDER BY sort_order")
         .all() as { data: string }[];
-      quotas = rows.map((r) => JSON.parse(r.data) as Quota);
+      quotas = rows
+        .map((r) => parseObject<Quota>(r.data))
+        .filter((q): q is Quota => q !== null);
     }
 
     const quotaLogs: QuotaLog[] = [];

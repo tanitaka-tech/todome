@@ -2,7 +2,10 @@ import { fetchEvents } from "../../caldav/client.ts";
 import { fetchEvents as fetchGoogleEvents } from "../../google/client.ts";
 import { scheduleAutosync } from "../../github/autosync.ts";
 import { loadCalDAVConfig } from "../../storage/caldav.ts";
-import { isGoogleAccountConnected } from "../../storage/google.ts";
+import {
+  isGoogleAccountConnected,
+  loadGoogleConfig,
+} from "../../storage/google.ts";
 import { loadProfile } from "../../storage/profile.ts";
 import {
   loadSchedules,
@@ -63,23 +66,61 @@ function pickDefaultColor(existing: CalendarSubscription[]): string {
   return FALLBACK_COLORS[existing.length % FALLBACK_COLORS.length] ?? "#3b82f6";
 }
 
+function googleCalendarIdFromRaw(
+  raw: Partial<CalendarSubscription> & Record<string, unknown>,
+): string {
+  const explicit = String(raw.googleCalendarId ?? "").trim();
+  if (explicit) return explicit;
+  const url = String(raw.url ?? "").trim();
+  return url.startsWith("google:") ? url.replace(/^google:/, "").trim() : "";
+}
+
+function googleAccountIdFromRaw(
+  raw: Partial<CalendarSubscription> & Record<string, unknown>,
+): string {
+  return (
+    String(raw.googleAccountId ?? "").trim() ||
+    loadGoogleConfig().activeAccountId ||
+    ""
+  );
+}
+
+function strictBoolean(value: unknown, fallback: boolean): boolean {
+  if (value === undefined) return fallback;
+  return value === true;
+}
+
 export const subscriptionAdd: Handler = async (_ws, session, data) => {
   const raw = (data.subscription ?? {}) as Partial<CalendarSubscription> &
     Record<string, unknown>;
-  const url = String(raw.url ?? "").trim();
+  const provider =
+    raw.provider === "caldav" || raw.provider === "google"
+      ? raw.provider
+      : "ics";
+  const googleCalendarId = provider === "google" ? googleCalendarIdFromRaw(raw) : "";
+  const googleAccountId = provider === "google" ? googleAccountIdFromRaw(raw) : "";
+  const rawUrl = String(raw.url ?? "").trim();
+  const url =
+    rawUrl ||
+    (provider === "google" && googleCalendarId
+      ? `google:${googleCalendarId}`
+      : "");
   if (!url) return;
   const now = nowLocalIso();
   const existing = loadSubscriptions();
   const sub = normalizeSubscription({
     ...raw,
-    id: raw.id ? String(raw.id) : shortId(),
+    id: shortId(),
     name: raw.name ? String(raw.name) : url,
     url,
     color: raw.color ? String(raw.color) : pickDefaultColor(existing),
-    enabled: raw.enabled === undefined ? true : Boolean(raw.enabled),
+    enabled: strictBoolean(raw.enabled, true),
     status: "idle",
     createdAt: now,
     updatedAt: now,
+    provider,
+    googleCalendarId,
+    googleAccountId,
   });
   saveSubscriptions([...existing, sub]);
   scheduleAutosync();
@@ -98,10 +139,32 @@ export const subscriptionEdit: Handler = async (_ws, session, data) => {
   const existing = loadSubscriptions();
   const idx = existing.findIndex((s) => s.id === id);
   if (idx < 0) return;
+  const current = existing[idx];
+  if (!current) return;
+  const provider =
+    raw.provider === "caldav" || raw.provider === "google" || raw.provider === "ics"
+      ? raw.provider
+      : current.provider;
+  const googleFields =
+    provider === "google"
+      ? {
+          googleCalendarId: googleCalendarIdFromRaw({
+            ...current,
+            ...raw,
+          }),
+          googleAccountId: googleAccountIdFromRaw({
+            ...current,
+            ...raw,
+          }),
+        }
+      : {};
   const merged = normalizeSubscription({
-    ...existing[idx],
+    ...current,
     ...raw,
+    ...googleFields,
     id,
+    provider,
+    createdAt: current.createdAt,
     updatedAt: nowLocalIso(),
   });
   const next = [...existing];
@@ -257,7 +320,9 @@ async function refreshGoogle(
   target: CalendarSubscription,
   session: SyncSession,
 ): Promise<void> {
-  if (!isGoogleAccountConnected(target.googleAccountId || undefined)) {
+  const accountId =
+    target.googleAccountId || loadGoogleConfig().activeAccountId || "";
+  if (!isGoogleAccountConnected(accountId || undefined)) {
     setSubscriptionState(target.id, {
       status: "error",
       lastError: "Google に未接続です",
@@ -266,13 +331,17 @@ async function refreshGoogle(
     broadcastSubscriptions(session);
     return;
   }
-  setSubscriptionState(target.id, { status: "fetching", lastError: "" });
+  setSubscriptionState(target.id, {
+    status: "fetching",
+    lastError: "",
+    googleAccountId: accountId,
+  });
   broadcastSubscriptions(session);
 
   const range = expandRange();
   const result = await fetchGoogleEvents({
     calendarId: target.googleCalendarId || target.url.replace(/^google:/, ""),
-    accountId: target.googleAccountId || undefined,
+    accountId: accountId || undefined,
     rangeStartMs: range.startMs,
     rangeEndMs: range.endMs,
   });
@@ -306,7 +375,7 @@ async function refreshGoogle(
     caldavObjectUrl: "",
     caldavEtag: "",
     googleEventId: part.googleEventId,
-    googleAccountId: target.googleAccountId,
+    googleAccountId: accountId,
   }));
   replaceSubscriptionSchedules(target.id, schedules);
   setSubscriptionState(target.id, {

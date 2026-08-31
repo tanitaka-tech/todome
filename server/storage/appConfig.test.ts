@@ -68,10 +68,10 @@ describe("normalizeAppConfig — 正規化 (純粋関数)", () => {
     expect(normalizeAppConfig({ dayBoundaryHour: undefined }).dayBoundaryHour).toBe(4);
   });
 
-  it("整数に変換可能な文字列は Number(raw) 経由で通過する (現仕様)", () => {
-    // clampBoundaryHour は Number(raw) で強制変換するため "5" → 5 として受理される。
-    // 将来より厳格にしたい場合はこの仕様テストを書き換える。
-    expect(normalizeAppConfig({ dayBoundaryHour: "5" }).dayBoundaryHour).toBe(5);
+  it("数値文字列や boolean は dayBoundaryHour として受け付けない", () => {
+    expect(normalizeAppConfig({ dayBoundaryHour: "5" }).dayBoundaryHour).toBe(4);
+    expect(normalizeAppConfig({ dayBoundaryHour: "" }).dayBoundaryHour).toBe(4);
+    expect(normalizeAppConfig({ dayBoundaryHour: false }).dayBoundaryHour).toBe(4);
   });
 
   it("余分なキーは無視される", () => {
@@ -84,6 +84,8 @@ describe("normalizeAppConfig — 正規化 (純粋関数)", () => {
     expect(normalizeAppConfig({ calendarWeekStart: 1 }).calendarWeekStart).toBe(1);
     expect(normalizeAppConfig({ calendarWeekStart: 2 }).calendarWeekStart).toBe(1);
     expect(normalizeAppConfig({ calendarWeekStart: "abc" }).calendarWeekStart).toBe(1);
+    expect(normalizeAppConfig({ calendarWeekStart: "0" }).calendarWeekStart).toBe(1);
+    expect(normalizeAppConfig({ calendarWeekStart: false }).calendarWeekStart).toBe(1);
   });
 });
 

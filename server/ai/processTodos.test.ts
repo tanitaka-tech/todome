@@ -360,4 +360,74 @@ describe("processTodos — データ分離保証 (regression: 目標追加でタ
     expect(result.tasks[0]?.title).toBe("企画書を作成");
     expect(result.tasks[0]?.goalId).toBe("g1");
   });
+
+  it("GOAL_UPDATEはid/未知キー/不正型を無視し、入力goalを破壊しない", () => {
+    const profile = makeProfile();
+    const goals = [
+      makeGoal({
+        id: "g1",
+        name: "既存目標X",
+        memo: "元メモ",
+        repository: "owner/repo",
+        kpis: [
+          {
+            id: "k1",
+            name: "進捗",
+            unit: "number",
+            targetValue: 10,
+            currentValue: 3,
+          },
+        ],
+      }),
+    ];
+    const snapshot = JSON.stringify(goals);
+
+    const result = processTodos(
+      [
+        {
+          content:
+            'GOAL_UPDATE:既存目標X:{"id":"evil","name":42,"memo":"更新メモ","kpis":"bad","achieved":"true","repository":"bad/name/shape","secret":"leak"}',
+          status: "completed",
+        },
+      ],
+      BASE_TASKS,
+      goals,
+      profile
+    );
+
+    expect(JSON.stringify(goals)).toBe(snapshot);
+    expect(result.tasks).toEqual(BASE_TASKS);
+    expect(result.profile).toBe(profile);
+    expect(result.goals).toHaveLength(1);
+    expect(result.goals[0]?.id).toBe("g1");
+    expect(result.goals[0]?.name).toBe("既存目標X");
+    expect(result.goals[0]?.memo).toBe("更新メモ");
+    expect(result.goals[0]?.repository).toBe("owner/repo");
+    expect(result.goals[0]?.kpis).toEqual(goals[0]!.kpis);
+    expect(result.goals[0]?.achieved).toBe(false);
+    expect((result.goals[0] as unknown as Record<string, unknown>).secret).toBeUndefined();
+  });
+
+  it("GOAL_ADDの新規目標はAI supplied idを使わず、boolean文字列をtrue扱いしない", () => {
+    const result = processTodos(
+      [
+        {
+          content:
+            'GOAL_ADD:{"id":"evil","name":"  新目標  ","achieved":"true","repository":" owner/repo ","unknown":"x"}',
+          status: "completed",
+        },
+      ],
+      BASE_TASKS,
+      [],
+      makeProfile()
+    );
+
+    expect(result.tasks).toEqual(BASE_TASKS);
+    expect(result.goals).toHaveLength(1);
+    expect(result.goals[0]?.id).not.toBe("evil");
+    expect(result.goals[0]?.name).toBe("新目標");
+    expect(result.goals[0]?.achieved).toBe(false);
+    expect(result.goals[0]?.repository).toBe("owner/repo");
+    expect((result.goals[0] as unknown as Record<string, unknown>).unknown).toBeUndefined();
+  });
 });

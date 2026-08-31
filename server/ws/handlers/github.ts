@@ -21,6 +21,40 @@ import { githubState } from "../../state.ts";
 import { broadcast, sendTo } from "../broadcast.ts";
 import type { Handler } from "../dispatch.ts";
 
+export interface GitHubLinkOptions {
+  owner: string | null;
+  name: string;
+  create: boolean;
+  private: boolean;
+}
+
+function trimString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function strictBoolean(value: unknown, fallback: boolean): boolean {
+  return typeof value === "boolean" ? value : fallback;
+}
+
+export function parseGitHubLinkOptions(
+  data: Record<string, unknown>
+): GitHubLinkOptions | null {
+  const name = trimString(data.name);
+  if (!name) return null;
+  const owner = trimString(data.owner) || null;
+  return {
+    owner,
+    name,
+    create: strictBoolean(data.create, false),
+    private: strictBoolean(data.private, true),
+  };
+}
+
+export function parseGitHubAutoSyncValue(value: unknown): boolean | null {
+  if (value === undefined) return true;
+  return typeof value === "boolean" ? value : null;
+}
+
 export const githubStatusRequest: Handler = async (ws) => {
   sendTo(ws, await buildGitHubStatus());
 };
@@ -35,13 +69,18 @@ export const githubListRepos: Handler = async (ws) => {
   }
 };
 
-export const githubLink: Handler = async (_ws, _session, data) => {
-  void doLink({
-    owner: typeof data.owner === "string" ? data.owner : null,
-    name: typeof data.name === "string" ? data.name : "",
-    create: Boolean(data.create),
-    private: data.private === undefined ? true : Boolean(data.private),
-  });
+export const githubLink: Handler = async (ws, _session, data) => {
+  const options = parseGitHubLinkOptions(data);
+  if (!options) {
+    sendTo(ws, {
+      type: "error",
+      scope: "handler",
+      requestType: "github_link",
+      message: "GitHub リポジトリ名が不正です",
+    });
+    return;
+  }
+  void doLink(options);
 };
 
 export const githubUnlink: Handler = async () => {
@@ -57,8 +96,10 @@ export const githubPullNow: Handler = async () => {
 };
 
 export const githubSetAutoSync: Handler = async (_ws, _session, data) => {
+  const value = parseGitHubAutoSyncValue(data.value);
+  if (value === null) return;
   const cfg = loadGitHubConfig();
-  cfg.autoSync = data.value === undefined ? true : Boolean(data.value);
+  cfg.autoSync = value;
   saveGitHubConfig(cfg);
   broadcast(await buildGitHubStatus());
 };
