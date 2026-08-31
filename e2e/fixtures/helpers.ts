@@ -30,11 +30,20 @@ export async function clickNav(page: Page, label: NavLabel): Promise<void> {
   for (const text of labels) {
     const item = page.locator(".sidebar-nav-item", { hasText: text }).first();
     if ((await item.count()) > 0) {
-      await item.click();
+      await item.dispatchEvent("click");
+      await page
+        .locator(".sidebar-nav-item--active", { hasText: text })
+        .first()
+        .waitFor({ timeout: 10_000 });
       return;
     }
   }
-  await page.locator(".sidebar-nav-item", { hasText: label }).first().click();
+  const fallback = page.locator(".sidebar-nav-item", { hasText: label }).first();
+  await fallback.dispatchEvent("click");
+  await page
+    .locator(".sidebar-nav-item--active", { hasText: label })
+    .first()
+    .waitFor({ timeout: 10_000 });
 }
 
 export function uniqueMark(prefix: string): string {

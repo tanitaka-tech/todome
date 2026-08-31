@@ -12,14 +12,14 @@ const DEFAULT_CALENDAR_WEEK_START = 1;
 let cache: AppConfig | null = null;
 
 function clampBoundaryHour(raw: unknown): number {
-  const n = Number(raw);
-  if (!Number.isInteger(n) || n < 0 || n > 23) return DEFAULT_DAY_BOUNDARY_HOUR;
-  return n;
+  if (typeof raw !== "number" || !Number.isInteger(raw) || raw < 0 || raw > 23) {
+    return DEFAULT_DAY_BOUNDARY_HOUR;
+  }
+  return raw;
 }
 
 function normalizeCalendarWeekStart(raw: unknown): number {
-  const n = Number(raw);
-  return n === 0 || n === 1 ? n : DEFAULT_CALENDAR_WEEK_START;
+  return raw === 0 || raw === 1 ? raw : DEFAULT_CALENDAR_WEEK_START;
 }
 
 export function normalizeAppConfig(raw: unknown): AppConfig {

@@ -23,18 +23,19 @@ export function ensureKpiIds(kpis: unknown): KPI[] {
 }
 
 export function normalizeGoalRepository(goal: Goal): Goal {
-  const raw = goal.repository;
-  if (typeof raw !== "string") {
+  const value = normalizeGoalRepositoryValue(goal.repository);
+  if (!value) {
     delete goal.repository;
     return goal;
   }
-  const value = raw.trim();
-  if (value && REPO_NAME_WITH_OWNER_RE.test(value)) {
-    goal.repository = value;
-  } else {
-    delete goal.repository;
-  }
+  goal.repository = value;
   return goal;
+}
+
+export function normalizeGoalRepositoryValue(raw: unknown): string | undefined {
+  if (typeof raw !== "string") return undefined;
+  const value = raw.trim();
+  return value && REPO_NAME_WITH_OWNER_RE.test(value) ? value : undefined;
 }
 
 export function isGoalAllKpisAchieved(goal: Goal): boolean {

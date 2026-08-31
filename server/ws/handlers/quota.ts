@@ -81,6 +81,7 @@ export const quotaReorder: Handler = async (_ws, _session, data) => {
 export const quotaLogStart: Handler = async (_ws, session, data) => {
   const quotaId = String(data.quota_id ?? data.quotaId ?? "");
   if (!quotaId) return;
+  if (!loadQuotas().some((q) => q.id === quotaId && !q.archived)) return;
   const stoppedTaskIds = stopTaskTimersIfRunning(session.kanbanTasks);
   saveTasks(session.kanbanTasks);
   const lifeStopped = stopActiveLifeLogIfAny();

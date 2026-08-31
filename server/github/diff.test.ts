@@ -43,6 +43,31 @@ function insertQuotaLog(log: QuotaLog): void {
     .run(log.id, log.quotaId, log.startedAt, log.endedAt, log.memo);
 }
 
+function insertRetrospectiveRow(
+  id: string,
+  document: string,
+  messages: string,
+): void {
+  getDb()
+    .prepare(
+      "INSERT INTO retrospectives " +
+        "(id, type, period_start, period_end, document, messages, ai_comment, completed_at, created_at, updated_at) " +
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    )
+    .run(
+      id,
+      "daily",
+      "2026-08-08",
+      "2026-08-08",
+      document,
+      messages,
+      "",
+      "",
+      "2026-08-08T20:00:00",
+      "2026-08-08T20:00:00",
+    );
+}
+
 beforeEach(() => {
   resetDbCache();
   const db = getDb();
@@ -284,5 +309,105 @@ describe("computeCommitDiff — ノルマ・タイムボックスの計測時間
     expect(result.summary.tasks).toEqual({ added: 0, removed: 0, modified: 0 });
     expect(result.summary.goals).toEqual({ added: 0, removed: 0, modified: 0 });
     expect(result.summary.lifeActivities).toEqual({ added: 0, removed: 0, modified: 0 });
+  });
+});
+
+describe("computeCommitDiff — 壊れた current DB 行をスキップする", () => {
+  it("task / goal / lifeActivity / quota の壊れた JSON 行で差分計算を止めない", async () => {
+    const HASH = "d4d4d4d4000000000000000000000000d4d4d4d4";
+
+    const task = makeTask({ id: "t-ok", title: "有効タスク" });
+    const goal = makeGoal({ id: "g-ok", name: "有効目標" });
+    const activity = makeActivity({ id: "a-ok", name: "有効活動" });
+    const quota = makeQuota({ id: "q-ok", name: "有効ノルマ" });
+    saveTasks([task]);
+    saveGoals([goal]);
+    saveLifeActivities([activity]);
+    saveQuotas([quota]);
+
+    const db = getDb();
+    db.prepare("INSERT INTO kanban_tasks (id, sort_order, data) VALUES (?, ?, ?)").run(
+      "t-bad",
+      99,
+      "{not json",
+    );
+    db.prepare("INSERT INTO goals (id, sort_order, data) VALUES (?, ?, ?)").run(
+      "g-bad",
+      99,
+      "{not json",
+    );
+    db.prepare("INSERT INTO life_activities (id, sort_order, data) VALUES (?, ?, ?)").run(
+      "a-bad",
+      99,
+      "{not json",
+    );
+    db.prepare("INSERT INTO quotas (id, sort_order, data) VALUES (?, ?, ?)").run(
+      "q-bad",
+      99,
+      "{not json",
+    );
+
+    githubState.diffCache.set(HASH, EMPTY_SNAPSHOT());
+
+    const result = await computeCommitDiff(HASH);
+    expect(result.summary.tasks).toEqual({ added: 0, removed: 1, modified: 0 });
+    expect(result.summary.goals).toEqual({ added: 0, removed: 1, modified: 0 });
+    expect(result.summary.lifeActivities).toEqual({ added: 0, removed: 1, modified: 0 });
+    expect(result.summary.quotas).toEqual({ added: 0, removed: 1, modified: 0 });
+    expect(result.details.tasks.removed).toEqual([{ id: "t-ok", label: "有効タスク" }]);
+    expect(result.details.goals.removed).toEqual([{ id: "g-ok", label: "有効目標" }]);
+    expect(result.details.lifeActivities.removed).toEqual([{ id: "a-ok", label: "有効活動" }]);
+    expect(result.details.quotas.removed).toEqual([{ id: "q-ok", label: "有効ノルマ" }]);
+    expect(result.summary.retros).toEqual({ added: 0, removed: 0, modified: 0 });
+    expect(result.summary.lifeLogs).toEqual({ added: 0, removed: 0, modified: 0 });
+    expect(result.summary.quotaLogs).toEqual({ added: 0, removed: 0, modified: 0 });
+    expect(result.summary.profileChanged).toBe(false);
+  });
+
+  it("retrospective の document / messages が壊れた行だけをスキップする", async () => {
+    const HASH = "e5e5e5e5000000000000000000000000e5e5e5e5";
+
+    insertRetrospectiveRow(
+      "retro-ok",
+      JSON.stringify({
+        did: "実施",
+        learned: "学び",
+        next: "次",
+        dayRating: 7,
+        wakeUpTime: "",
+        bedtime: "",
+      }),
+      JSON.stringify([]),
+    );
+    insertRetrospectiveRow("retro-bad-doc", "{not json", JSON.stringify([]));
+    insertRetrospectiveRow("retro-bad-messages", JSON.stringify({ did: "" }), "{not json");
+
+    githubState.diffCache.set(HASH, EMPTY_SNAPSHOT());
+
+    const result = await computeCommitDiff(HASH);
+    expect(result.summary.retros).toEqual({ added: 0, removed: 1, modified: 0 });
+    expect(result.details.retros.removed).toEqual([
+      { id: "retro-ok", label: "2026-08-08" },
+    ]);
+    expect(result.summary.tasks).toEqual({ added: 0, removed: 0, modified: 0 });
+    expect(result.summary.goals).toEqual({ added: 0, removed: 0, modified: 0 });
+    expect(result.summary.profileChanged).toBe(false);
+  });
+
+  it("profile 行が壊れていても既定値として扱い false positive を出さない", async () => {
+    const HASH = "f6f6f6f6000000000000000000000000f6f6f6f6";
+
+    getDb().prepare("UPDATE profile SET data = ? WHERE id = 1").run("{not json");
+    githubState.diffCache.set(HASH, EMPTY_SNAPSHOT());
+
+    const result = await computeCommitDiff(HASH);
+    expect(result.summary.profileChanged).toBe(false);
+    expect(result.summary.tasks).toEqual({ added: 0, removed: 0, modified: 0 });
+    expect(result.summary.goals).toEqual({ added: 0, removed: 0, modified: 0 });
+    expect(result.summary.retros).toEqual({ added: 0, removed: 0, modified: 0 });
+    expect(result.summary.lifeActivities).toEqual({ added: 0, removed: 0, modified: 0 });
+    expect(result.summary.lifeLogs).toEqual({ added: 0, removed: 0, modified: 0 });
+    expect(result.summary.quotas).toEqual({ added: 0, removed: 0, modified: 0 });
+    expect(result.summary.quotaLogs).toEqual({ added: 0, removed: 0, modified: 0 });
   });
 });

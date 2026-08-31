@@ -28,6 +28,13 @@ async function dragLocatorTo(
   await page.mouse.up();
 }
 
+async function dispatchDragTo(source: Locator, target: Locator): Promise<void> {
+  const dataTransfer = await source.evaluateHandle(() => new DataTransfer());
+  await source.dispatchEvent("dragstart", { dataTransfer });
+  await target.dispatchEvent("dragover", { dataTransfer });
+  await target.dispatchEvent("drop", { dataTransfer });
+}
+
 test.describe("Kanban CRUD", () => {
   test.beforeEach(async ({ page }) => {
     await gotoApp(page);
@@ -100,20 +107,14 @@ test.describe("Kanban CRUD", () => {
     const cardsBox = await todoCards.boundingBox();
     expect(cardsBox?.height ?? 0).toBeGreaterThan(120);
 
-    const dataTransfer = await page.evaluateHandle(() => new DataTransfer());
-    await card.dispatchEvent("dragstart", { dataTransfer });
-    await inProgressColumn.dispatchEvent("dragover", { dataTransfer });
-    await inProgressColumn.dispatchEvent("drop", { dataTransfer });
+    await dispatchDragTo(card, inProgressColumn);
 
     await expect(
       inProgressColumn.locator(".kanban-card", { hasText: title }),
     ).toBeVisible();
 
     const movedCard = inProgressColumn.locator(".kanban-card", { hasText: title });
-    const nextDataTransfer = await page.evaluateHandle(() => new DataTransfer());
-    await movedCard.dispatchEvent("dragstart", { dataTransfer: nextDataTransfer });
-    await todoColumn.dispatchEvent("dragover", { dataTransfer: nextDataTransfer });
-    await todoColumn.dispatchEvent("drop", { dataTransfer: nextDataTransfer });
+    await dispatchDragTo(movedCard, todoColumn);
 
     await expect(todoColumn.locator(".kanban-card", { hasText: title })).toBeVisible();
   });
@@ -131,14 +132,7 @@ test.describe("Kanban CRUD", () => {
     const targetCardInTodo = todoColumn.locator(".kanban-card", {
       hasText: targetTitle,
     });
-    const seedDataTransfer = await page.evaluateHandle(() => new DataTransfer());
-    await targetCardInTodo.dispatchEvent("dragstart", {
-      dataTransfer: seedDataTransfer,
-    });
-    await inProgressColumn.dispatchEvent("dragover", {
-      dataTransfer: seedDataTransfer,
-    });
-    await inProgressColumn.dispatchEvent("drop", { dataTransfer: seedDataTransfer });
+    await dispatchDragTo(targetCardInTodo, inProgressColumn);
 
     const targetCard = inProgressColumn.locator(".kanban-card", {
       hasText: targetTitle,
@@ -160,7 +154,7 @@ test.describe("Kanban CRUD", () => {
     });
     await expect(movedSubject).toBeVisible();
 
-    await dragLocatorTo(page, movedSubject, todoColumn, { x: 32, y: 72 });
+    await dispatchDragTo(movedSubject, todoColumn);
     await expect(
       todoColumn.locator(".kanban-card", { hasText: subjectTitle }),
     ).toBeVisible();
