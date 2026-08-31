@@ -47,6 +47,16 @@ function makeQuota(partial: Partial<Quota> & Pick<Quota, "id" | "name">): Quota 
   return { icon: "🎯", targetMinutes: 30, archived: false, createdAt: "2026-04-22T00:00:00", ...partial };
 }
 
+async function withoutConsoleWarn(fn: () => void | Promise<void>): Promise<void> {
+  const warn = console.warn;
+  console.warn = () => {};
+  try {
+    await fn();
+  } finally {
+    console.warn = warn;
+  }
+}
+
 beforeEach(() => {
   resetDbCache();
   const db = getDb();
@@ -168,6 +178,19 @@ describe("saveLifeActivities / loadLifeActivities — 永続化ラウンドト�
     const loaded = loadLifeActivities();
     expect(loaded).toHaveLength(1);
     expect(loaded[0]!.id).toBe("a2");
+  });
+
+  it("破損した保存行はスキップし、正常なアクティビティは返す", async () => {
+    const activity = makeActivity({ id: "a1", name: "食事" });
+    saveLifeActivities([activity]);
+    getDb()
+      .prepare("INSERT INTO life_activities (id, sort_order, data) VALUES (?, ?, ?)")
+      .run("broken", 1, "{ invalid json");
+
+    await withoutConsoleWarn(() => {
+      const loaded = loadLifeActivities();
+      expect(loaded).toEqual([activity]);
+    });
   });
 });
 
