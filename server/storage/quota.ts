@@ -43,7 +43,15 @@ export function loadQuotas(): Quota[] {
     saveQuotas(defaults);
     return defaults;
   }
-  return rows.map((r) => normalizeQuota(JSON.parse(r.data)));
+  const quotas: Quota[] = [];
+  for (const r of rows) {
+    try {
+      quotas.push(normalizeQuota(JSON.parse(r.data)));
+    } catch (err) {
+      console.warn("[storage/quota] skip malformed row:", err);
+    }
+  }
+  return quotas;
 }
 
 export function saveQuotas(quotas: Quota[]): void {

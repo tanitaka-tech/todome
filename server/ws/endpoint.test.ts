@@ -78,6 +78,23 @@ describe("wsHandlers.message error propagation", () => {
     });
   });
 
+  it("JSON として正しくても object でないメッセージは handler に渡さない", async () => {
+    const samples = ["null", "[]", JSON.stringify("hello")];
+
+    for (const sample of samples) {
+      const { ws, sent } = makeFakeWs();
+
+      await wsHandlers.message(ws, sample);
+
+      expect(sent).toHaveLength(1);
+      expect(sent[0]).toEqual({
+        type: "error",
+        scope: "parse",
+        message: "受信メッセージは JSON オブジェクトである必要があります",
+      });
+    }
+  });
+
   it("ask_response と cancel は error を返さない（既存挙動の維持）", async () => {
     const { ws, sent } = makeFakeWs();
 

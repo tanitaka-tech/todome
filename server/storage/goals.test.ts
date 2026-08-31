@@ -192,6 +192,50 @@ describe("loadGoals — 壊れた JSON 行をスキップして他を返す", ()
     expect(() => loadGoals()).not.toThrow();
     expect(loadGoals()).toEqual([]);
   });
+
+  it("JSON としては有効でも goal として必須形を満たさない行はスキップする", () => {
+    const db = getDb();
+    db.prepare("INSERT INTO goals (id, sort_order, data) VALUES (?, ?, ?)").run(
+      "primitive",
+      0,
+      JSON.stringify("not a goal")
+    );
+    db.prepare("INSERT INTO goals (id, sort_order, data) VALUES (?, ?, ?)").run(
+      "missing-name",
+      1,
+      JSON.stringify({ id: "missing-name", memo: "名前がない" })
+    );
+    db.prepare("INSERT INTO goals (id, sort_order, data) VALUES (?, ?, ?)").run(
+      "ok",
+      2,
+      JSON.stringify({
+        id: " ok ",
+        name: "  正常  ",
+        memo: 123,
+        kpis: [{ id: "k1", name: "KPI", unit: "bad", targetValue: "7", currentValue: "2" }],
+        deadline: 456,
+        achieved: "true",
+        achievedAt: 789,
+        icon: "  G  ",
+        repository: "not a repo",
+        extra: "ignore",
+      })
+    );
+
+    const loaded = loadGoals();
+
+    expect(loaded).toHaveLength(1);
+    expect(loaded[0]).toEqual({
+      id: "ok",
+      name: "正常",
+      memo: "",
+      kpis: [{ id: "k1", name: "KPI", unit: "number", targetValue: 7, currentValue: 2 }],
+      deadline: "",
+      achieved: false,
+      achievedAt: "",
+      icon: "G",
+    });
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
