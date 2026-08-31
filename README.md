@@ -147,6 +147,27 @@ bun server/index.ts
 
 - **スマホからアクセスする** — PC で起動した todome をスマホのブラウザから開く方法(同一LAN / Tailscale / cloudflared)。詳細は [docs/smartphone-access.md](docs/smartphone-access.md) を参照。
 
+## 開発・テスト
+
+CI と同等のチェックをローカルで再現するコマンド。
+
+```bash
+# サーバー: 型チェック + クライアント型チェック + Lint + ユニットテスト を順次実行
+bun run check
+
+# 個別に実行する場合
+bunx tsc --noEmit                     # サーバー型チェック
+cd client && npx tsc -b && cd ..      # クライアント型チェック
+cd client && npm run lint && cd ..    # ESLint (client)
+bun run test                          # サーバー単体テスト (bun:test, server/**/*.test.ts)
+cd client && npm test && cd ..        # クライアント単体テスト (vitest)
+
+# E2E (Playwright) — client build → e2e deps → ブラウザ install → テスト実行
+./test.sh
+```
+
+`.github/workflows/ci.yml` も同じコマンドを叩いているので、push 前にローカルで `bun run check` を通しておくと CI 待ちが減ります。
+
 ## 技術スタック
 
 | レイヤー | 技術 |
