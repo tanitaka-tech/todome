@@ -6,9 +6,16 @@ interface Row {
   data: string;
 }
 
+function isRecord(raw: unknown): raw is Partial<CalendarSubscription> & Record<string, unknown> {
+  return Boolean(raw && typeof raw === "object");
+}
+
 function safeParse(json: string): CalendarSubscription | null {
   try {
-    return JSON.parse(json) as CalendarSubscription;
+    const raw = JSON.parse(json) as unknown;
+    if (!isRecord(raw)) return null;
+    const normalized = normalizeSubscription(raw);
+    return normalized.id && normalized.url ? normalized : null;
   } catch {
     return null;
   }
