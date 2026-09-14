@@ -1,3 +1,5 @@
+import { readLocalStorage, writeLocalStorage } from "./browserStorage";
+
 export type ThemeName =
   | "dark"
   | "midnight"
@@ -35,8 +37,7 @@ const ALL_THEMES: ThemeName[] = [...DARK_THEMES, ...LIGHT_THEMES];
 const STORAGE_KEY = "todome.theme";
 
 export function getInitialTheme(): ThemeName {
-  if (typeof window === "undefined") return "dark";
-  const stored = window.localStorage.getItem(STORAGE_KEY) as ThemeName | null;
+  const stored = readLocalStorage(STORAGE_KEY) as ThemeName | null;
   if (stored && ALL_THEMES.includes(stored)) return stored;
   return "dark";
 }
@@ -44,11 +45,7 @@ export function getInitialTheme(): ThemeName {
 export function applyTheme(theme: ThemeName) {
   if (typeof document === "undefined") return;
   document.documentElement.setAttribute("data-theme", theme);
-  try {
-    window.localStorage.setItem(STORAGE_KEY, theme);
-  } catch {
-    // ignore quota errors
-  }
+  writeLocalStorage(STORAGE_KEY, theme);
 }
 
 export function isDarkTheme(theme: ThemeName): boolean {

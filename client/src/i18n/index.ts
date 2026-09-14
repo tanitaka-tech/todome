@@ -32,12 +32,13 @@ import { ja_quota } from "./locales/ja/quota";
 import { en_quota } from "./locales/en/quota";
 import { ja_schedule } from "./locales/ja/schedule";
 import { en_schedule } from "./locales/en/schedule";
+import { readLocalStorage } from "../browserStorage";
 
 const STORAGE_KEY = "todome.language";
 
 function initialLang(): "ja" | "en" {
   if (typeof window === "undefined") return "ja";
-  const stored = window.localStorage.getItem(STORAGE_KEY);
+  const stored = readLocalStorage(STORAGE_KEY);
   if (stored === "ja" || stored === "en") return stored;
   const nav = window.navigator?.language?.toLowerCase() ?? "";
   if (nav.startsWith("en")) return "en";

@@ -1,4 +1,5 @@
 import i18n from "./index";
+import { readLocalStorage, writeLocalStorage } from "../browserStorage";
 
 export type Language = "ja" | "en";
 
@@ -7,9 +8,9 @@ export const LANGUAGES: Language[] = ["ja", "en"];
 const STORAGE_KEY = "todome.language";
 
 export function getInitialLanguage(): Language {
-  if (typeof window === "undefined") return "ja";
-  const stored = window.localStorage.getItem(STORAGE_KEY) as Language | null;
+  const stored = readLocalStorage(STORAGE_KEY) as Language | null;
   if (stored && LANGUAGES.includes(stored)) return stored;
+  if (typeof window === "undefined") return "ja";
   const nav = window.navigator?.language?.toLowerCase() ?? "";
   if (nav.startsWith("ja")) return "ja";
   if (nav.startsWith("en")) return "en";
@@ -21,9 +22,5 @@ export function applyLanguage(lang: Language) {
   if (typeof document !== "undefined") {
     document.documentElement.lang = lang;
   }
-  try {
-    window.localStorage.setItem(STORAGE_KEY, lang);
-  } catch {
-    // ignore quota errors
-  }
+  writeLocalStorage(STORAGE_KEY, lang);
 }

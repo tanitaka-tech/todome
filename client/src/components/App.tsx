@@ -56,6 +56,7 @@ import {
   saveRetroTab,
   saveRetroViewMode,
 } from "../viewState";
+import { readLocalStorage } from "../browserStorage";
 import { useTick } from "../hooks/useTick";
 import { useWebSocket } from "../hooks/useWebSocket";
 import { KanbanBoard } from "./KanbanBoard";
@@ -513,8 +514,7 @@ export function App() {
           dayBoundaryHourMigratedRef.current = true;
           const localHour = loadDayBoundaryHour();
           const hasLocalOverride =
-            typeof window !== "undefined" &&
-            window.localStorage.getItem("todome.dayBoundaryHour") !== null;
+            readLocalStorage("todome.dayBoundaryHour") !== null;
           if (hasLocalOverride && localHour !== serverHour) {
             sendRef.current({
               type: "app_config_update",

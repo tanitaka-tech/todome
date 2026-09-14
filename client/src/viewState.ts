@@ -1,5 +1,10 @@
 import type { RetroType } from "./types";
 import type { RetroViewMode } from "./components/RetroPanel";
+import {
+  readLocalStorage,
+  removeLocalStorage,
+  writeLocalStorage,
+} from "./browserStorage";
 
 const BOARD_GOAL_FILTER_KEY = "todome.board.goalFilters";
 const BOARD_RECENT_DAYS_KEY = "todome.board.recentDays";
@@ -18,8 +23,7 @@ const RETRO_TYPES: RetroType[] = ["daily", "weekly", "monthly", "yearly"];
 const VALID_RECENT_DAYS = new Set([0, 1, 3, 7, 30]);
 
 export function loadBoardGoalFilters(): string[] {
-  if (typeof window === "undefined") return [];
-  const raw = window.localStorage.getItem(BOARD_GOAL_FILTER_KEY);
+  const raw = readLocalStorage(BOARD_GOAL_FILTER_KEY);
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw);
@@ -33,82 +37,52 @@ export function loadBoardGoalFilters(): string[] {
 }
 
 export function saveBoardGoalFilters(value: string[]): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(BOARD_GOAL_FILTER_KEY, JSON.stringify(value));
-  } catch {
-    /* ignore quota errors */
-  }
+  writeLocalStorage(BOARD_GOAL_FILTER_KEY, JSON.stringify(value));
 }
 
 export function loadBoardRecentDays(): number {
-  if (typeof window === "undefined") return 0;
-  const raw = window.localStorage.getItem(BOARD_RECENT_DAYS_KEY);
+  const raw = readLocalStorage(BOARD_RECENT_DAYS_KEY);
   if (raw === null) return 0;
   const n = Number(raw);
   return VALID_RECENT_DAYS.has(n) ? n : 0;
 }
 
 export function saveBoardRecentDays(value: number): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(BOARD_RECENT_DAYS_KEY, String(value));
-  } catch {
-    /* ignore quota errors */
-  }
+  writeLocalStorage(BOARD_RECENT_DAYS_KEY, String(value));
 }
 
 export function loadRetroTab(): RetroType {
-  if (typeof window === "undefined") return "weekly";
-  const v = window.localStorage.getItem(RETRO_TAB_KEY) as RetroType | null;
+  const v = readLocalStorage(RETRO_TAB_KEY) as RetroType | null;
   return v && RETRO_TYPES.includes(v) ? v : "weekly";
 }
 
 export function saveRetroTab(value: RetroType): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(RETRO_TAB_KEY, value);
-  } catch {
-    /* ignore quota errors */
-  }
+  writeLocalStorage(RETRO_TAB_KEY, value);
 }
 
 export function loadRetroViewMode(): RetroViewMode {
-  if (typeof window === "undefined") return "list";
-  const v = window.localStorage.getItem(RETRO_VIEW_MODE_KEY);
+  const v = readLocalStorage(RETRO_VIEW_MODE_KEY);
   return v === "calendar" ? "calendar" : "list";
 }
 
 export function saveRetroViewMode(value: RetroViewMode): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(RETRO_VIEW_MODE_KEY, value);
-  } catch {
-    /* ignore quota errors */
-  }
+  writeLocalStorage(RETRO_VIEW_MODE_KEY, value);
 }
 
 export function loadPopupTaskId(): string | null {
-  if (typeof window === "undefined") return null;
-  return window.localStorage.getItem(POPUP_TASK_ID_KEY);
+  return readLocalStorage(POPUP_TASK_ID_KEY);
 }
 
 export function savePopupTaskId(value: string | null): void {
-  if (typeof window === "undefined") return;
-  try {
-    if (value) {
-      window.localStorage.setItem(POPUP_TASK_ID_KEY, value);
-    } else {
-      window.localStorage.removeItem(POPUP_TASK_ID_KEY);
-    }
-  } catch {
-    /* ignore quota errors */
+  if (value) {
+    writeLocalStorage(POPUP_TASK_ID_KEY, value);
+  } else {
+    removeLocalStorage(POPUP_TASK_ID_KEY);
   }
 }
 
 export function loadDayBoundaryHour(): number {
-  if (typeof window === "undefined") return DEFAULT_DAY_BOUNDARY_HOUR;
-  const raw = window.localStorage.getItem(DAY_BOUNDARY_HOUR_KEY);
+  const raw = readLocalStorage(DAY_BOUNDARY_HOUR_KEY);
   if (raw === null) return DEFAULT_DAY_BOUNDARY_HOUR;
   const n = Number(raw);
   if (!Number.isInteger(n) || n < 0 || n > 23) return DEFAULT_DAY_BOUNDARY_HOUR;
@@ -116,17 +90,11 @@ export function loadDayBoundaryHour(): number {
 }
 
 export function saveDayBoundaryHour(value: number): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(DAY_BOUNDARY_HOUR_KEY, String(value));
-  } catch {
-    /* ignore quota errors */
-  }
+  writeLocalStorage(DAY_BOUNDARY_HOUR_KEY, String(value));
 }
 
 export function loadBoardBottomHeight(): number {
-  if (typeof window === "undefined") return DEFAULT_BOARD_BOTTOM_HEIGHT;
-  const raw = window.localStorage.getItem(BOARD_BOTTOM_HEIGHT_KEY);
+  const raw = readLocalStorage(BOARD_BOTTOM_HEIGHT_KEY);
   if (raw === null) return DEFAULT_BOARD_BOTTOM_HEIGHT;
   const n = Number(raw);
   if (!Number.isFinite(n) || n < 120 || n > 2000) return DEFAULT_BOARD_BOTTOM_HEIGHT;
@@ -134,17 +102,11 @@ export function loadBoardBottomHeight(): number {
 }
 
 export function saveBoardBottomHeight(value: number): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(BOARD_BOTTOM_HEIGHT_KEY, String(Math.round(value)));
-  } catch {
-    /* ignore quota errors */
-  }
+  writeLocalStorage(BOARD_BOTTOM_HEIGHT_KEY, String(Math.round(value)));
 }
 
 export function loadBoardQuotaWidth(): number {
-  if (typeof window === "undefined") return DEFAULT_BOARD_QUOTA_WIDTH;
-  const raw = window.localStorage.getItem(BOARD_QUOTA_WIDTH_KEY);
+  const raw = readLocalStorage(BOARD_QUOTA_WIDTH_KEY);
   if (raw === null) return DEFAULT_BOARD_QUOTA_WIDTH;
   const n = Number(raw);
   if (!Number.isFinite(n) || n < 240 || n > 4000) return DEFAULT_BOARD_QUOTA_WIDTH;
@@ -152,27 +114,16 @@ export function loadBoardQuotaWidth(): number {
 }
 
 export function saveBoardQuotaWidth(value: number): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(BOARD_QUOTA_WIDTH_KEY, String(Math.round(value)));
-  } catch {
-    /* ignore quota errors */
-  }
+  writeLocalStorage(BOARD_QUOTA_WIDTH_KEY, String(Math.round(value)));
 }
 
 export type ScheduleViewMode = "month" | "week";
 
 export function loadScheduleView(): ScheduleViewMode {
-  if (typeof window === "undefined") return "month";
-  const v = window.localStorage.getItem(SCHEDULE_VIEW_KEY);
+  const v = readLocalStorage(SCHEDULE_VIEW_KEY);
   return v === "week" ? "week" : "month";
 }
 
 export function saveScheduleView(value: ScheduleViewMode): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(SCHEDULE_VIEW_KEY, value);
-  } catch {
-    /* ignore quota errors */
-  }
+  writeLocalStorage(SCHEDULE_VIEW_KEY, value);
 }
