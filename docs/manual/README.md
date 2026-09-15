@@ -27,9 +27,10 @@ docs/manual/
 Playwright で todome 本体を起動し、デモデータを投入→各画面を撮影する。
 
 ```bash
-cd e2e
-npm install            # 初回のみ
-npx playwright install # 初回のみ
+bun install            # リポジトリルートで初回のみ
+cd client && npm ci    # 初回または lockfile 更新時
+cd ../e2e && npm ci    # 初回または lockfile 更新時
+npx playwright install chromium # 初回のみ
 npm run capture        # client ビルド → data-manual/ 初期化 → スクショ生成
 ```
 

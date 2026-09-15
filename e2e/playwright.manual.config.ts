@@ -19,7 +19,7 @@ export default defineConfig({
     deviceScaleFactor: 2,
   },
   webServer: {
-    command: `TODOME_DATA_DIR="${dataDir}" uv run uvicorn server:app --host 127.0.0.1 --port ${PORT}`,
+    command: `TODOME_DATA_DIR="${dataDir}" TODOME_BACKEND_PORT=${PORT} bun server/index.ts`,
     cwd: rootDir,
     url: `http://127.0.0.1:${PORT}`,
     timeout: 180_000,

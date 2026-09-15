@@ -4,9 +4,9 @@
 
 | 場所 | 内容 | 永続化 |
 |---|---|---|
-| **ローカル SQLite DB (`data/todome.db`)** | タスク・目標・プロフィール | ✅ ファイル永続化 |
+| **ローカル SQLite DB (`data/todome.db`)** | タスク・目標・プロフィール・振り返り・ライフログ・ノルマ・スケジュール | ✅ ファイル永続化 |
 | **サーバーメモリ (WebSocket セッションごと)** | 上記 DB のインメモリキャッシュ・`ClaudeSDKClient` | ❌ 切断で破棄 (DB から再ロード) |
-| **ブラウザ `localStorage`** | テーマ設定 (`todome.theme`) のみ | ✅ |
+| **ブラウザ `localStorage`** | テーマ・言語・表示設定など端末ごとの UI 設定 | ✅ |
 | **ブラウザ React state** | UI 表示用コピー・チャット履歴・タイマー tick 等 | ❌ リロードで消失 |
 
 `data/` は `.gitignore` に追加されている。接続時に `server/ws/initialState.ts` が DB からロードし `kanban_sync` / `goal_sync` / `profile_sync` などで初期同期する。各種ミューテーション後は `server/storage/*.ts` の `save*()` で書き戻す。
@@ -31,6 +31,7 @@ calendar_subscriptions (id TEXT PRIMARY KEY, sort_order INTEGER, data TEXT)
 | ファイル | 内容 |
 |---|---|
 | `github_config.json` | GitHub 同期先 owner/repo / autoSync / lastSyncAt |
+| `google_config.json` | Google OAuth クライアント設定・アカウントの refresh token |
 | `ai_config.json` | AI ツール許可リスト + モデル設定 |
 | `app_config.json` | `dayBoundaryHour` などのアプリ設定 |
 | `caldav_config.json` | iCloud (CalDAV) 接続情報 — `appleId` / `appPassword` / `connectedAt`。**App用パスワードを平文で保管**するため、`data/` の権限管理に注意。切断時に削除される。 |
@@ -88,6 +89,23 @@ CalendarSubscription:
 ### 5. Chat / AI 関連 (クライアントのみ)
 `ChatMessage`, `AskUserRequest`, ストリーミング中の `streamText` / `thinkingText` — React state のみ。
 
+### 6. ブラウザ `localStorage`
+端末ごとの表示設定だけを保存する。タスク・目標・プロフィール・予定・AI会話の正本は置かない。
+
+| キー | 内容 |
+|---|---|
+| `todome.theme` | 表示テーマ |
+| `todome.language` | 表示言語 |
+| `todome.board.goalFilters` | ボードの目標フィルター |
+| `todome.board.recentDays` | 最近完了タスクの表示範囲 |
+| `todome.board.popupTaskId` | ボード上で開いていたタスク詳細 |
+| `todome.board.bottomHeight` | ボード下段パネルの高さ |
+| `todome.board.quotaWidth` | ボード下段のノルマ領域幅 |
+| `todome.retro.tab` | 振り返りタブ |
+| `todome.retro.viewMode` | 振り返り一覧/カレンダー表示 |
+| `todome.dayBoundaryHour` | 1日の区切り時刻 |
+| `todome.schedule.view` | スケジュール月/週表示 |
+
 ## データ更新フロー
 
 1. **直接操作**: クライアント → WS で `kanban_add/edit/delete/move`, `goal_add/edit/delete`, `profile_update` 送信 → サーバー state 更新 → `*_sync` で全量返却。
@@ -102,4 +120,4 @@ CalendarSubscription:
 
 - **単一ストア**: 認証/ユーザー分離なし。全 WebSocket 接続が同じ `data/todome.db` を共有する想定 (シングルユーザー)。
 - **並行書き込み注意**: 複数クライアントが同時にミューテーションすると、各接続のインメモリキャッシュが独立しているため、後勝ちで上書きされる可能性がある。
-- テーマのみ `localStorage` に保存 (`client/src/theme.ts:7`)。
+- `localStorage` は端末ごとの UI 設定のみ。タスク・目標・プロフィール・予定は SQLite / 設定ファイル側を正とする。
