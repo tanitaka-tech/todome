@@ -9,6 +9,7 @@
 - **Stats dashboard** — Pie chart of work time per goal, bar charts for daily/monthly/yearly trends
 - **Profile definition** — Reflects your current state, balance wheel, principles, and wishes into the AI context
 - **GitHub sync** — Share data across devices & link repositories to goals to feed the AI context ([Terms of Service notes](docs/github-sync-compliance.md))
+- **Calendar integrations** — Import public ICS URLs, iCloud calendars (CalDAV), and Google Calendar into the schedule tab, with write-back support for manual events
 
 | Task management with Kanban | Leave task management to AI | Plan goals and tasks with AI |
 |:---:|:---:|:---:|

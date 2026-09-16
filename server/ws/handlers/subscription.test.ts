@@ -38,9 +38,34 @@ import {
 import type { CalendarSubscription } from "../../types.ts";
 
 const googleFetchCalls: Array<{ calendarId: string; accountId?: string }> = [];
+const icsFetchCalls: Array<{ url: string }> = [];
 
 mock.module("../../caldav/client.ts", () => ({
   fetchEvents: async () => ({ ok: true, schedules: [] }),
+}));
+
+mock.module("../../ics/client.ts", () => ({
+  fetchEvents: async (args: { url: string }) => {
+    icsFetchCalls.push(args);
+    return {
+      ok: true,
+      schedules: [
+        {
+          externalUid: "ics-uid-1",
+          title: "ICS event",
+          description: "Public calendar",
+          location: "Online",
+          start: "2026-06-06T09:00:00",
+          end: "2026-06-06T10:00:00",
+          allDay: false,
+          rrule: "",
+          recurrenceId: "",
+          objectUrl: "",
+          etag: "",
+        },
+      ],
+    };
+  },
 }));
 
 mock.module("../../google/client.ts", () => ({
@@ -125,9 +150,33 @@ function makeGoogleSubscription(
   };
 }
 
+function makeIcsSubscription(
+  partial: Partial<CalendarSubscription>,
+): CalendarSubscription {
+  return {
+    id: "ics-sub",
+    name: "Public",
+    url: "https://example.com/public.ics",
+    color: "#10b981",
+    enabled: true,
+    lastFetchedAt: "",
+    lastError: "",
+    status: "idle",
+    eventCount: 0,
+    createdAt: "2026-06-05T08:00:00",
+    updatedAt: "2026-06-05T08:00:00",
+    provider: "ics",
+    caldavCalendarId: "",
+    googleCalendarId: "",
+    googleAccountId: "",
+    ...partial,
+  };
+}
+
 beforeEach(() => {
   activeSockets.clear();
   googleFetchCalls.length = 0;
+  icsFetchCalls.length = 0;
   resetDbCache();
   clearGitHubConfig();
   clearGoogleConfig();
@@ -147,6 +196,42 @@ afterAll(() => {
 });
 
 describe("subscription handlers", () => {
+  it("ICS購読追加時にURLを取得し、生成予定を保存する", async () => {
+    const { ws, session } = makeRequester();
+
+    await subscriptionAdd(ws, session, {
+      subscription: {
+        name: "Public",
+        url: "https://example.com/public.ics",
+        provider: "ics",
+      },
+    });
+
+    expect(icsFetchCalls).toHaveLength(1);
+    expect(icsFetchCalls[0]).toMatchObject({
+      url: "https://example.com/public.ics",
+    });
+    const subscriptions = loadSubscriptions();
+    expect(subscriptions).toHaveLength(1);
+    expect(subscriptions[0]).toMatchObject({
+      provider: "ics",
+      status: "ok",
+      eventCount: 1,
+      lastError: "",
+    });
+
+    const schedules = loadSchedules();
+    expect(schedules).toHaveLength(1);
+    expect(schedules[0]).toMatchObject({
+      source: "subscription",
+      subscriptionId: subscriptions[0]?.id,
+      externalUid: "ics-uid-1",
+      title: "ICS event",
+      caldavObjectUrl: "",
+      googleEventId: "",
+    });
+  });
+
   it("Google購読追加時にアクティブアカウントを補完し、生成予定にも保持する", async () => {
     saveActiveGoogleAccount();
     const { ws, session } = makeRequester();
@@ -204,6 +289,7 @@ describe("subscription handlers", () => {
     const subscriptions = loadSubscriptions();
     expect(subscriptions).toHaveLength(1);
     expect(subscriptions[0]?.enabled).toBe(false);
+    expect(icsFetchCalls).toHaveLength(0);
   });
 
   it("Google購読編集時にcreatedAtを保持し、空のaccountIdを補完する", async () => {
@@ -255,5 +341,40 @@ describe("subscription handlers", () => {
       subscriptionId: "legacy-sub",
       googleAccountId: "active@example.com",
     });
+  });
+
+  it("全件refreshでICS購読も再取得する", async () => {
+    saveActiveGoogleAccount();
+    saveSubscriptions([
+      makeIcsSubscription({ id: "ics-sub" }),
+      makeGoogleSubscription({ id: "google-sub" }),
+    ]);
+    const { ws, session } = makeRequester();
+
+    await subscriptionRefresh(ws, session, { subscriptionId: "" });
+
+    expect(icsFetchCalls).toHaveLength(1);
+    expect(icsFetchCalls[0]).toMatchObject({
+      url: "https://example.com/public.ics",
+    });
+    expect(googleFetchCalls).toHaveLength(1);
+
+    const subscriptions = loadSubscriptions();
+    expect(subscriptions).toHaveLength(2);
+    expect(subscriptions.find((s) => s.id === "ics-sub")).toMatchObject({
+      status: "ok",
+      eventCount: 1,
+    });
+    expect(subscriptions.find((s) => s.id === "google-sub")).toMatchObject({
+      status: "ok",
+      eventCount: 1,
+    });
+
+    const schedules = loadSchedules();
+    expect(schedules).toHaveLength(2);
+    expect(schedules.map((s) => s.subscriptionId).sort()).toEqual([
+      "google-sub",
+      "ics-sub",
+    ]);
   });
 });
