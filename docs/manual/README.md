@@ -27,9 +27,19 @@ docs/manual/
 Playwright で todome 本体を起動し、デモデータを投入→各画面を撮影する。
 
 ```bash
-cd e2e
-npm install            # 初回のみ
+bun install            # 初回のみ: サーバー依存
+cd client
+npm install            # 初回のみ: client ビルド依存
+cd ../e2e
+npm install            # 初回のみ: Playwright 依存
 npx playwright install # 初回のみ
+npm run capture        # client ビルド → data-manual/ 初期化 → スクショ生成
+```
+
+`client/node_modules` と `node_modules` が既にある場合は、次回以降は `cd e2e && npm run capture` だけで更新できる。
+
+```bash
+cd e2e
 npm run capture        # client ビルド → data-manual/ 初期化 → スクショ生成
 ```
 

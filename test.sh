@@ -11,6 +11,11 @@ if [ ! -d "node_modules" ]; then
   bun install
 fi
 
+if [ ! -d "client/node_modules" ]; then
+  echo "==> installing client dependencies"
+  (cd client && npm install)
+fi
+
 cd client && npm run build
 cd ../e2e && npm ci
 rm -rf data-e2e test-results playwright-report
