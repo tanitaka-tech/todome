@@ -9,7 +9,7 @@
 - **統計ダッシュボード** — 目標別作業時間の円グラフ、日/月/年の推移棒グラフ
 - **プロフィール定義** — 現在の状態、バランスホイール、行動指針、やりたいことをAIコンテキストに反映
 - **GitHub連携** — 端末間でのデータを共有 & 目標にリポジトリを紐付けてAIコンテキストに反映 ([利用規約との関係](docs/github-sync-compliance.md))
-- **iCloudカレンダー連携 (CalDAV)** — Apple ID と App用パスワードで接続し、iCloud のカレンダーをスケジュールタブに読み込み（読み取り専用、RRULE 展開対応）
+- **カレンダー連携** — 公開 ICS URL / iCloud (CalDAV) / Google Calendar をスケジュールタブに読み込み、手動予定の書き戻しにも対応
 
 | Kanban形式でのタスク管理 | タスク管理をAIにお任せ | 目標もタスクもAIに相談 |
 |:---:|:---:|:---:|
@@ -89,9 +89,10 @@ cp .env.example .env
 | `ai_config.json` | AI ツール許可リストとモデル設定 |
 | `app_config.json` | 日の境界時刻などのアプリ設定 |
 | `caldav_config.json` | **iCloud (CalDAV) の Apple ID と App用パスワード**。接続切断時に削除されます。 |
+| `google_config.json` | **Google OAuth クライアント情報・更新トークン・接続アカウント情報**。接続解除時に削除/更新されます。 |
 | `repo/` | GitHub 連携時に clone されるリポジトリ（DB はここに切り替わる） |
 
-iCloud 連携を使う場合は [appleid.apple.com](https://appleid.apple.com) で **App用パスワード** を発行してください。Apple ID の本パスワードは絶対に入力しないでください。
+iCloud 連携を使う場合は [appleid.apple.com](https://appleid.apple.com) で **App用パスワード** を発行してください。Apple ID の本パスワードは絶対に入力しないでください。Google Calendar 連携を使う場合は Google Cloud Console で Calendar API と OAuth クライアントを設定し、スケジュールタブの購読設定から接続してください。
 
 ### 3. 依存関係をインストール
 

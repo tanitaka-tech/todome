@@ -34,6 +34,7 @@ calendar_subscriptions (id TEXT PRIMARY KEY, sort_order INTEGER, data TEXT)
 | `ai_config.json` | AI ツール許可リスト + モデル設定 |
 | `app_config.json` | `dayBoundaryHour` などのアプリ設定 |
 | `caldav_config.json` | iCloud (CalDAV) 接続情報 — `appleId` / `appPassword` / `connectedAt`。**App用パスワードを平文で保管**するため、`data/` の権限管理に注意。切断時に削除される。 |
+| `google_config.json` | Google Calendar 接続情報 — OAuth クライアント ID / Secret、接続アカウント、更新トークン、書き込み先カレンダー。**OAuth 認証情報を平文で保管**するため、`data/` の権限管理に注意。接続解除時に削除/更新される。 |
 
 ## データ構造
 
@@ -78,12 +79,13 @@ Schedule:
 
 CalendarSubscription:
   id, name, url, color, enabled
-  provider: "ics" | "caldav"
+  provider: "ics" | "caldav" | "google"
   caldavCalendarId                // provider=caldav のとき表示用
+  googleCalendarId, googleAccountId // provider=google のとき取得/書き戻し先の識別子
   status: "idle"|"fetching"|"ok"|"error", lastFetchedAt, lastError, eventCount
 ```
 
-`source="subscription"` の Schedule は `subscriptionRefresh` ハンドラが `replaceSubscriptionSchedules()` で **全置換** する（差分更新ではない）。CalDAV の RRULE / EXDATE / RECURRENCE-ID は `server/caldav/client.ts` の `parseAndExpand()` で **過去90日 〜 未来365日** の範囲に展開される。
+`source="subscription"` の Schedule は `subscriptionRefresh` ハンドラが `replaceSubscriptionSchedules()` で **全置換** する（差分更新ではない）。公開 ICS と CalDAV の RRULE / EXDATE / RECURRENCE-ID は `server/caldav/client.ts` の `parseAndExpand()` で **過去90日 〜 未来365日** の範囲に展開される。Google Calendar は Google Calendar API v3 の events list 結果を同じ Schedule 形へ変換する。
 
 ### 5. Chat / AI 関連 (クライアントのみ)
 `ChatMessage`, `AskUserRequest`, ストリーミング中の `streamText` / `thinkingText` — React state のみ。

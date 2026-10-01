@@ -1,5 +1,6 @@
 import { fetchEvents } from "../../caldav/client.ts";
 import { fetchEvents as fetchGoogleEvents } from "../../google/client.ts";
+import { fetchEvents as fetchIcsEvents } from "../../ics/client.ts";
 import { scheduleAutosync } from "../../github/autosync.ts";
 import { loadCalDAVConfig } from "../../storage/caldav.ts";
 import {
@@ -125,10 +126,7 @@ export const subscriptionAdd: Handler = async (_ws, session, data) => {
   saveSubscriptions([...existing, sub]);
   scheduleAutosync();
   broadcastSubscriptions(session);
-  // CalDAV / Google 購読は追加直後に 1 回フェッチして UI に出す
-  if (sub.provider === "caldav" || sub.provider === "google") {
-    await refreshOne(sub.id, session);
-  }
+  await refreshOne(sub.id, session);
 };
 
 export const subscriptionEdit: Handler = async (_ws, session, data) => {
@@ -250,9 +248,65 @@ async function refreshOne(id: string, session: SyncSession): Promise<void> {
     await refreshGoogle(target, session);
     return;
   }
-  // ICS フェッチは未実装。状態だけ idle に戻して終わる。
-  setSubscriptionState(id, { status: "idle" });
+  await refreshIcs(target, session);
+}
+
+async function refreshIcs(
+  target: CalendarSubscription,
+  session: SyncSession,
+): Promise<void> {
+  setSubscriptionState(target.id, { status: "fetching", lastError: "" });
   broadcastSubscriptions(session);
+
+  const range = expandRange();
+  const result = await fetchIcsEvents({
+    url: target.url,
+    rangeStartMs: range.startMs,
+    rangeEndMs: range.endMs,
+    tzid: effectiveTimezone(),
+  });
+
+  if (!result.ok) {
+    setSubscriptionState(target.id, {
+      status: "error",
+      lastError: result.error,
+      lastFetchedAt: nowLocalIso(),
+    });
+    broadcastSubscriptions(session);
+    return;
+  }
+
+  const now = nowLocalIso();
+  const schedules: Schedule[] = result.schedules.map((part, i) => ({
+    id: `${target.id}:${i}`,
+    source: "subscription",
+    subscriptionId: target.id,
+    externalUid: part.externalUid,
+    title: part.title,
+    description: part.description,
+    location: part.location,
+    start: part.start,
+    end: part.end,
+    allDay: part.allDay,
+    rrule: part.rrule,
+    recurrenceId: part.recurrenceId,
+    createdAt: now,
+    updatedAt: now,
+    caldavObjectUrl: "",
+    caldavEtag: "",
+    googleEventId: "",
+    googleAccountId: "",
+  }));
+  replaceSubscriptionSchedules(target.id, schedules);
+  setSubscriptionState(target.id, {
+    status: "ok",
+    lastError: "",
+    lastFetchedAt: now,
+    eventCount: schedules.length,
+  });
+  scheduleAutosync();
+  broadcastSubscriptions(session);
+  broadcastSchedules(session);
 }
 
 async function refreshCalDAV(
@@ -399,7 +453,6 @@ export const subscriptionRefresh: Handler = async (_ws, session, data) => {
   const subs = loadSubscriptions();
   for (const s of subs) {
     if (!s.enabled) continue;
-    if (s.provider !== "caldav" && s.provider !== "google") continue;
     await refreshOne(s.id, session);
   }
 };
