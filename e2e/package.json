@@ -16,7 +16,7 @@
     "animate": "npm run animate:capture && npm run animate:build"
   },
   "devDependencies": {
-    "@playwright/test": "^1.62.1",
+    "@playwright/test": "^1.64.0",
     "@types/node": "^26.4.0"
   }
 }
